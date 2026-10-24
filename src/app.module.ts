@@ -4,6 +4,8 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { ConfigModule } from '@nestjs/config';
 import Joi from 'joi';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -16,8 +18,11 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
-      envFilePath:
-        process.env.NODE_ENV === 'production' ? '.env.prod' : '.env.dev',
+      envFilePath: existsSync(resolve('.env'))
+        ? '.env'
+        : process.env.NODE_ENV === 'production'
+          ? '.env.prod'
+          : '.env.dev',
       validationSchema: Joi.object({
         NODE_ENV: Joi.string()
           .valid('development', 'test', 'production')
