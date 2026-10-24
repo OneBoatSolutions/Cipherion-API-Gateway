@@ -13,3 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Better Auth configuration with email/password sign-in, database sessions and database-backed rate limiting.
 - README covering the gateway's purpose, architecture, setup, environment variables and deployment.
 - AGENTS.md / CLAUDE.md describing the agent workflow (approval → CHANGELOG/ROADMAP updates, `cm` commit shorthand).
+- CHANGELOG.md and ROADMAP.md.
+
+### Changed
+
+- `.env.example` now includes `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`.

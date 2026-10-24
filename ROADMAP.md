@@ -11,7 +11,7 @@
 - [x] Better Auth configuration
 - [x] NestJS Observe instrumentation
 - [x] README and agent workflow docs
-- [ ] Add `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` to `.env.example`
+- [x] Add `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` to `.env.example`
 - [ ] Add `dotenv` to dev dependencies (needed by `prisma7.config.ts`)
 - [ ] Initial database migration
 
