@@ -1,126 +1,262 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Cipherion API Gateway
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A unified API gateway for the Cipherion product suite. It gives clients a single entry point, with shared authentication, rate limiting, validation and observability, in front of these services:
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+| Service | Description |
+| --- | --- |
+| **Cipherion Enqrypt** | Encryption service |
+| **Zentriq** | Zentriq service |
+| **Cipsec** | Security service |
+| **Dashboard** | Cipherion web dashboard (the main browser client of the gateway) |
 
-## Description
+> **Status:** early development. The core runtime (NestJS on Fastify, environment validation, Prisma/PostgreSQL, Better Auth and Nest Observe) is set up. Routing to the upstream services has not been built yet.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+---
 
-## Project setup
+## Architecture
 
-```bash
-$ npm install
+```
+                 ┌──────────────────────────────────────────┐
+  Dashboard ───► │          Cipherion API Gateway           │ ───► Cipherion Enqrypt
+  API clients ─► │  Auth · Rate limit · Validation · Tracing│ ───► Zentriq
+                 │                                          │ ───► Cipsec
+                 └───────────────────┬──────────────────────┘
+                                     │
+                                PostgreSQL
+                     (users, sessions, rate limits)
 ```
 
-## Compile and run the project
+**Responsibilities**
+
+- **Authentication**: email/password sign-in and database-backed sessions through [Better Auth](https://better-auth.com). Sessions last 7 days and are refreshed every 24 hours.
+- **Rate limiting**: 100 requests per 60-second window, stored in PostgreSQL so the limit holds across instances.
+- **Request validation**: a global `ValidationPipe` that removes unknown fields, rejects requests containing them, and returns errors in one consistent format.
+- **Configuration safety**: environment variables are checked with Joi when the app starts, so a misconfigured deployment fails immediately.
+- **Observability**: tracing, metrics, logs and error tracking through [NestJS Observe](https://observe.nestjs.com).
+- **Routing** *(planned)*: forwarding requests to Enqrypt, Zentriq, Cipsec and the dashboard backend.
+
+## Tech stack
+
+| Area | Technology |
+| --- | --- |
+| Runtime | Node.js 22+, TypeScript (ESM) |
+| Framework | NestJS 12 with the Fastify adapter |
+| Database | PostgreSQL, Prisma ORM 7 (`@prisma/adapter-pg` driver adapter) |
+| Auth | Better Auth with the Prisma adapter |
+| Validation | class-validator, class-transformer, Joi (environment) |
+| Observability | `@nestjs/observe` |
+| Tooling | Vitest, oxlint, Prettier |
+
+## Project structure
+
+```
+.
+├── prisma/
+│   └── schema.prisma        # Database schema (User, Session, Account, Verification, RateLimit)
+├── prisma7.config.ts        # Prisma config; loads .env.dev / .env.prod / .env.test from NODE_ENV
+├── src/
+│   ├── main.ts              # Bootstrap: Fastify adapter, global ValidationPipe, port binding
+│   ├── app.module.ts        # Root module: ConfigModule (Joi validation) and ObserveModule
+│   ├── auth.ts              # Better Auth configuration
+│   ├── lib/prisma.ts        # Shared PrismaClient
+│   └── generated/prisma/    # Generated Prisma Client (do not edit by hand)
+├── test/                    # End-to-end tests
+├── .env.example             # Template for environment variables
+└── package.json
+```
+
+---
+
+## Getting started
+
+### Prerequisites
+
+- **Node.js** 22 or later, and npm
+- **PostgreSQL** 14 or later, running locally, in Docker, or hosted
+
+To run PostgreSQL quickly with Docker:
+
+```bash
+docker run -d --name cipherion-postgres \
+  -e POSTGRES_PASSWORD=password \
+  -e POSTGRES_DB=cipherion_gateway \
+  -p 5432:5432 postgres:16
+```
+
+### 1. Clone and install
+
+```bash
+git clone <repository-url>
+cd Cipherion-API_Gateway
+npm install
+```
+
+### 2. Configure the environment
+
+Copy the template and fill in your values:
+
+```bash
+cp .env.example .env.dev
+```
+
+The application loads its environment file in this order:
+
+1. `.env`, if it exists
+2. Otherwise `.env.prod` when `NODE_ENV=production`
+3. Otherwise `.env.dev`
+
+The Prisma CLI (`prisma7.config.ts`) chooses `.env.dev`, `.env.prod` or `.env.test` based on `NODE_ENV`.
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `NODE_ENV` | No | `development` | `development`, `test` or `production` |
+| `PORT` | No | `3000` | Port the gateway listens on (binds to `0.0.0.0`) |
+| `DATABASE_URL` | **Yes** | – | PostgreSQL connection string, e.g. `postgresql://postgres:password@localhost:5432/cipherion_gateway` |
+| `BETTER_AUTH_SECRET` | **Yes** | – | Secret used to sign sessions. Must be **at least 32 characters** |
+| `BETTER_AUTH_URL` | **Yes** | – | Public base URL of the gateway, e.g. `http://localhost:3000` |
+| `AUTH_TRUSTED_ORIGINS` | **Yes** | – | Comma-separated list of origins allowed to call auth endpoints (for example, the dashboard URL) |
+| `OBSERVE_APP_KEY` | No | – | NestJS Observe app key |
+| `OBSERVE_APP_SECRET` | No | – | NestJS Observe app secret |
+
+To generate a strong `BETTER_AUTH_SECRET`:
+
+```bash
+openssl rand -base64 32
+# or
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+Example `.env.dev`:
+
+```env
+NODE_ENV=development
+PORT=3000
+
+DATABASE_URL=postgresql://postgres:password@localhost:5432/cipherion_gateway
+
+BETTER_AUTH_SECRET=replace-with-a-random-string-of-at-least-32-chars
+BETTER_AUTH_URL=http://localhost:3000
+AUTH_TRUSTED_ORIGINS="http://localhost:3000,http://localhost:5173"
+```
+
+> Never commit `.env`, `.env.dev` or `.env.prod`. Only `.env.example` belongs in version control.
+
+### 3. Set up the database
+
+The Prisma config file is named `prisma7.config.ts`, so pass it to every Prisma command with `--config`:
+
+```bash
+# Generate the Prisma Client into src/generated/prisma
+npx prisma generate --config prisma7.config.ts
+
+# Create and apply migrations (development)
+npx prisma migrate dev --name init --config prisma7.config.ts
+```
+
+Optionally, open Prisma Studio to browse the data:
+
+```bash
+npx prisma studio --config prisma7.config.ts
+```
+
+### 4. Run the gateway
 
 ```bash
 # development
-$ npm run start
+npm run start
 
-# watch mode
-$ npm run start:dev
+# watch mode (recommended for local work)
+npm run start:dev
 
-# production mode
-$ npm run start:prod
+# debug mode with watch
+npm run start:debug
 ```
 
-## Run tests
+The gateway starts on `http://localhost:3000` (or on `PORT` if set). To check that it is running:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+curl http://localhost:3000/
 ```
+
+---
+
+## Scripts
+
+| Command | Description |
+| --- | --- |
+| `npm run start` | Start the app |
+| `npm run start:dev` | Start in watch mode |
+| `npm run start:debug` | Start in debug mode with watch |
+| `npm run build` | Compile to `dist/` |
+| `npm run start:prod` | Run the compiled build (`node dist/main`) |
+| `npm run lint` | Lint `src/` and `test/` with oxlint (type-aware) |
+| `npm run format` | Format code with Prettier |
+| `npm run test` | Run unit tests (Vitest) |
+| `npm run test:watch` | Run unit tests in watch mode |
+| `npm run test:cov` | Run unit tests with coverage |
+| `npm run test:e2e` | Run end-to-end tests |
+
+## Validation error format
+
+Requests that fail DTO validation return `400 Bad Request` in this format:
+
+```json
+{
+  "message": "Validation failed",
+  "errors": [
+    { "property": "email", "constraints": ["email must be an email"] }
+  ]
+}
+```
+
+---
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+1. Set `NODE_ENV=production` and provide every required variable through the host's environment or `.env.prod`.
+2. Install dependencies, generate the client and build:
+   ```bash
+   npm ci
+   npx prisma generate --config prisma7.config.ts
+   npm run build
+   ```
+3. Apply migrations. Use `migrate deploy` in production, never `migrate dev`:
+   ```bash
+   NODE_ENV=production npx prisma migrate deploy --config prisma7.config.ts
+   ```
+4. Start the gateway:
+   ```bash
+   npm run start:prod
+   ```
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+**Production checklist**
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+- `BETTER_AUTH_SECRET` is unique for each environment and at least 32 characters long.
+- `BETTER_AUTH_URL` uses `https://`. Secure cookies are turned on automatically when `NODE_ENV=production`.
+- `AUTH_TRUSTED_ORIGINS` lists only the real dashboard and client origins.
+- `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` are set so that telemetry is sent.
 
 ## Observability
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
-
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
-
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
-
-This project is already instrumented. To connect it, run this and approve the code it prints at [observe.nestjs.com/link](https://observe.nestjs.com/link) - signing up for free if you have no account:
+The gateway is instrumented with NestJS Observe under the service ID `Cipherion-API_Gateway`. To connect it locally:
 
 ```bash
-$ npx @nestjs/observe link
+npx @nestjs/observe link
 ```
 
-It writes the app key and secret into `.env` and makes every `nest start` script (`start`, `start:dev`, `start:debug`) load it. In production, set `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` in the environment instead.
+In production, set `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` in the environment.
 
-Or do it by hand: create an application and an API key at [observe.nestjs.com](https://observe.nestjs.com), and set the pair as `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` in the environment the app runs in.
+---
 
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
+## Roadmap and changelog
 
-## Resources
+- Planned and completed work: [ROADMAP.md](ROADMAP.md)
+- Release notes: [CHANGELOG.md](CHANGELOG.md)
 
-Check out a few resources that may come in handy when working with NestJS:
+## Contributing
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Branch from `dev` (`feature/<name>`, `fix/<name>`), use [Conventional Commits](https://www.conventionalcommits.org), and open PRs into `dev`. Agent workflow rules are in [AGENTS.md](AGENTS.md).
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+UNLICENSED. Proprietary to OneBoat Solutions. All rights reserved.
