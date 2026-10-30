@@ -19,10 +19,12 @@
 
 ## Auth
 
-- [ ] Load env before `auth.ts` / `lib/prisma.ts` are imported (they read `process.env` at import time)
-- [ ] Mount the Better Auth handler on the gateway
+- [x] Load env before `auth.ts` / `lib/prisma.ts` are imported (they read `process.env` at import time)
+- [x] Mount the Better Auth handler on the gateway (`/api/v1/auth/*`)
+- [x] CORS for trusted origins
 - [ ] Auth guard for protected routes
 - [ ] API keys for service-to-service and programmatic clients
+- [ ] Separate `.env.test` database for e2e tests (they currently use the `.env.dev` database)
 
 ## Gateway routing
 

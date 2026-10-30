@@ -1,14 +1,10 @@
 import { NestFactory } from '@nestjs/core';
 import {
-  BadRequestException,
-  ValidationError,
-  ValidationPipe,
-} from '@nestjs/common';
-import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { AppModule, ObserveInstrument } from './app.module.js';
+import { configureApp } from './app.setup.js';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -19,28 +15,7 @@ async function bootstrap() {
     },
   );
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      forbidUnknownValues: true,
-      stopAtFirstError: false,
-      exceptionFactory: (validationErrors: ValidationError[] = []) => {
-        const errors = validationErrors.map((error) => ({
-          property: error.property,
-          constraints: error.constraints
-            ? Object.values(error.constraints)
-            : [],
-        }));
-
-        return new BadRequestException({
-          message: 'Validation failed',
-          errors,
-        });
-      },
-    }),
-  );
+  configureApp(app);
 
   const port = Number(process.env.PORT ?? 3000);
 
