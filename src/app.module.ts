@@ -4,8 +4,8 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { ConfigModule } from '@nestjs/config';
 import Joi from 'joi';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { AuthModule } from './auth/auth.module.js';
+import { envFilePath } from './config/env.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -18,11 +18,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
-      envFilePath: existsSync(resolve('.env'))
-        ? '.env'
-        : process.env.NODE_ENV === 'production'
-          ? '.env.prod'
-          : '.env.dev',
+      envFilePath,
       validationSchema: Joi.object({
         NODE_ENV: Joi.string()
           .valid('development', 'test', 'production')
@@ -50,6 +46,8 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       appSecret: process.env.OBSERVE_APP_SECRET ?? 'YOUR_APP_SECRET',
       serviceId: 'Cipherion-API_Gateway',
     }),
+
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

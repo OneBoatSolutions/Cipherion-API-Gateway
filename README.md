@@ -9,7 +9,7 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 | **Cipsec** | Security service |
 | **Dashboard** | Cipherion web dashboard (the main browser client of the gateway) |
 
-> **Status:** early development. The core runtime (NestJS on Fastify, environment validation, Prisma/PostgreSQL, Better Auth and Nest Observe) is set up. Routing to the upstream services has not been built yet.
+> **Status:** early development. The core runtime (NestJS on Fastify, environment validation, Prisma/PostgreSQL, Better Auth and Nest Observe) is set up, and the auth endpoints are live under `/api/v1/auth`. Routing to the upstream services has not been built yet.
 
 ---
 
@@ -56,9 +56,12 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 │   └── migrations/          # Prisma migrations (commit every migration)
 ├── prisma7.config.ts        # Prisma config; loads .env.dev / .env.prod / .env.test from NODE_ENV
 ├── src/
-│   ├── main.ts              # Bootstrap: Fastify adapter, global ValidationPipe, port binding
-│   ├── app.module.ts        # Root module: ConfigModule (Joi validation) and ObserveModule
+│   ├── main.ts              # Bootstrap: Fastify adapter, configureApp(), port binding
+│   ├── app.setup.ts         # configureApp(): /api/v1 prefix, CORS, global ValidationPipe
+│   ├── app.module.ts        # Root module: ConfigModule (Joi validation), ObserveModule, AuthModule
+│   ├── config/env.ts        # Loads the env file before anything reads process.env
 │   ├── auth.ts              # Better Auth configuration
+│   ├── auth/                # AuthController: forwards /api/v1/auth/* to Better Auth
 │   ├── lib/prisma.ts        # Shared PrismaClient
 │   └── generated/prisma/    # Generated Prisma Client (do not edit by hand)
 ├── test/                    # End-to-end tests
@@ -173,10 +176,10 @@ npm run start:dev
 npm run start:debug
 ```
 
-The gateway starts on `http://localhost:3000` (or on `PORT` if set). To check that it is running:
+The gateway starts on `http://localhost:3000` (or on `PORT` if set). Every route is served under the `/api/v1` prefix. To check that it is running:
 
 ```bash
-curl http://localhost:3000/
+curl http://localhost:3000/api/v1
 ```
 
 ---
@@ -196,6 +199,33 @@ curl http://localhost:3000/
 | `npm run test:watch` | Run unit tests in watch mode |
 | `npm run test:cov` | Run unit tests with coverage |
 | `npm run test:e2e` | Run end-to-end tests |
+
+## Auth endpoints
+
+Better Auth is mounted at `/api/v1/auth/*`. Sessions are returned as cookies, and browsers can only call these endpoints from an origin listed in `AUTH_TRUSTED_ORIGINS` (CORS with credentials). Better Auth also checks the `Origin` header of state-changing requests against that list, so the curl examples below send one.
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/api/v1/auth/sign-up/email` | Create an account (`name`, `email`, `password`) |
+| `POST` | `/api/v1/auth/sign-in/email` | Sign in (`email`, `password`) and receive the session cookie |
+| `GET` | `/api/v1/auth/get-session` | Current user and session, or `null` |
+| `POST` | `/api/v1/auth/sign-out` | End the current session |
+
+```bash
+# sign up, then sign in and store the session cookie
+curl -X POST http://localhost:3000/api/v1/auth/sign-up/email \
+  -H 'Content-Type: application/json' -H 'Origin: http://localhost:3000' \
+  -d '{"name":"Jane","email":"jane@example.com","password":"a-strong-password"}'
+
+curl -X POST http://localhost:3000/api/v1/auth/sign-in/email -c cookies.txt \
+  -H 'Content-Type: application/json' -H 'Origin: http://localhost:3000' \
+  -d '{"email":"jane@example.com","password":"a-strong-password"}'
+
+# read the session with the stored cookie
+curl http://localhost:3000/api/v1/auth/get-session -b cookies.txt
+```
+
+The e2e tests (`npm run test:e2e`) exercise these endpoints against the `.env.dev` database and delete the test user afterwards.
 
 ## Validation error format
 

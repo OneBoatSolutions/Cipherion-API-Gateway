@@ -1,13 +1,10 @@
+import { trustedOrigins } from './config/env.js';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { prisma } from './lib/prisma.js';
 
 const authSecret = process.env.BETTER_AUTH_SECRET;
 const authUrl = process.env.BETTER_AUTH_URL;
-const trustedOrigins = (process.env.AUTH_TRUSTED_ORIGINS ?? '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
 
 if (!authSecret || authSecret.length < 32) {
   throw new Error('BETTER_AUTH_SECRET must be configured securely');
@@ -25,6 +22,7 @@ export const auth = betterAuth({
   appName: 'Cipherion',
   secret: authSecret,
   baseURL: authUrl,
+  basePath: '/api/v1/auth',
   trustedOrigins,
 
   database: prismaAdapter(prisma, {
