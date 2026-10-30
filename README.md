@@ -52,7 +52,8 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 ```
 .
 ├── prisma/
-│   └── schema.prisma        # Database schema (User, Session, Account, Verification, RateLimit)
+│   ├── schema.prisma        # Database schema (User, Session, Account, Verification, RateLimit)
+│   └── migrations/          # Prisma migrations (commit every migration)
 ├── prisma7.config.ts        # Prisma config; loads .env.dev / .env.prod / .env.test from NODE_ENV
 ├── src/
 │   ├── main.ts              # Bootstrap: Fastify adapter, global ValidationPipe, port binding

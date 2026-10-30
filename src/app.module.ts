@@ -34,6 +34,12 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
           .uri({ scheme: ['postgresql', 'postgres'] })
           .required(),
 
+        BETTER_AUTH_SECRET: Joi.string().min(32).required(),
+        BETTER_AUTH_URL: Joi.string()
+          .uri({ scheme: ['http', 'https'] })
+          .required(),
+        AUTH_TRUSTED_ORIGINS: Joi.string().required(),
+
         OBSERVE_APP_KEY: Joi.string().optional(),
         OBSERVE_APP_SECRET: Joi.string().optional(),
       }),
