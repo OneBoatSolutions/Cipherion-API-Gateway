@@ -9,7 +9,7 @@ import { configureApp } from './../src/app.setup.js';
 import type { AuthUser } from './../src/auth/auth.types.js';
 import { CurrentUser } from './../src/auth/decorators/current-user.decorator.js';
 import { trustedOrigins } from './../src/config/env.js';
-import { prisma } from './../src/lib/prisma.js';
+import { deleteTestUser } from './helpers/delete-test-user.js';
 
 // Test-only route, so the guard can be exercised without a production endpoint.
 @Controller('guard-test')
@@ -42,7 +42,7 @@ describe('AuthGuard (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany({ where: { email } });
+    await deleteTestUser(email);
     await app.close();
   });
 

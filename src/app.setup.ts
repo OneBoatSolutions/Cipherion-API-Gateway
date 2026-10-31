@@ -11,6 +11,7 @@ export const API_PREFIX = 'api/v1';
 // Shared by main.ts and the e2e tests so both run the same app configuration.
 export function configureApp(app: NestFastifyApplication): void {
   app.setGlobalPrefix(API_PREFIX);
+  app.enableShutdownHooks();
 
   app.enableCors({
     origin: trustedOrigins,

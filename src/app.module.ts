@@ -1,11 +1,13 @@
-import { Module } from '@nestjs/common';
+import { Module, OnApplicationShutdown } from '@nestjs/common';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { ConfigModule } from '@nestjs/config';
-import Joi from 'joi';
 import { AuthModule } from './auth/auth.module.js';
 import { envFilePath } from './config/env.js';
+import { envSchema } from './config/env.schema.js';
+import { prisma } from './lib/prisma.js';
+import { redis } from './lib/redis.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -19,26 +21,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       isGlobal: true,
       cache: true,
       envFilePath,
-      validationSchema: Joi.object({
-        NODE_ENV: Joi.string()
-          .valid('development', 'test', 'production')
-          .default('development'),
-
-        PORT: Joi.number().port().default(3000),
-
-        DATABASE_URL: Joi.string()
-          .uri({ scheme: ['postgresql', 'postgres'] })
-          .required(),
-
-        BETTER_AUTH_SECRET: Joi.string().min(32).required(),
-        BETTER_AUTH_URL: Joi.string()
-          .uri({ scheme: ['http', 'https'] })
-          .required(),
-        AUTH_TRUSTED_ORIGINS: Joi.string().required(),
-
-        OBSERVE_APP_KEY: Joi.string().optional(),
-        OBSERVE_APP_SECRET: Joi.string().optional(),
-      }),
+      validationSchema: envSchema,
     }),
 
     ObserveModule.forRoot({
@@ -52,4 +35,9 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements OnApplicationShutdown {
+  // The shared clients live for the whole process, so close them with the app.
+  async onApplicationShutdown(): Promise<void> {
+    await Promise.allSettled([redis.quit(), prisma.$disconnect()]);
+  }
+}

@@ -6,7 +6,8 @@ import {
 import { AppModule } from './../src/app.module.js';
 import { configureApp } from './../src/app.setup.js';
 import { trustedOrigins } from './../src/config/env.js';
-import { prisma } from './../src/lib/prisma.js';
+import { redis } from './../src/lib/redis.js';
+import { deleteTestUser } from './helpers/delete-test-user.js';
 
 // Runs against the .env.dev database; the test user is removed afterwards.
 describe('Auth (e2e)', () => {
@@ -29,7 +30,7 @@ describe('Auth (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany({ where: { email } });
+    await deleteTestUser(email);
     await app.close();
   });
 
@@ -65,6 +66,41 @@ describe('Auth (e2e)', () => {
 
     expect(session.statusCode).toBe(200);
     expect(session.json().user.email).toBe(email);
+  });
+
+  it('caches the session in Redis and revokes it on sign-out', async () => {
+    const signIn = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/sign-in/email',
+      headers: { origin },
+      payload: { email, password },
+    });
+    const cookie = signIn.cookies
+      .map(({ name, value }) => `${name}=${value}`)
+      .join('; ');
+    const getSession = () =>
+      app.inject({
+        method: 'GET',
+        url: '/api/v1/auth/get-session',
+        headers: { cookie },
+      });
+
+    const { token } = (await getSession()).json().session;
+    expect(await redis.get(token)).not.toBeNull();
+
+    // A missing Redis entry falls back to the database copy.
+    await redis.del(token);
+    expect((await getSession()).json().user.email).toBe(email);
+
+    const signOut = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/sign-out',
+      headers: { origin, cookie },
+      payload: {},
+    });
+    expect(signOut.statusCode).toBe(200);
+    expect(await redis.get(token)).toBeNull();
+    expect((await getSession()).json()).toBeNull();
   });
 
   it('returns no session without a cookie', async () => {

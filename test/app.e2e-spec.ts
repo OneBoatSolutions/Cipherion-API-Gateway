@@ -9,7 +9,8 @@ import { configureApp } from './../src/app.setup.js';
 describe('AppController (e2e)', () => {
   let app: NestFastifyApplication;
 
-  beforeEach(async () => {
+  // One app per file: closing it also closes the shared Prisma and Redis clients.
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -29,7 +30,7 @@ describe('AppController (e2e)', () => {
     expect(response.body).toBe('Hello Cipherion :)');
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     await app.close();
   });
 });

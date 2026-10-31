@@ -9,7 +9,7 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 | **Cipsec** | Security service |
 | **Dashboard** | Cipherion web dashboard (the main browser client of the gateway) |
 
-> **Status:** early development. The core runtime (NestJS on Fastify, environment validation, Prisma/PostgreSQL, Better Auth and Nest Observe) is set up, and the auth endpoints are live under `/api/v1/auth`. Routing to the upstream services has not been built yet.
+> **Status:** early development. The core runtime (NestJS on Fastify, environment validation, Prisma/PostgreSQL, Redis, Better Auth and Nest Observe) is set up, and the auth endpoints are live under `/api/v1/auth`. Routing to the upstream services has not been built yet.
 
 ---
 
@@ -20,16 +20,16 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
   Dashboard ───► │          Cipherion API Gateway           │ ───► Cipherion Enqrypt
   API clients ─► │  Auth · Rate limit · Validation · Tracing│ ───► Zentriq
                  │                                          │ ───► Cipsec
-                 └───────────────────┬──────────────────────┘
-                                     │
-                                PostgreSQL
-                     (users, sessions, rate limits)
+                 └──────────┬────────────────────┬──────────┘
+                            │                    │
+                          Redis              PostgreSQL
+               (session cache, rate limits)  (users, sessions)
 ```
 
 **Responsibilities**
 
-- **Authentication**: email/password sign-in and database-backed sessions through [Better Auth](https://better-auth.com). Sessions last 7 days and are refreshed every 24 hours.
-- **Rate limiting**: 100 requests per 60-second window, stored in PostgreSQL so the limit holds across instances.
+- **Authentication**: email/password sign-in through [Better Auth](https://better-auth.com). Sessions last 7 days and are refreshed every 24 hours. They are cached in Redis and also stored in PostgreSQL, which stays the source of truth: if a Redis entry is missing, the session is read from the database. Signing out removes the Redis entry, so a revoked session stops working immediately. If Redis is unreachable, auth fails closed: auth and protected routes answer `503 Service Unavailable` within about 2 seconds, and work again as soon as Redis is back.
+- **Rate limiting**: 100 requests per 60-second window, counted atomically in Redis so the limit holds across instances.
 - **Request validation**: a global `ValidationPipe` that removes unknown fields, rejects requests containing them, and returns errors in one consistent format.
 - **Configuration safety**: environment variables are checked with Joi when the app starts, so a misconfigured deployment fails immediately.
 - **Observability**: tracing, metrics, logs and error tracking through [NestJS Observe](https://observe.nestjs.com).
@@ -42,7 +42,8 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 | Runtime | Node.js 22+, TypeScript (ESM) |
 | Framework | NestJS 12 with the Fastify adapter |
 | Database | PostgreSQL, Prisma ORM 7 (`@prisma/adapter-pg` driver adapter) |
-| Auth | Better Auth with the Prisma adapter |
+| Cache | Redis 7, `ioredis` |
+| Auth | Better Auth with the Prisma adapter and Redis secondary storage |
 | Validation | class-validator, class-transformer, Joi (environment) |
 | Observability | `@nestjs/observe` |
 | Tooling | Vitest, oxlint, Prettier |
@@ -63,8 +64,9 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 │   ├── auth.ts              # Better Auth configuration
 │   ├── auth/                # AuthController (/api/v1/auth/*), global AuthGuard, @Public() / @CurrentUser()
 │   ├── lib/prisma.ts        # Shared PrismaClient
+│   ├── lib/redis.ts         # Shared Redis client (sessions, rate limits, caching)
 │   └── generated/prisma/    # Generated Prisma Client (do not edit by hand)
-├── test/                    # End-to-end tests
+├── test/                    # End-to-end tests (helpers/ cleans up test users in Postgres and Redis)
 ├── .env.example             # Template for environment variables
 └── package.json
 ```
@@ -77,14 +79,17 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 
 - **Node.js** 22 or later, and npm
 - **PostgreSQL** 14 or later, running locally, in Docker, or hosted
+- **Redis** 6.2 or later (`GETDEL` is required), running locally, in Docker, or hosted
 
-To run PostgreSQL quickly with Docker:
+To run both quickly with Docker:
 
 ```bash
 docker run -d --name cipherion-postgres \
   -e POSTGRES_PASSWORD=password \
   -e POSTGRES_DB=cipherion_gateway \
   -p 5432:5432 postgres:16
+
+docker run -d --name cipherion-redis -p 6379:6379 redis:7
 ```
 
 ### 1. Clone and install
@@ -119,6 +124,7 @@ The Prisma CLI (`prisma7.config.ts`) chooses `.env.dev`, `.env.prod` or `.env.te
 | `BETTER_AUTH_SECRET` | **Yes** | – | Secret used to sign sessions. Must be **at least 32 characters** |
 | `BETTER_AUTH_URL` | **Yes** | – | Public base URL of the gateway, e.g. `http://localhost:3000` |
 | `AUTH_TRUSTED_ORIGINS` | **Yes** | – | Comma-separated list of origins allowed to call auth endpoints (for example, the dashboard URL) |
+| `REDIS_URL` | **Yes** | – | Redis connection string (`redis://` or `rediss://` for TLS; `rediss://` is required when `NODE_ENV=production`), e.g. `redis://localhost:6379` |
 | `OBSERVE_APP_KEY` | No | – | NestJS Observe app key |
 | `OBSERVE_APP_SECRET` | No | – | NestJS Observe app secret |
 
@@ -141,6 +147,8 @@ DATABASE_URL=postgresql://postgres:password@localhost:5432/cipherion_gateway
 BETTER_AUTH_SECRET=replace-with-a-random-string-of-at-least-32-chars
 BETTER_AUTH_URL=http://localhost:3000
 AUTH_TRUSTED_ORIGINS="http://localhost:3000,http://localhost:5173"
+
+REDIS_URL=redis://localhost:6379
 ```
 
 > Never commit `.env`, `.env.dev` or `.env.prod`. Only `.env.example` belongs in version control.
@@ -225,7 +233,9 @@ curl -X POST http://localhost:3000/api/v1/auth/sign-in/email -c cookies.txt \
 curl http://localhost:3000/api/v1/auth/get-session -b cookies.txt
 ```
 
-The e2e tests (`npm run test:e2e`) exercise these endpoints against the `.env.dev` database and delete the test user afterwards.
+The e2e tests (`npm run test:e2e`) exercise these endpoints against the `.env.dev` database and Redis, and delete the test user and its cached sessions afterwards.
+
+> **Always delete users and revoke sessions through Better Auth** (`auth.api.*`), never with raw Prisma. Better Auth also removes the cached copy from Redis. A session deleted only from PostgreSQL stays valid in Redis until its TTL (up to 7 days) runs out.
 
 ## Protecting routes
 
@@ -293,6 +303,9 @@ Requests that fail DTO validation return `400 Bad Request` in this format:
 - `BETTER_AUTH_SECRET` is unique for each environment and at least 32 characters long.
 - `BETTER_AUTH_URL` uses `https://`. Secure cookies are turned on automatically when `NODE_ENV=production`.
 - `AUTH_TRUSTED_ORIGINS` lists only the real dashboard and client origins.
+- `REDIS_URL` points to a managed or replicated Redis over TLS. Startup is refused unless it uses `rediss://` when `NODE_ENV=production`. Auth requests answer `503` while Redis is unreachable.
+- Redis requires authentication: a dedicated ACL user with a strong password in the URL, e.g. `rediss://gateway:<password>@redis.internal:6380`. Never use the passwordless `default` user.
+- Redis is reachable only from the gateway's private network (VPC / security group / firewall); port 6379/6380 is never exposed to the public internet.
 - `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` are set so that telemetry is sent.
 
 ## Observability

@@ -2,12 +2,14 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { FastifyRequest } from 'fastify';
+import { APIError } from 'better-auth/api';
 import { fromNodeHeaders } from 'better-auth/node';
-import { auth } from '../auth.js';
+import { auth, SESSION_STORE_UNAVAILABLE } from '../auth.js';
 import { IS_PUBLIC_KEY } from './decorators/public.decorator.js';
 
 // Registered globally: every route needs a valid session unless it is @Public().
@@ -26,9 +28,15 @@ export class AuthGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<FastifyRequest>();
-    const result = await auth.api.getSession({
-      headers: fromNodeHeaders(request.headers),
-    });
+    const result = await auth.api
+      .getSession({ headers: fromNodeHeaders(request.headers) })
+      .catch((error: unknown) => {
+        // Without the session store the session can't be checked: fail closed with 503.
+        if (error instanceof APIError && error.statusCode === 503) {
+          throw new ServiceUnavailableException(SESSION_STORE_UNAVAILABLE);
+        }
+        throw error;
+      });
 
     if (!result) {
       throw new UnauthorizedException();
