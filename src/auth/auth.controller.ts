@@ -2,8 +2,10 @@ import { All, Controller, Req, Res } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../auth.js';
+import { Public } from './decorators/public.decorator.js';
 
 // Forwards every /api/v1/auth/* request to the Better Auth handler.
+@Public()
 @Controller('auth')
 export class AuthController {
   @All('*')

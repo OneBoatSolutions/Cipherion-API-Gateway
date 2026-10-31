@@ -26,7 +26,7 @@ describe('AppController (e2e)', () => {
     const response = await app.inject({ method: 'GET', url: '/api/v1' });
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toBe('Hello World!');
+    expect(response.body).toBe('Hello Cipherion :)');
   });
 
   afterEach(async () => {
