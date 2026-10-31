@@ -61,7 +61,7 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 │   ├── app.module.ts        # Root module: ConfigModule (Joi validation), ObserveModule, AuthModule
 │   ├── config/env.ts        # Loads the env file before anything reads process.env
 │   ├── auth.ts              # Better Auth configuration
-│   ├── auth/                # AuthController: forwards /api/v1/auth/* to Better Auth
+│   ├── auth/                # AuthController (/api/v1/auth/*), global AuthGuard, @Public() / @CurrentUser()
 │   ├── lib/prisma.ts        # Shared PrismaClient
 │   └── generated/prisma/    # Generated Prisma Client (do not edit by hand)
 ├── test/                    # End-to-end tests
@@ -226,6 +226,34 @@ curl http://localhost:3000/api/v1/auth/get-session -b cookies.txt
 ```
 
 The e2e tests (`npm run test:e2e`) exercise these endpoints against the `.env.dev` database and delete the test user afterwards.
+
+## Protecting routes
+
+A global `AuthGuard` runs before every route. Without a valid session cookie the request is rejected with `401 Unauthorized`, so **new routes are protected by default**.
+
+- `@Public()` on a route or controller lets requests through without a session. `GET /api/v1` and `/api/v1/auth/*` are public.
+- `@CurrentUser()` injects the signed-in user into a handler.
+
+```ts
+import { Controller, Get } from '@nestjs/common';
+import { Public } from './auth/decorators/public.decorator.js';
+import { CurrentUser } from './auth/decorators/current-user.decorator.js';
+import type { AuthUser } from './auth/auth.types.js';
+
+@Controller('example')
+export class ExampleController {
+  @Public()
+  @Get('status')
+  status() {
+    return { ok: true }; // reachable without signing in
+  }
+
+  @Get('me')
+  me(@CurrentUser() user: AuthUser) {
+    return { id: user.id, email: user.email }; // 401 when signed out
+  }
+}
+```
 
 ## Validation error format
 

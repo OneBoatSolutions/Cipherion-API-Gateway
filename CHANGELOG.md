@@ -22,6 +22,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `src/config/env.ts`, which loads the environment file before `auth.ts` and `lib/prisma.ts` read `process.env`.
 - `configureApp()` in `src/app.setup.ts`, shared by `main.ts` and the e2e tests.
 - Auth e2e tests covering sign-up, sign-in, get-session and CORS preflight.
+- Global `AuthGuard` that requires a valid Better Auth session on every route and returns `401 Unauthorized` without one; on success it sets `request.user` and `request.session`.
+- `@Public()` decorator to open a route or controller, and `@CurrentUser()` decorator to inject the signed-in user into a handler.
+- `AuthUser` / `AuthSession` types inferred from Better Auth, with `user` and `session` typed on `FastifyRequest`.
+- Unit tests for `AuthGuard` and e2e tests for protected routes and `@CurrentUser()`.
 
 ### Changed
 
@@ -29,6 +33,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `prisma7.config.ts` no longer imports `dotenv/config`, so `.env` can't override the `NODE_ENV`-specific env file.
 - All routes are now served under the global prefix `/api/v1` (`GET /` moved to `GET /api/v1`).
 - `dotenv` moved from dev dependencies to dependencies, since the app now loads env files at runtime.
+- Routes now require authentication by default; `/api/v1` and `/api/v1/auth/*` are marked `@Public()`.
+- `GET /api/v1` now returns `Hello Cipherion :)`.
+- `.gitignore` ignores `/playground`, a local login and landing page for trying the auth flow.
 
 ### Fixed
 
