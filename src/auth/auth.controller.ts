@@ -1,5 +1,6 @@
 import { All, Controller, Req, Res } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { APIError } from 'better-auth/api';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../auth.js';
 import { Public } from './decorators/public.decorator.js';
@@ -17,13 +18,22 @@ export class AuthController {
     const hasBody =
       req.method !== 'GET' && req.method !== 'HEAD' && req.body != null;
 
-    const response = await auth.handler(
-      new Request(url, {
-        method: req.method,
-        headers: fromNodeHeaders(req.headers),
-        body: hasBody ? JSON.stringify(req.body) : undefined,
-      }),
-    );
+    const response = await auth
+      .handler(
+        new Request(url, {
+          method: req.method,
+          headers: fromNodeHeaders(req.headers),
+          body: hasBody ? JSON.stringify(req.body) : undefined,
+        }),
+      )
+      .catch((error: unknown) => {
+        // The rate limiter runs before Better Auth's own error handling, so a
+        // failure there (e.g. Redis down, 503) is thrown instead of returned.
+        if (error instanceof APIError) {
+          return Response.json(error.body, { status: error.statusCode });
+        }
+        throw error;
+      });
 
     reply.status(response.status);
     response.headers.forEach((value, key) => {

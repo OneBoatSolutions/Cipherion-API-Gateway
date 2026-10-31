@@ -1,12 +1,20 @@
-import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  ExecutionContext,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { FastifyRequest } from 'fastify';
+import { APIError } from 'better-auth/api';
 import { AuthGuard } from './auth.guard.js';
 import { Public } from './decorators/public.decorator.js';
 
 const { getSession } = vi.hoisted(() => ({ getSession: vi.fn() }));
 
-vi.mock('../auth.js', () => ({ auth: { api: { getSession } } }));
+vi.mock('../auth.js', () => ({
+  auth: { api: { getSession } },
+  SESSION_STORE_UNAVAILABLE: 'Session store is unavailable.',
+}));
 
 @Public()
 class PublicController {
@@ -50,6 +58,23 @@ describe('AuthGuard', () => {
     await expect(
       guard.canActivate(contextFor(PrivateController, { headers: {} })),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('answers 503 when the session store is unavailable', async () => {
+    getSession.mockRejectedValue(new APIError('SERVICE_UNAVAILABLE'));
+
+    await expect(
+      guard.canActivate(contextFor(PrivateController, { headers: {} })),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it('rethrows other session lookup errors', async () => {
+    const error = new Error('database down');
+    getSession.mockRejectedValue(error);
+
+    await expect(
+      guard.canActivate(contextFor(PrivateController, { headers: {} })),
+    ).rejects.toBe(error);
   });
 
   it('attaches the user and session when the session is valid', async () => {
