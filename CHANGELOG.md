@@ -33,6 +33,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - e2e test for session caching, database fallback and revocation, and a `deleteTestUser` helper that cleans up both PostgreSQL and Redis.
 - Unit tests for the environment schema (`src/config/env.schema.spec.ts`) and for the `AuthGuard` 503 path.
 - Redis connection loss and recovery are logged once each through the Nest logger (`[Redis]`) instead of ioredis printing every failed reconnect.
+- Public health endpoints in a new `HealthModule`: `GET /api/v1/health` (liveness, never checks dependencies) and `GET /api/v1/ready` (readiness: PostgreSQL `SELECT 1` and Redis `PING`, `503` with the failing dependency when either is down or exceeds a 2-second timeout).
+- Unit and e2e tests for the health endpoints.
 
 ### Changed
 
