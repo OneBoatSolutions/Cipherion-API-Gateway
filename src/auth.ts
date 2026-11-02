@@ -1,7 +1,8 @@
-import { trustedOrigins } from './config/env.js';
+import { apiDocsEnabled, trustedOrigins } from './config/env.js';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { APIError } from 'better-auth/api';
+import { openAPI } from 'better-auth/plugins';
 import { prisma } from './lib/prisma.js';
 import { redis } from './lib/redis.js';
 
@@ -92,4 +93,9 @@ export const auth = betterAuth({
   advanced: {
     useSecureCookies: process.env.NODE_ENV === 'production',
   },
+
+  // Feeds the auth endpoints into the gateway's Swagger document. Its schema
+  // endpoint is public, so the plugin is left out entirely in production; its
+  // own Scalar page is disabled in favour of Swagger UI.
+  plugins: apiDocsEnabled ? [openAPI({ disableDefaultReference: true })] : [],
 });

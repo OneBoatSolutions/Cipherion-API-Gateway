@@ -35,6 +35,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Redis connection loss and recovery are logged once each through the Nest logger (`[Redis]`) instead of ioredis printing every failed reconnect.
 - Public health endpoints in a new `HealthModule`: `GET /api/v1/health` (liveness, never checks dependencies) and `GET /api/v1/ready` (readiness: PostgreSQL `SELECT 1` and Redis `PING`, `503` with the failing dependency when either is down or exceeds a 2-second timeout).
 - Unit and e2e tests for the health endpoints.
+- OpenAPI 3.1 documentation with `@nestjs/swagger`: Swagger UI at `/api/v1/docs` and the JSON document at `/api/v1/docs-json`, set up by `setupOpenApi()` in `src/openapi.ts`.
+- Better Auth's `openAPI()` plugin, whose generated endpoints are merged into the document under `/api/v1/auth` (tagged `auth`, with Better Auth's bearer/API-key security entries removed since the gateway uses the session cookie).
+- Swagger summaries and response schemas for the hello and health routes, including the `503` readiness response (`src/health/health.dto.ts`).
+- `@nestjs/swagger` and `@fastify/static` (required by Swagger UI on Fastify) dependencies.
+- Unit and e2e tests for the API docs.
 
 ### Changed
 
@@ -59,6 +64,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `REDIS_URL` must use TLS (`rediss://`) when `NODE_ENV` is `production`; startup fails otherwise.
 - Auth fails closed while Redis is down: sessions can't be read, created or revoked, so a session revoked during an outage can't come back from a stale cache.
 - README production checklist now requires a dedicated Redis ACL user with a strong password and Redis reachable only from the private network.
+- API docs are never served in production: Swagger UI, the JSON document and the Better Auth `openAPI()` plugin (whose schema endpoint is public) are only enabled when `NODE_ENV` isn't `production`. The wildcard auth route is hidden from the docs.
 
 ### Removed
 

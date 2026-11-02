@@ -1,11 +1,14 @@
 import { All, Controller, Req, Res } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { APIError } from 'better-auth/api';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../auth.js';
 import { Public } from './decorators/public.decorator.js';
 
-// Forwards every /api/v1/auth/* request to the Better Auth handler.
+// Forwards every /api/v1/auth/* request to the Better Auth handler. Swagger
+// lists Better Auth's own endpoints instead of this wildcard (see openapi.ts).
+@ApiExcludeController()
 @Public()
 @Controller('auth')
 export class AuthController {

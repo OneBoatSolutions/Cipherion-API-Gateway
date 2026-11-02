@@ -45,5 +45,6 @@
 
 - [x] Health and readiness endpoints (PostgreSQL and Redis)
 - [ ] Add each upstream service to the readiness check as it is routed
-- [ ] OpenAPI / Swagger documentation
+- [x] OpenAPI / Swagger documentation (`/api/v1/docs`, not served in production)
+- [ ] Drop the accepted `glob`/`minimatch` advisories (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249) once `@fastify/static` moves to glob 14; they only affect a startup glob over Swagger UI's own files
 - [ ] CI pipeline (lint, test, build)

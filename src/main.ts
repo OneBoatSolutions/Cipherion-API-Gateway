@@ -5,6 +5,7 @@ import {
 } from '@nestjs/platform-fastify';
 import { AppModule, ObserveInstrument } from './app.module.js';
 import { configureApp } from './app.setup.js';
+import { setupOpenApi } from './openapi.js';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -16,6 +17,7 @@ async function bootstrap() {
   );
 
   configureApp(app);
+  await setupOpenApi(app);
 
   const port = Number(process.env.PORT ?? 3000);
 
