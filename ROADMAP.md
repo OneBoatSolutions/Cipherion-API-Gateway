@@ -43,6 +43,7 @@
 
 ## Operations
 
-- [ ] Health and readiness endpoints, including each upstream service
+- [x] Health and readiness endpoints (PostgreSQL and Redis)
+- [ ] Add each upstream service to the readiness check as it is routed
 - [ ] OpenAPI / Swagger documentation
 - [ ] CI pipeline (lint, test, build)

@@ -59,10 +59,11 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 ├── src/
 │   ├── main.ts              # Bootstrap: Fastify adapter, configureApp(), port binding
 │   ├── app.setup.ts         # configureApp(): /api/v1 prefix, CORS, global ValidationPipe
-│   ├── app.module.ts        # Root module: ConfigModule (Joi validation), ObserveModule, AuthModule
+│   ├── app.module.ts        # Root module: ConfigModule (Joi validation), ObserveModule, AuthModule, HealthModule
 │   ├── config/env.ts        # Loads the env file before anything reads process.env
 │   ├── auth.ts              # Better Auth configuration
 │   ├── auth/                # AuthController (/api/v1/auth/*), global AuthGuard, @Public() / @CurrentUser()
+│   ├── health/              # Liveness (/api/v1/health) and readiness (/api/v1/ready) endpoints
 │   ├── lib/prisma.ts        # Shared PrismaClient
 │   ├── lib/redis.ts         # Shared Redis client (sessions, rate limits, caching)
 │   └── generated/prisma/    # Generated Prisma Client (do not edit by hand)
@@ -188,6 +189,7 @@ The gateway starts on `http://localhost:3000` (or on `PORT` if set). Every route
 
 ```bash
 curl http://localhost:3000/api/v1
+curl http://localhost:3000/api/v1/ready   # also checks PostgreSQL and Redis
 ```
 
 ---
@@ -237,11 +239,27 @@ The e2e tests (`npm run test:e2e`) exercise these endpoints against the `.env.de
 
 > **Always delete users and revoke sessions through Better Auth** (`auth.api.*`), never with raw Prisma. Better Auth also removes the cached copy from Redis. A session deleted only from PostgreSQL stays valid in Redis until its TTL (up to 7 days) runs out.
 
+## Health checks
+
+Both endpoints are public, so load balancers and orchestrators can call them without a session.
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/health` | Liveness: `200 {"status":"ok"}` whenever the process is running. It never checks dependencies, so a database or Redis outage doesn't get healthy instances restarted. |
+| `GET` | `/api/v1/ready` | Readiness: checks PostgreSQL (`SELECT 1`) and Redis (`PING`) together. `200` when both answer; `503` when either is down or takes longer than 2 seconds. |
+
+```json
+// GET /api/v1/ready while Redis is down → 503
+{ "status": "error", "checks": { "database": "up", "redis": "down" } }
+```
+
+The response only says `up` or `down` for each dependency, never error details.
+
 ## Protecting routes
 
 A global `AuthGuard` runs before every route. Without a valid session cookie the request is rejected with `401 Unauthorized`, so **new routes are protected by default**.
 
-- `@Public()` on a route or controller lets requests through without a session. `GET /api/v1` and `/api/v1/auth/*` are public.
+- `@Public()` on a route or controller lets requests through without a session. `GET /api/v1`, `/api/v1/auth/*`, `/api/v1/health` and `/api/v1/ready` are public.
 - `@CurrentUser()` injects the signed-in user into a handler.
 
 ```ts
@@ -306,6 +324,7 @@ Requests that fail DTO validation return `400 Bad Request` in this format:
 - `REDIS_URL` points to a managed or replicated Redis over TLS. Startup is refused unless it uses `rediss://` when `NODE_ENV=production`. Auth requests answer `503` while Redis is unreachable.
 - Redis requires authentication: a dedicated ACL user with a strong password in the URL, e.g. `rediss://gateway:<password>@redis.internal:6380`. Never use the passwordless `default` user.
 - Redis is reachable only from the gateway's private network (VPC / security group / firewall); port 6379/6380 is never exposed to the public internet.
+- The load balancer or orchestrator uses `/api/v1/health` as the liveness probe and `/api/v1/ready` as the readiness probe, so instances stop receiving traffic while PostgreSQL or Redis is unreachable.
 - `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` are set so that telemetry is sent.
 
 ## Observability
