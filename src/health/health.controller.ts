@@ -1,30 +1,45 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
+import {
+  ApiOkResponse,
+  ApiOperation,
+  ApiServiceUnavailableResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { prisma } from '../lib/prisma.js';
 import { redis } from '../lib/redis.js';
+import {
+  CheckStatus,
+  LivenessResponse,
+  ReadinessResponse,
+} from './health.dto.js';
 
 // A dependency that doesn't answer within this time counts as down.
 export const CHECK_TIMEOUT_MS = 2000;
 
-export type CheckStatus = 'up' | 'down';
-
-export interface ReadinessResponse {
-  status: 'ok' | 'error';
-  checks: { database: CheckStatus; redis: CheckStatus };
-}
-
+@ApiTags('health')
 @Public()
 @Controller()
 export class HealthController {
   // Liveness: the process is running. It never checks dependencies, so a
   // database or Redis outage doesn't get healthy instances restarted.
+  @ApiOperation({ summary: 'Liveness probe: the process is running' })
+  @ApiOkResponse({ type: LivenessResponse })
   @Get('health')
-  health(): { status: 'ok' } {
+  health(): LivenessResponse {
     return { status: 'ok' };
   }
 
   // Readiness: the instance can serve traffic. A 503 tells the load balancer
   // to stop routing requests here until the dependencies are back.
+  @ApiOperation({
+    summary: 'Readiness probe: PostgreSQL and Redis are reachable',
+  })
+  @ApiOkResponse({ type: ReadinessResponse })
+  @ApiServiceUnavailableResponse({
+    type: ReadinessResponse,
+    description: 'A dependency is down or slower than 2 seconds',
+  })
   @Get('ready')
   async ready(): Promise<ReadinessResponse> {
     const [database, cache] = await Promise.all([

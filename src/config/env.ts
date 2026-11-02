@@ -13,6 +13,10 @@ export const envFilePath = existsSync(resolve('.env'))
 
 dotenv.config({ path: envFilePath, quiet: true });
 
+// API docs (Swagger UI and Better Auth's schema endpoint) are never served in
+// production, so the full API surface isn't advertised publicly.
+export const apiDocsEnabled = process.env.NODE_ENV !== 'production';
+
 export const trustedOrigins = (process.env.AUTH_TRUSTED_ORIGINS ?? '')
   .split(',')
   .map((origin) => origin.trim())
