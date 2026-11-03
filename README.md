@@ -1,15 +1,15 @@
 # Cipherion API Gateway
 
-A unified API gateway for the Cipherion product suite. It gives clients a single entry point, with shared authentication, rate limiting, validation and observability, in front of these services:
+A unified API gateway for the Cipherion product suite. It gives clients a single entry point, with shared authentication, rate limiting, validation and observability, and it hosts the backends of these products as modules of the same service:
 
-| Service | Description |
-| --- | --- |
-| **Cipherion Enqrypt** | Encryption service |
-| **Zentriq** | Zentriq service |
-| **Cipsec** | Security service |
-| **Dashboard** | Cipherion web dashboard (the main browser client of the gateway) |
+| Product | Description | Status |
+| --- | --- | --- |
+| **Dashboard** | Backend of the Cipherion web dashboard: profile, settings, account activity, billing/subscription | In progress |
+| **CipSeq** | Projects, groups, invitations, devices and key management. All crypto runs in the Cipherion KMS (gRPC over TLS); CipSeq stores the wrapped keys in its own PostgreSQL database | Planned |
+| **Cipherion EnQrypt** | Encryption service | Deferred |
+| **Zentriq** | Zentriq service | Deferred |
 
-> **Status:** early development. The core runtime (NestJS on Fastify, environment validation, Prisma/PostgreSQL, Redis, Better Auth and Nest Observe) is set up, and the auth endpoints are live under `/api/v1/auth`. Routing to the upstream services has not been built yet.
+> **Status:** early development. The core runtime (NestJS on Fastify, environment validation, Prisma/PostgreSQL, Redis, Better Auth and Nest Observe) is set up, and the auth endpoints are live under `/api/v1/auth`. The Dashboard and CipSeq modules are being built.
 
 ---
 
@@ -17,13 +17,16 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 
 ```
                  ┌──────────────────────────────────────────┐
-  Dashboard ───► │          Cipherion API Gateway           │ ───► Cipherion Enqrypt
-  API clients ─► │  Auth · Rate limit · Validation · Tracing│ ───► Zentriq
-                 │                                          │ ───► Cipsec
-                 └──────────┬────────────────────┬──────────┘
-                            │                    │
-                          Redis              PostgreSQL
-               (session cache, rate limits)  (users, sessions)
+  Dashboard ───► │          Cipherion API Gateway           │
+  API clients ─► │  Auth · Rate limit · Validation · Tracing│
+                 │  ┌──────────────────┐ ┌───────────────┐  │
+                 │  │ Dashboard module │ │ CipSeq module │  │ ── gRPC + TLS ──► Cipherion KMS
+                 │  └──────────────────┘ └───────────────┘  │                  (all crypto)
+                 └─────┬──────────────────┬────────────┬────┘
+                       │                  │            │
+                     Redis           PostgreSQL    PostgreSQL (CipSeq)
+          (session cache,          (users, sessions, (projects, groups, keys,
+           rate limits)             settings)        devices, audit, billing)
 ```
 
 **Responsibilities**
@@ -33,7 +36,9 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 - **Request validation**: a global `ValidationPipe` that removes unknown fields, rejects requests containing them, and returns errors in one consistent format.
 - **Configuration safety**: environment variables are checked with Joi when the app starts, so a misconfigured deployment fails immediately.
 - **Observability**: tracing, metrics, logs and error tracking through [NestJS Observe](https://observe.nestjs.com).
-- **Routing** *(planned)*: forwarding requests to Enqrypt, Zentriq, Cipsec and the dashboard backend.
+- **Dashboard** *(in progress)*: profile, settings and account activity for the signed-in user. Billing/subscription is deferred.
+- **CipSeq** *(planned)*: projects, key rotation, groups, invitations and device registration. CipSeq calls the Cipherion KMS over gRPC for every crypto operation and keeps its data, including an audit event for each operation, in a separate PostgreSQL database.
+- **EnQrypt and Zentriq** *(deferred)*.
 
 ## Tech stack
 
@@ -54,7 +59,7 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 ```
 .
 ├── prisma/
-│   ├── schema.prisma        # Database schema (User, Session, Account, Verification, RateLimit)
+│   ├── schema.prisma        # Database schema (User, Session, Account, Verification, RateLimit, UserSettings)
 │   └── migrations/          # Prisma migrations (commit every migration)
 ├── prisma7.config.ts        # Prisma config; loads .env.dev / .env.prod / .env.test from NODE_ENV
 ├── src/
@@ -65,6 +70,7 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 │   ├── config/env.ts        # Loads the env file before anything reads process.env
 │   ├── auth.ts              # Better Auth configuration
 │   ├── auth/                # AuthController (/api/v1/auth/*), global AuthGuard, @Public() / @CurrentUser()
+│   ├── dashboard/           # Dashboard routes (/api/v1/dashboard/profile, /settings)
 │   ├── health/              # Liveness (/api/v1/health) and readiness (/api/v1/ready) endpoints
 │   ├── lib/prisma.ts        # Shared PrismaClient
 │   ├── lib/redis.ts         # Shared Redis client (sessions, rate limits, caching)
@@ -284,6 +290,21 @@ Both endpoints are public, so load balancers and orchestrators can call them wit
 ```
 
 The response only says `up` or `down` for each dependency, never error details.
+
+## Dashboard
+
+Routes for the signed-in user's dashboard. They need the session cookie.
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/dashboard/profile` | The user's `id`, `name`, `email`, `emailVerified` and `createdAt`, served from the session without a database query. |
+| `PATCH` | `/api/v1/dashboard/profile` | Changes the `name` (1–100 characters). It goes through Better Auth, so the user cached with the session in Redis is refreshed too. Other fields return `400`. |
+| `GET` | `/api/v1/dashboard/settings` | The user's settings. A user who has never saved settings gets the defaults: `{"timezone":"UTC","locale":"en","securityAlerts":true}`. |
+| `PATCH` | `/api/v1/dashboard/settings` | Updates only the fields sent: `timezone` (IANA, e.g. `Asia/Kolkata`), `locale` (BCP 47, e.g. `en-IN`) and `securityAlerts` (in-app alerts for security events). Invalid values or unknown fields return `400`. |
+
+Email and password are changed through Better Auth's `/api/v1/auth/change-email` and `/api/v1/auth/change-password`.
+
+Cipherion has no profile images. Better Auth's user table requires an `image` column, so the column stays, but `/api/v1/auth/sign-up/email` and `/api/v1/auth/update-user` reject an `image` field with `400` and it is always `null`.
 
 ## Protecting routes
 

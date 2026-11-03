@@ -50,6 +50,17 @@ describe('OpenAPI docs (e2e)', () => {
     );
   });
 
+  it('documents the dashboard routes behind the session cookie', () => {
+    for (const path of ['profile', 'settings']) {
+      const route = document.paths[`/api/v1/dashboard/${path}`];
+
+      expect(route.get?.tags).toEqual(['dashboard']);
+      expect(route.patch?.security).toEqual([{ cookie: [] }]);
+    }
+    expect(document.components?.schemas).toHaveProperty('UpdateProfileDto');
+    expect(document.components?.schemas).toHaveProperty('UpdateSettingsDto');
+  });
+
   it('lists the Better Auth endpoints instead of the wildcard route', () => {
     const signIn = document.paths['/api/v1/auth/sign-in/email'].post;
 

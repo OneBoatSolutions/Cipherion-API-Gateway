@@ -7,6 +7,7 @@ import { AppModule } from './../src/app.module.js';
 import { configureApp } from './../src/app.setup.js';
 import { trustedOrigins } from './../src/config/env.js';
 import { redis } from './../src/lib/redis.js';
+import { uniqueClientIp } from './helpers/client-ip.js';
 import { deleteTestUser } from './helpers/delete-test-user.js';
 
 // Runs against the .env.dev database; the test user is removed afterwards.
@@ -15,6 +16,7 @@ describe('Auth (e2e)', () => {
   const email = `e2e-${Date.now()}@cipherion.test`;
   const password = 'e2e-password-123';
   const origin = trustedOrigins[0];
+  const clientIp = uniqueClientIp();
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -38,7 +40,7 @@ describe('Auth (e2e)', () => {
     const signUp = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/sign-up/email',
-      headers: { origin },
+      headers: { origin, 'x-forwarded-for': clientIp },
       payload: { name: 'E2E User', email, password },
     });
 
@@ -48,7 +50,7 @@ describe('Auth (e2e)', () => {
     const signIn = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/sign-in/email',
-      headers: { origin },
+      headers: { origin, 'x-forwarded-for': clientIp },
       payload: { email, password },
     });
 
@@ -72,7 +74,7 @@ describe('Auth (e2e)', () => {
     const signIn = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/sign-in/email',
-      headers: { origin },
+      headers: { origin, 'x-forwarded-for': clientIp },
       payload: { email, password },
     });
     const cookie = signIn.cookies
@@ -101,6 +103,37 @@ describe('Auth (e2e)', () => {
     expect(signOut.statusCode).toBe(200);
     expect(await redis.get(token)).toBeNull();
     expect((await getSession()).json()).toBeNull();
+  });
+
+  it('rejects a profile image on sign-up and update-user', async () => {
+    const headers = { origin, 'x-forwarded-for': uniqueClientIp() };
+    const image = 'https://example.com/avatar.png';
+
+    const signUp = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/sign-up/email',
+      headers,
+      payload: { name: 'E2E User', email: `x-${email}`, password, image },
+    });
+    expect(signUp.statusCode).toBe(400);
+
+    const signIn = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/sign-in/email',
+      headers,
+      payload: { email, password },
+    });
+    const cookie = signIn.cookies
+      .map(({ name, value }) => `${name}=${value}`)
+      .join('; ');
+
+    const update = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/update-user',
+      headers: { ...headers, cookie },
+      payload: { image },
+    });
+    expect(update.statusCode).toBe(400);
   });
 
   it('returns no session without a cookie', async () => {

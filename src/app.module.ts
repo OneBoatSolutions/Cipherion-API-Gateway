@@ -4,6 +4,7 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
 import { HealthModule } from './health/health.module.js';
 import { envFilePath } from './config/env.js';
 import { envSchema } from './config/env.schema.js';
@@ -33,6 +34,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
     AuthModule,
     HealthModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

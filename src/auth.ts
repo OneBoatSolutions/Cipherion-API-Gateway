@@ -1,7 +1,7 @@
 import { apiDocsEnabled, trustedOrigins } from './config/env.js';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { APIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { openAPI } from 'better-auth/plugins';
 import { prisma } from './lib/prisma.js';
 import { redis } from './lib/redis.js';
@@ -41,6 +41,19 @@ const sessionStoreUnavailable = (cause: unknown): never => {
     cause,
   });
 };
+
+// Cipherion has no profile images. Better Auth's user table must keep the
+// image column, so clients are stopped from setting it instead.
+const USER_WRITE_PATHS = new Set(['/sign-up/email', '/update-user']);
+
+const rejectProfileImage = createAuthMiddleware(async (ctx) => {
+  const body = ctx.body as Record<string, unknown> | undefined;
+  if (USER_WRITE_PATHS.has(ctx.path) && body?.image !== undefined) {
+    throw new APIError('BAD_REQUEST', {
+      message: 'Profile images are not supported',
+    });
+  }
+});
 
 export const auth = betterAuth({
   appName: 'Cipherion',
@@ -92,6 +105,10 @@ export const auth = betterAuth({
 
   advanced: {
     useSecureCookies: process.env.NODE_ENV === 'production',
+  },
+
+  hooks: {
+    before: rejectProfileImage,
   },
 
   // Feeds the auth endpoints into the gateway's Swagger document. Its schema
