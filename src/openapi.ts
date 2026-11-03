@@ -19,7 +19,7 @@ export async function setupOpenApi(app: NestFastifyApplication): Promise<void> {
     .setOpenAPIVersion('3.1.0')
     .setTitle('Cipherion API Gateway')
     .setDescription(
-      'Unified gateway in front of Cipherion Enqrypt, Zentriq, Cipsec and the Cipherion Dashboard. ' +
+      'Unified API gateway for the Cipherion product suite, hosting the Dashboard and CipSeq backends. ' +
         'Protected routes need the session cookie set by `POST /api/v1/auth/sign-in/email`.',
     )
     .setVersion(process.env.npm_package_version ?? '0.0.1')
@@ -28,6 +28,10 @@ export async function setupOpenApi(app: NestFastifyApplication): Promise<void> {
     .addTag('gateway', 'Gateway information')
     .addTag('health', 'Liveness and readiness probes')
     .addTag('auth', 'Better Auth endpoints (sign-up, sign-in, sessions)')
+    .addTag(
+      'dashboard',
+      'Profile, settings and account activity of the signed-in user',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

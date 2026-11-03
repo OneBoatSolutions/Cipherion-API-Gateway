@@ -9,6 +9,7 @@ import { configureApp } from './../src/app.setup.js';
 import type { AuthUser } from './../src/auth/auth.types.js';
 import { CurrentUser } from './../src/auth/decorators/current-user.decorator.js';
 import { trustedOrigins } from './../src/config/env.js';
+import { uniqueClientIp } from './helpers/client-ip.js';
 import { deleteTestUser } from './helpers/delete-test-user.js';
 
 // Test-only route, so the guard can be exercised without a production endpoint.
@@ -70,7 +71,7 @@ describe('AuthGuard (e2e)', () => {
     const signUp = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/sign-up/email',
-      headers: { origin },
+      headers: { origin, 'x-forwarded-for': uniqueClientIp() },
       payload: { name: 'E2E Guard User', email, password },
     });
     expect(signUp.statusCode).toBe(200);

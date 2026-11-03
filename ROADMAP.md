@@ -34,17 +34,32 @@
 - [ ] API keys for service-to-service and programmatic clients
 - [ ] Separate `.env.test` database for e2e tests (they currently use the `.env.dev` database)
 
-## Gateway routing
+## Dashboard
 
-- [ ] Cipherion Enqrypt
+- [x] Profile (`GET`/`PATCH /api/v1/dashboard/profile`)
+- [x] Settings: timezone, locale, in-app security alerts (`GET`/`PATCH /api/v1/dashboard/settings`)
+- [ ] Account activity: last login, last CipSeq operation and its time
+- [ ] Billing/subscription (provider not chosen; tables live in the CipSeq database)
+
+## CipSeq
+
+- [ ] Separate PostgreSQL database with its own Prisma schema, client and migrations
+- [ ] Cipherion KMS client (gRPC + TLS), with a KMS check in `/ready`
+- [ ] Projects and initialisation with the user's passphrase
+- [ ] Key rotation and key versions
+- [ ] Groups and group members
+- [ ] Invitations (send and accept)
+- [ ] Device registration and device key material
+- [ ] Audit event for every operation
+
+## Deferred
+
+- [ ] Cipherion EnQrypt
 - [ ] Zentriq
-- [ ] Cipsec
-- [ ] Dashboard backend endpoints
 
 ## Operations
 
 - [x] Health and readiness endpoints (PostgreSQL and Redis)
-- [ ] Add each upstream service to the readiness check as it is routed
 - [x] OpenAPI / Swagger documentation (`/api/v1/docs`, not served in production)
 - [ ] Drop the accepted `glob`/`minimatch` advisories (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249) once `@fastify/static` moves to glob 14; they only affect a startup glob over Swagger UI's own files
 - [ ] CI pipeline (lint, test, build)

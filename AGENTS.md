@@ -4,7 +4,7 @@ Instructions for AI coding agents (Claude Code, Codex, Windsurf, Cursor, etc.) w
 
 ## Project
 
-**Cipherion API Gateway** is the unified API gateway in front of Cipherion Enqrypt, Zentriq, Cipsec and the Cipherion Dashboard. See [README.md](README.md) for architecture and setup.
+**Cipherion API Gateway** is the unified API gateway for the Cipherion product suite. It hosts the Dashboard and CipSeq backends as Nest modules; CipSeq delegates all crypto to the Cipherion KMS over gRPC + TLS and has its own PostgreSQL database. EnQrypt and Zentriq are deferred. See [README.md](README.md) for architecture and setup.
 
 - NestJS 12 on the Fastify adapter, TypeScript, ESM (`"type": "module"`; relative imports use the `.js` extension)
 - PostgreSQL through Prisma ORM 7 (`@prisma/adapter-pg`); the client is generated into `src/generated/prisma` and must not be edited by hand
@@ -106,6 +106,6 @@ When the user types **`cm`** (or asks "give me commit message", "commit message"
 **Commit message rules** ([Conventional Commits](https://www.conventionalcommits.org)):
 
 - Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `style`, `revert`
-- Scope: the affected area, such as `auth`, `gateway`, `enqrypt`, `zentriq`, `cipsec`, `dashboard`, `prisma`, `config` or `setup`
+- Scope: the affected area, such as `auth`, `gateway`, `dashboard`, `cipseq`, `kms`, `enqrypt`, `zentriq`, `prisma`, `config` or `setup`
 - Summary: imperative mood, lowercase, no trailing period
 - Put `BREAKING CHANGE:` in the body when behaviour or the API changes in a way that isn't backward compatible

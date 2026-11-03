@@ -17,14 +17,31 @@ model User {
   name          String
   email         String
   emailVerified Boolean   @default(false)
+  // Required by Better Auth's core user schema. Cipherion has no profile
+  // images: auth.ts rejects it on sign-up and update-user, so it stays null.
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
+  settings      UserSettings?
 
   @@unique([email])
   @@map("user")
+}
+
+// Dashboard settings, one row per user. A user without a row gets the
+// defaults below (see DEFAULT_SETTINGS in src/dashboard/settings.dto.ts).
+model UserSettings {
+  userId         String   @id
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timezone       String   @default("UTC")
+  locale         String   @default("en")
+  securityAlerts Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("userSettings")
 }
 
 model Session {
