@@ -8,6 +8,7 @@ import { DashboardModule } from './dashboard/dashboard.module.js';
 import { HealthModule } from './health/health.module.js';
 import { envFilePath } from './config/env.js';
 import { envSchema } from './config/env.schema.js';
+import { cipseqPrisma } from './lib/cipseq-prisma.js';
 import { prisma } from './lib/prisma.js';
 import { redis } from './lib/redis.js';
 
@@ -42,6 +43,10 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
 export class AppModule implements OnApplicationShutdown {
   // The shared clients live for the whole process, so close them with the app.
   async onApplicationShutdown(): Promise<void> {
-    await Promise.allSettled([redis.quit(), prisma.$disconnect()]);
+    await Promise.allSettled([
+      redis.quit(),
+      prisma.$disconnect(),
+      cipseqPrisma.$disconnect(),
+    ]);
   }
 }

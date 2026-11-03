@@ -43,7 +43,7 @@
 
 ## CipSeq
 
-- [ ] Separate PostgreSQL database with its own Prisma schema, client and migrations
+- [x] Separate PostgreSQL database with its own Prisma schema, client and migrations
 - [ ] Cipherion KMS client (gRPC + TLS), with a KMS check in `/ready`
 - [ ] Projects and initialisation with the user's passphrase
 - [ ] Key rotation and key versions

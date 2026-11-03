@@ -59,9 +59,11 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 ```
 .
 ├── prisma/
-│   ├── schema.prisma        # Database schema (User, Session, Account, Verification, RateLimit, UserSettings)
-│   └── migrations/          # Prisma migrations (commit every migration)
-├── prisma7.config.ts        # Prisma config; loads .env.dev / .env.prod / .env.test from NODE_ENV
+│   ├── schema.prisma        # Auth database schema (User, Session, Account, Verification, RateLimit, UserSettings)
+│   ├── migrations/          # Auth database migrations (commit every migration)
+│   └── cipseq/              # CipSeq database: schema.prisma and migrations/
+├── prisma7.config.ts        # Prisma config for the auth database; loads .env.dev / .env.prod / .env.test from NODE_ENV
+├── prisma7.cipseq.config.ts # Prisma config for the CipSeq database
 ├── src/
 │   ├── main.ts              # Bootstrap: Fastify adapter, configureApp(), setupOpenApi(), port binding
 │   ├── app.setup.ts         # configureApp(): /api/v1 prefix, CORS, global ValidationPipe
@@ -72,9 +74,10 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 │   ├── auth/                # AuthController (/api/v1/auth/*), global AuthGuard, @Public() / @CurrentUser()
 │   ├── dashboard/           # Dashboard routes (/api/v1/dashboard/profile, /settings)
 │   ├── health/              # Liveness (/api/v1/health) and readiness (/api/v1/ready) endpoints
-│   ├── lib/prisma.ts        # Shared PrismaClient
+│   ├── lib/prisma.ts        # Shared PrismaClient for the auth database
+│   ├── lib/cipseq-prisma.ts # Shared PrismaClient for the CipSeq database
 │   ├── lib/redis.ts         # Shared Redis client (sessions, rate limits, caching)
-│   └── generated/prisma/    # Generated Prisma Client (do not edit by hand)
+│   └── generated/           # Generated Prisma Clients, prisma/ and cipseq/ (do not edit by hand)
 ├── test/                    # End-to-end tests (helpers/ cleans up test users in Postgres and Redis)
 ├── .env.example             # Template for environment variables
 └── package.json
@@ -101,6 +104,12 @@ docker run -d --name cipherion-postgres \
 docker run -d --name cipherion-redis -p 6379:6379 redis:7
 ```
 
+CipSeq has its own database. Locally it can live in the same container:
+
+```bash
+docker exec cipherion-postgres psql -U postgres -c "CREATE DATABASE cipherion_cipseq"
+```
+
 ### 1. Clone and install
 
 ```bash
@@ -123,13 +132,14 @@ The application loads its environment file in this order:
 2. Otherwise `.env.prod` when `NODE_ENV=production`
 3. Otherwise `.env.dev`
 
-The Prisma CLI (`prisma7.config.ts`) chooses `.env.dev`, `.env.prod` or `.env.test` based on `NODE_ENV`.
+The Prisma CLI configs (`prisma7.config.ts`, `prisma7.cipseq.config.ts`) choose `.env.dev`, `.env.prod` or `.env.test` based on `NODE_ENV`.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `NODE_ENV` | No | `development` | `development`, `test` or `production` |
 | `PORT` | No | `3000` | Port the gateway listens on (binds to `0.0.0.0`) |
-| `DATABASE_URL` | **Yes** | – | PostgreSQL connection string, e.g. `postgresql://postgres:password@localhost:5432/cipherion_gateway` |
+| `DATABASE_URL` | **Yes** | – | Auth database (users, sessions, settings), e.g. `postgresql://postgres:password@localhost:5432/cipherion_gateway` |
+| `CIPSEQ_DATABASE_URL` | **Yes** | – | CipSeq database (projects, groups, keys, devices, audit, billing), e.g. `postgresql://postgres:password@localhost:5432/cipherion_cipseq`. Must be a different database from `DATABASE_URL` when `NODE_ENV=production` |
 | `BETTER_AUTH_SECRET` | **Yes** | – | Secret used to sign sessions. Must be **at least 32 characters** |
 | `BETTER_AUTH_URL` | **Yes** | – | Public base URL of the gateway, e.g. `http://localhost:3000` |
 | `AUTH_TRUSTED_ORIGINS` | **Yes** | – | Comma-separated list of origins allowed to call auth endpoints (for example, the dashboard URL) |
@@ -152,6 +162,7 @@ NODE_ENV=development
 PORT=3000
 
 DATABASE_URL=postgresql://postgres:password@localhost:5432/cipherion_gateway
+CIPSEQ_DATABASE_URL=postgresql://postgres:password@localhost:5432/cipherion_cipseq
 
 BETTER_AUTH_SECRET=replace-with-a-random-string-of-at-least-32-chars
 BETTER_AUTH_URL=http://localhost:3000
@@ -162,22 +173,33 @@ REDIS_URL=redis://localhost:6379
 
 > Never commit `.env`, `.env.dev` or `.env.prod`. Only `.env.example` belongs in version control.
 
-### 3. Set up the database
+### 3. Set up the databases
 
-The Prisma config file is named `prisma7.config.ts`, so pass it to every Prisma command with `--config`:
+There are two Prisma setups, one per database. Every Prisma command needs `--config` to pick one:
+
+| Database | Config | Schema | Client |
+| --- | --- | --- | --- |
+| Auth (`DATABASE_URL`) | `prisma7.config.ts` | `prisma/schema.prisma` | `src/generated/prisma` |
+| CipSeq (`CIPSEQ_DATABASE_URL`) | `prisma7.cipseq.config.ts` | `prisma/cipseq/schema.prisma` | `src/generated/cipseq` |
 
 ```bash
-# Generate the Prisma Client into src/generated/prisma
-npx prisma generate --config prisma7.config.ts
+# Generate both Prisma Clients
+npm run db:generate
 
-# Create and apply migrations (development)
-npx prisma migrate dev --name init --config prisma7.config.ts
+# Apply migrations (development)
+npm run db:migrate          # auth database
+npm run db:migrate:cipseq   # CipSeq database
+
+# Create a new migration after changing a schema
+npx prisma migrate dev --name <name> --config prisma7.config.ts
+npx prisma migrate dev --name <name> --config prisma7.cipseq.config.ts
 ```
 
 Optionally, open Prisma Studio to browse the data:
 
 ```bash
 npx prisma studio --config prisma7.config.ts
+npx prisma studio --config prisma7.cipseq.config.ts
 ```
 
 ### 4. Run the gateway
@@ -282,11 +304,11 @@ Both endpoints are public, so load balancers and orchestrators can call them wit
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/api/v1/health` | Liveness: `200 {"status":"ok"}` whenever the process is running. It never checks dependencies, so a database or Redis outage doesn't get healthy instances restarted. |
-| `GET` | `/api/v1/ready` | Readiness: checks PostgreSQL (`SELECT 1`) and Redis (`PING`) together. `200` when both answer; `503` when either is down or takes longer than 2 seconds. |
+| `GET` | `/api/v1/ready` | Readiness: checks the auth database and the CipSeq database (`SELECT 1`) and Redis (`PING`) together. `200` when all three answer; `503` when any is down or takes longer than 2 seconds. |
 
 ```json
 // GET /api/v1/ready while Redis is down → 503
-{ "status": "error", "checks": { "database": "up", "redis": "down" } }
+{ "status": "error", "checks": { "database": "up", "cipseq": "up", "redis": "down" } }
 ```
 
 The response only says `up` or `down` for each dependency, never error details.
@@ -355,12 +377,12 @@ Requests that fail DTO validation return `400 Bad Request` in this format:
 2. Install dependencies, generate the client and build:
    ```bash
    npm ci
-   npx prisma generate --config prisma7.config.ts
+   npm run db:generate
    npm run build
    ```
-3. Apply migrations. Use `migrate deploy` in production, never `migrate dev`:
+3. Apply migrations to both databases. Use `migrate deploy` in production, never `migrate dev`:
    ```bash
-   NODE_ENV=production npx prisma migrate deploy --config prisma7.config.ts
+   NODE_ENV=production npm run db:deploy
    ```
 4. Start the gateway:
    ```bash
@@ -375,8 +397,9 @@ Requests that fail DTO validation return `400 Bad Request` in this format:
 - `REDIS_URL` points to a managed or replicated Redis over TLS. Startup is refused unless it uses `rediss://` when `NODE_ENV=production`. Auth requests answer `503` while Redis is unreachable.
 - Redis requires authentication: a dedicated ACL user with a strong password in the URL, e.g. `rediss://gateway:<password>@redis.internal:6380`. Never use the passwordless `default` user.
 - Redis is reachable only from the gateway's private network (VPC / security group / firewall); port 6379/6380 is never exposed to the public internet.
+- `CIPSEQ_DATABASE_URL` points to a different database from `DATABASE_URL` (startup is refused otherwise). CipSeq holds key material, so preferably give it its own database user too, with access to that database only.
 - `NODE_ENV=production` is set, which also turns off the API docs (`/api/v1/docs`) and Better Auth's schema endpoint.
-- The load balancer or orchestrator uses `/api/v1/health` as the liveness probe and `/api/v1/ready` as the readiness probe, so instances stop receiving traffic while PostgreSQL or Redis is unreachable.
+- The load balancer or orchestrator uses `/api/v1/health` as the liveness probe and `/api/v1/ready` as the readiness probe, so instances stop receiving traffic while either database or Redis is unreachable.
 - `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` are set so that telemetry is sent.
 
 ## Observability

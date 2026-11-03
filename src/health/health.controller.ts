@@ -6,6 +6,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator.js';
+import { cipseqPrisma } from '../lib/cipseq-prisma.js';
 import { prisma } from '../lib/prisma.js';
 import { redis } from '../lib/redis.js';
 import {
@@ -33,7 +34,8 @@ export class HealthController {
   // Readiness: the instance can serve traffic. A 503 tells the load balancer
   // to stop routing requests here until the dependencies are back.
   @ApiOperation({
-    summary: 'Readiness probe: PostgreSQL and Redis are reachable',
+    summary:
+      'Readiness probe: both PostgreSQL databases and Redis are reachable',
   })
   @ApiOkResponse({ type: ReadinessResponse })
   @ApiServiceUnavailableResponse({
@@ -42,14 +44,16 @@ export class HealthController {
   })
   @Get('ready')
   async ready(): Promise<ReadinessResponse> {
-    const [database, cache] = await Promise.all([
+    const [database, cipseq, cache] = await Promise.all([
       check(() => prisma.$queryRaw`SELECT 1`),
+      check(() => cipseqPrisma.$queryRaw`SELECT 1`),
       check(() => redis.ping()),
     ]);
 
+    const checks = { database, cipseq, redis: cache };
     const response: ReadinessResponse = {
-      status: database === 'up' && cache === 'up' ? 'ok' : 'error',
-      checks: { database, redis: cache },
+      status: Object.values(checks).every((s) => s === 'up') ? 'ok' : 'error',
+      checks,
     };
 
     if (response.status === 'error') {
