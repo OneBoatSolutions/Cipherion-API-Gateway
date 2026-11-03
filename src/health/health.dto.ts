@@ -13,6 +13,9 @@ export class ReadinessChecks {
   database!: CheckStatus;
 
   @ApiProperty({ enum: ['up', 'down'], example: 'up' })
+  cipseq!: CheckStatus;
+
+  @ApiProperty({ enum: ['up', 'down'], example: 'up' })
   redis!: CheckStatus;
 }
 

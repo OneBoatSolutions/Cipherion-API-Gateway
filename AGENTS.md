@@ -7,9 +7,11 @@ Instructions for AI coding agents (Claude Code, Codex, Windsurf, Cursor, etc.) w
 **Cipherion API Gateway** is the unified API gateway for the Cipherion product suite. It hosts the Dashboard and CipSeq backends as Nest modules; CipSeq delegates all crypto to the Cipherion KMS over gRPC + TLS and has its own PostgreSQL database. EnQrypt and Zentriq are deferred. See [README.md](README.md) for architecture and setup.
 
 - NestJS 12 on the Fastify adapter, TypeScript, ESM (`"type": "module"`; relative imports use the `.js` extension)
-- PostgreSQL through Prisma ORM 7 (`@prisma/adapter-pg`); the client is generated into `src/generated/prisma` and must not be edited by hand
+- Two PostgreSQL databases through Prisma ORM 7 (`@prisma/adapter-pg`), each with its own schema, config, migrations and generated client (never edit generated code by hand):
+  - auth (users, sessions, settings): `prisma/schema.prisma`, `prisma7.config.ts`, client `src/generated/prisma`, used through `src/lib/prisma.ts`
+  - CipSeq (projects, groups, keys, invitations, devices, audit, billing): `prisma/cipseq/schema.prisma`, `prisma7.cipseq.config.ts`, client `src/generated/cipseq`, used through `src/lib/cipseq-prisma.ts`. No foreign keys to the auth database: reference users by the Better Auth user id
 - Better Auth for authentication ([src/auth.ts](src/auth.ts))
-- Environment validated with Joi in [src/app.module.ts](src/app.module.ts)
+- Environment validated with Joi in [src/config/env.schema.ts](src/config/env.schema.ts)
 
 ### Commands
 
@@ -20,15 +22,16 @@ npm run lint                                        # oxlint (type-aware)
 npm run format                                      # prettier
 npm run test                                        # unit tests (vitest)
 npm run test:e2e                                    # e2e tests
-npx prisma generate --config prisma7.config.ts      # regenerate client after schema changes
-npx prisma migrate dev --name <name> --config prisma7.config.ts
+npm run db:generate                                 # regenerate both Prisma clients
+npx prisma migrate dev --name <name> --config prisma7.config.ts          # auth database
+npx prisma migrate dev --name <name> --config prisma7.cipseq.config.ts   # CipSeq database
 ```
 
-Always pass `--config prisma7.config.ts` to Prisma commands.
+Always pass `--config` to Prisma commands: `prisma7.config.ts` for the auth database, `prisma7.cipseq.config.ts` for CipSeq.
 
 ### Conventions
 
-- Add every new environment variable to the Joi schema in `app.module.ts`, to `.env.example` and to the variables table in `README.md`.
+- Add every new environment variable to the Joi schema in `src/config/env.schema.ts`, to `.env.example` and to the variables table in `README.md`.
 - Never commit `.env`, `.env.dev`, `.env.prod` or secrets.
 - Run `npm run lint` and `npm run test` before calling a change finished.
 

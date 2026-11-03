@@ -1,5 +1,27 @@
 import Joi from 'joi';
 
+// CipSeq holds key material, so in production it must not live in the auth
+// database.
+const separateFromAuthDatabase: Joi.CustomValidator<string> = (
+  value,
+  helpers,
+) => {
+  const env = helpers.state.ancestors[0] as {
+    NODE_ENV?: string;
+    DATABASE_URL?: string;
+  };
+  if (env.NODE_ENV !== 'production' || !env.DATABASE_URL) {
+    return value;
+  }
+
+  const auth = new URL(env.DATABASE_URL);
+  const cipseq = new URL(value);
+  if (auth.host === cipseq.host && auth.pathname === cipseq.pathname) {
+    return helpers.error('cipseq.sharedDatabase');
+  }
+  return value;
+};
+
 // Validated by ConfigModule at startup, so a misconfigured deployment fails immediately.
 export const envSchema = Joi.object({
   NODE_ENV: Joi.string()
@@ -11,6 +33,15 @@ export const envSchema = Joi.object({
   DATABASE_URL: Joi.string()
     .uri({ scheme: ['postgresql', 'postgres'] })
     .required(),
+
+  CIPSEQ_DATABASE_URL: Joi.string()
+    .uri({ scheme: ['postgresql', 'postgres'] })
+    .required()
+    .custom(separateFromAuthDatabase)
+    .messages({
+      'cipseq.sharedDatabase':
+        '"CIPSEQ_DATABASE_URL" must point to a different database than "DATABASE_URL" when NODE_ENV is production',
+    }),
 
   BETTER_AUTH_SECRET: Joi.string().min(32).required(),
   BETTER_AUTH_URL: Joi.string()

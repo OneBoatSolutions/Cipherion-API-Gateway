@@ -1,0 +1,15 @@
+// CipSeq database: projects, members, groups, key material and versions,
+// invitations, devices, audit events and billing. It is a separate database
+// from the auth one (prisma/schema.prisma), so rows reference a user by the
+// Better Auth user id without a foreign key.
+//
+// Commands take --config prisma7.cipseq.config.ts.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../../src/generated/cipseq"
+}
+
+datasource db {
+  provider = "postgresql"
+}

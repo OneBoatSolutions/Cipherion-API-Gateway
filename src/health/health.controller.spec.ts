@@ -1,12 +1,16 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { CHECK_TIMEOUT_MS, HealthController } from './health.controller.js';
 
-const { queryRaw, ping } = vi.hoisted(() => ({
+const { queryRaw, cipseqQueryRaw, ping } = vi.hoisted(() => ({
   queryRaw: vi.fn(),
+  cipseqQueryRaw: vi.fn(),
   ping: vi.fn(),
 }));
 
 vi.mock('../lib/prisma.js', () => ({ prisma: { $queryRaw: queryRaw } }));
+vi.mock('../lib/cipseq-prisma.js', () => ({
+  cipseqPrisma: { $queryRaw: cipseqQueryRaw },
+}));
 vi.mock('../lib/redis.js', () => ({ redis: { ping } }));
 
 describe('HealthController', () => {
@@ -14,6 +18,7 @@ describe('HealthController', () => {
 
   beforeEach(() => {
     queryRaw.mockReset().mockResolvedValue([{ '?column?': 1 }]);
+    cipseqQueryRaw.mockReset().mockResolvedValue([{ '?column?': 1 }]);
     ping.mockReset().mockResolvedValue('PONG');
   });
 
@@ -24,13 +29,14 @@ describe('HealthController', () => {
   it('reports liveness without checking dependencies', () => {
     expect(controller.health()).toEqual({ status: 'ok' });
     expect(queryRaw).not.toHaveBeenCalled();
+    expect(cipseqQueryRaw).not.toHaveBeenCalled();
     expect(ping).not.toHaveBeenCalled();
   });
 
-  it('is ready when the database and Redis are up', async () => {
+  it('is ready when both databases and Redis are up', async () => {
     await expect(controller.ready()).resolves.toEqual({
       status: 'ok',
-      checks: { database: 'up', redis: 'up' },
+      checks: { database: 'up', cipseq: 'up', redis: 'up' },
     });
   });
 
@@ -42,7 +48,18 @@ describe('HealthController', () => {
     expect(error).toBeInstanceOf(ServiceUnavailableException);
     expect((error as ServiceUnavailableException).getResponse()).toEqual({
       status: 'error',
-      checks: { database: 'up', redis: 'down' },
+      checks: { database: 'up', cipseq: 'up', redis: 'down' },
+    });
+  });
+
+  it('answers 503 when only the CipSeq database is down', async () => {
+    cipseqQueryRaw.mockRejectedValue(new Error('database does not exist'));
+
+    const error = await controller.ready().catch((e: unknown) => e);
+
+    expect((error as ServiceUnavailableException).getResponse()).toEqual({
+      status: 'error',
+      checks: { database: 'up', cipseq: 'down', redis: 'up' },
     });
   });
 
@@ -56,7 +73,7 @@ describe('HealthController', () => {
     const error = (await result) as ServiceUnavailableException;
     expect(error.getResponse()).toEqual({
       status: 'error',
-      checks: { database: 'down', redis: 'up' },
+      checks: { database: 'down', cipseq: 'up', redis: 'up' },
     });
   });
 });

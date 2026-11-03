@@ -45,6 +45,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Unit and e2e tests for the dashboard settings.
 - Dashboard profile: `GET /api/v1/dashboard/profile` (id, name, email, emailVerified, createdAt, read from the session) and `PATCH /api/v1/dashboard/profile` (name only, 1–100 characters, saved through Better Auth so the session cache in Redis stays current).
 - Unit and e2e tests for the dashboard profile, and a `uniqueClientIp()` e2e helper.
+- Separate CipSeq database: `CIPSEQ_DATABASE_URL` (validated by Joi), its own Prisma schema (`prisma/cipseq/schema.prisma`), config (`prisma7.cipseq.config.ts`), migrations folder and client (`src/generated/cipseq`), shared through `src/lib/cipseq-prisma.ts`. No tables yet; they arrive with the CipSeq endpoints.
+- `GET /api/v1/ready` also checks the CipSeq database (`cipseq` in `checks`), and its client is disconnected on shutdown.
+- `db:generate`, `db:migrate`, `db:migrate:cipseq` and `db:deploy` npm scripts covering both databases.
 
 ### Changed
 
@@ -73,6 +76,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - README production checklist now requires a dedicated Redis ACL user with a strong password and Redis reachable only from the private network.
 - API docs are never served in production: Swagger UI, the JSON document and the Better Auth `openAPI()` plugin (whose schema endpoint is public) are only enabled when `NODE_ENV` isn't `production`. The wildcard auth route is hidden from the docs.
 - Profile images are not supported: a Better Auth `before` hook rejects an `image` field on `/api/v1/auth/sign-up/email` and `/api/v1/auth/update-user` with `400`. The column stays because Better Auth's user schema requires it, but it is always `null`.
+- Startup is refused in production when `CIPSEQ_DATABASE_URL` points to the same database as `DATABASE_URL`, so CipSeq key material never shares the auth database.
 
 ### Removed
 
