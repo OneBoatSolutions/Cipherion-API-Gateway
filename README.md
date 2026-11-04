@@ -5,11 +5,11 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 | Product | Description | Status |
 | --- | --- | --- |
 | **Dashboard** | Backend of the Cipherion web dashboard: profile, settings, account activity, billing/subscription | In progress |
-| **CipSeq** | Projects, groups, invitations, devices and key management. All crypto runs in the Cipherion KMS (gRPC over TLS); CipSeq stores the wrapped keys in its own PostgreSQL database | Planned |
+| **CipSeq** | Projects, groups, invitations, devices and key management. All crypto runs in the Cipherion KMS (gRPC over TLS); CipSeq stores the wrapped keys in its own PostgreSQL database | In progress |
 | **Cipherion EnQrypt** | Encryption service | Deferred |
 | **Zentriq** | Zentriq service | Deferred |
 
-> **Status:** early development. The core runtime (NestJS on Fastify, environment validation, Prisma/PostgreSQL, Redis, Better Auth and Nest Observe) is set up, and the auth endpoints are live under `/api/v1/auth`. The Dashboard and CipSeq modules are being built.
+> **Status:** early development. The core runtime (NestJS on Fastify, environment validation, Prisma/PostgreSQL, Redis, Better Auth and Nest Observe) is set up, and the auth, Dashboard and CipSeq project endpoints are live under `/api/v1`. The rest of the Dashboard and CipSeq modules are being built.
 
 ---
 
@@ -37,7 +37,7 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 - **Configuration safety**: environment variables are checked with Joi when the app starts, so a misconfigured deployment fails immediately.
 - **Observability**: tracing, metrics, logs and error tracking through [NestJS Observe](https://observe.nestjs.com).
 - **Dashboard** *(in progress)*: profile, settings and account activity for the signed-in user. Billing/subscription is deferred.
-- **CipSeq** *(planned)*: projects, key rotation, groups, invitations and device registration. CipSeq calls the Cipherion KMS over gRPC for every crypto operation and keeps its data, including an audit event for each operation, in a separate PostgreSQL database.
+- **CipSeq** *(in progress)*: projects (available), key rotation, groups, invitations and device registration. CipSeq calls the Cipherion KMS over gRPC for every crypto operation and keeps its data, including an audit event for each operation, in a separate PostgreSQL database.
 - **EnQrypt and Zentriq** *(deferred)*.
 
 ## Tech stack
@@ -76,6 +76,7 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 │   ├── auth.ts              # Better Auth configuration
 │   ├── auth/                # AuthController (/api/v1/auth/*), global AuthGuard, @Public() / @CurrentUser()
 │   ├── dashboard/           # Dashboard routes (/api/v1/dashboard/profile, /settings)
+│   ├── cipseq/              # CipSeq routes (/api/v1/cipseq/projects), access checks and audit events
 │   ├── health/              # Liveness (/api/v1/health) and readiness (/api/v1/ready) endpoints
 │   ├── lib/prisma.ts        # Shared pg pool and PrismaClient for the auth database
 │   ├── lib/cipseq-prisma.ts # Shared pg pool and PrismaClient for the CipSeq database
@@ -409,6 +410,38 @@ Email and password are changed through Better Auth's `/api/v1/auth/change-email`
 
 Cipherion has no profile images. Better Auth's user table requires an `image` column, so the column stays, but `/api/v1/auth/sign-up/email` and `/api/v1/auth/update-user` reject an `image` field with `400` and it is always `null`.
 
+## CipSeq projects
+
+Routes under `/api/v1/cipseq/projects`. They need the session cookie. The KMS does all the crypto, and the gateway stores the wrapped keys it returns.
+
+| Method | Path | Who | Description |
+| --- | --- | --- | --- |
+| `POST` | `/` | Signed-in user | Creates a project from `name` (1–100 characters) and `description` (1–500 characters). The caller becomes its one admin. Answers `201`. |
+| `POST` | `/:id/initialize` | Admin | Sets the project's `passphrase` (12–256 characters) and creates key version 1. Answers `409` if it is already initialised. |
+| `GET` | `/` | Signed-in user | The caller's projects, newest first. |
+| `GET` | `/:id` | Member | One project. |
+| `PATCH` | `/:id` | Admin | Updates only the fields sent: `name` and `description`. |
+| `DELETE` | `/:id` | Admin | Soft delete, answering `204`: the API stops serving the project, but its rows and wrapped keys stay in the database. |
+
+Every project response has this shape. `role` is the caller's role, and `keyVersion` is `null` until the project is initialised:
+
+```json
+{
+  "id": "0f8fad5b-d9cb-469f-a165-70867728950e",
+  "name": "Payments",
+  "description": "Card and invoice data",
+  "role": "ADMIN",
+  "keyVersion": 1,
+  "createdAt": "2026-11-04T06:36:46.000Z",
+  "updatedAt": "2026-11-04T06:36:46.000Z"
+}
+```
+
+- **Access:** someone who isn't a member gets `404`, the same as for a project that doesn't exist. A member who isn't the admin gets `403` on admin routes.
+- **Passphrase:** it goes to the KMS and is never stored, logged or audited, and it can't be changed or recovered yet.
+- **KMS failures:** `503` when the KMS is unreachable or slower than 2 seconds. Other failures follow the `kmsCall()` mapping, usually `502`. Nothing is written, so the client can try again.
+- **Audit:** each successful write records an event in the same transaction: `project.created`, `project.initialized`, `project.updated` or `project.deleted`.
+
 ## Protecting routes
 
 A global `AuthGuard` runs before every route. Without a valid session cookie the request is rejected with `401 Unauthorized`, so **new routes are protected by default**.
@@ -480,6 +513,7 @@ Requests that fail DTO validation return `400 Bad Request` in this format:
 - Redis is reachable only from the gateway's private network (VPC / security group / firewall); port 6379/6380 is never exposed to the public internet.
 - The KMS is reachable only from the gateway's private network. Each environment has its own gateway client certificate for mTLS; the private key file is readable only by the gateway's user and never committed. Rotate the client certificate before it expires.
 - `CIPSEQ_DATABASE_URL` points to a different database from `DATABASE_URL` (startup is refused otherwise). CipSeq holds key material, so preferably give it its own database user too, with access to that database only.
+- The CipSeq database has backups and point-in-time recovery, with a tested restore. The KMS is stateless, so this database holds the only copy of the wrapped keys: losing it makes the encrypted data unrecoverable.
 - `NODE_ENV=production` is set, which also turns off the API docs (`/api/v1/docs`) and Better Auth's schema endpoint.
 - The orchestrator restarts the gateway when it exits (it exits with code 1 if a database is unreachable at startup), and starts the databases before the gateway.
 - The load balancer or orchestrator uses `/api/v1/health` as the liveness probe and `/api/v1/ready` as the readiness probe, so instances stop receiving traffic while either database, Redis or the KMS is unreachable.

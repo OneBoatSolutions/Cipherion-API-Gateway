@@ -57,6 +57,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Startup check (`src/lib/startup-checks.ts`): before Nest starts, `SELECT 1` runs on both databases (5-second timeout). If either fails, the gateway logs `[Startup] Can't connect to the <auth|CipSeq> database (host:port/db): <reason>` without credentials and exits with code 1.
 - Database connection logging like Redis and the KMS (`src/lib/database-watch.ts`): a 5-second `SELECT 1` heartbeat and the pool's `error` event log `[Database]` / `[CipSeqDatabase] Connection lost, reconnecting: <reason>` (e.g. `ECONNREFUSED`, `57P01 …`) once per outage and `Connection restored` once it is back.
 - Unit tests for the startup check and the database watcher.
+- CipSeq projects in a new `CipSeqModule`, under `/api/v1/cipseq/projects`: `POST /` (create with `name` and `description`; the caller becomes the project's one admin), `POST /:id/initialize` (set the passphrase), `GET /`, `GET /:id`, `PATCH /:id` (`name` and `description`) and `DELETE /:id` (soft delete). Responses never contain wrapped keys or salts; non-members get `404` and members who aren't the admin get `403` on writes.
+- Create calls `CreateAndWrapNewProjectRootKey` and initialize calls `CreateAndWrapNewProjectEncryptionKey` on the KMS. A KMS response for a different project id answers `502` and stores nothing.
+- CipSeq tables and migrations (`cipseq_projects`, `project_description`): `project`, `projectKeys` (current wrapped keys), `projectKeyVersion` (wrapped keys of each version), `projectMember` and `auditEvent`.
+- Audit events for successful project writes (`project.created`, `project.initialized`, `project.updated`, `project.deleted`), committed in the same transaction as the change.
+- Unit and e2e tests for the project endpoints.
 
 ### Changed
 
@@ -79,6 +84,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The e2e test now boots the app on the Fastify adapter instead of Nest's default Express platform.
 - e2e tests no longer share one Better Auth rate-limit bucket (sign-up/sign-in: 3 per 10 s per IP), which made the fourth sign-up in a run fail with `429`: each test now sends its own `x-forwarded-for` address from the reserved 198.18.0.0/15 range.
 - When Redis is unreachable, auth requests no longer hang for over a minute: the Redis client fails commands within about 2 seconds (`maxRetriesPerRequest: 1`, `commandTimeout: 2000`) and auth routes and protected routes answer `503 Service Unavailable` instead of `500`.
+- CORS now allows `PATCH` and `DELETE`. Fastify's default (`GET`, `HEAD`, `POST`) made browsers block them, including Dashboard profile and settings saves.
 
 ### Security
 
@@ -89,6 +95,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Profile images are not supported: a Better Auth `before` hook rejects an `image` field on `/api/v1/auth/sign-up/email` and `/api/v1/auth/update-user` with `400`. The column stays because Better Auth's user schema requires it, but it is always `null`.
 - Startup is refused in production when `CIPSEQ_DATABASE_URL` points to the same database as `DATABASE_URL`, so CipSeq key material never shares the auth database.
 - The KMS connection always uses mutual TLS (no plaintext mode). KMS request data, which carries passphrases and key material, is never logged, and clients never see the KMS's error details.
+- Project passphrases go to the KMS and are never stored, logged or written to audit events. Only wrapped keys and salts are kept, in their own tables, so a project query can't return them by accident.
 
 ### Removed
 

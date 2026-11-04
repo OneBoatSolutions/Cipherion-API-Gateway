@@ -38,6 +38,7 @@
 
 - [x] Profile (`GET`/`PATCH /api/v1/dashboard/profile`)
 - [x] Settings: timezone, locale, in-app security alerts (`GET`/`PATCH /api/v1/dashboard/settings`)
+- [ ] Reject `null` on `PATCH` routes (`@IsOptional()` lets it through; projects use `@ValidateIf`)
 - [ ] Account activity: last login, last CipSeq operation and its time
 - [ ] Billing/subscription (provider not chosen; tables live in the CipSeq database)
 
@@ -46,12 +47,19 @@
 - [x] Separate PostgreSQL database with its own Prisma schema, client and migrations
 - [x] Cipherion KMS client (gRPC + TLS), with a KMS check in `/ready`
 - [ ] Optional concurrency limit on KMS calls, if the KMS needs protection from bursts
-- [ ] Projects and initialisation with the user's passphrase
-- [ ] Key rotation and key versions
-- [ ] Groups and group members
-- [ ] Invitations (send and accept)
-- [ ] Device registration and device key material
-- [ ] Audit event for every operation
+- [x] Projects and initialisation with the user's passphrase
+- [x] Audit events for successful project writes
+- [ ] Key rotation and key versions (decide whether old wrapped keys are deleted: a kept row still opens with the old passphrase; only the admin rotates; map the KMS's wrong-passphrase status)
+- [ ] Groups and group members (only the project admin creates or deletes a group and is a group admin by default; they can assign acting admins)
+- [ ] Invitations (send and accept; an acting admin's invitations and member removals need the project admin's approval)
+- [ ] Device registration and device key material (decide who provides the passphrase `CreateDeviceEnvelope` needs when a member registers a device)
+- [ ] Per-project limit on passphrase attempts in Redis, before any endpoint verifies a passphrase (the KMS is stateless and can't count them)
+- [ ] Rate-limit project routes (each create also calls the KMS)
+- [ ] Paginate the project list
+- [ ] Audit reads and failed attempts
+- [ ] Restore and purge for soft-deleted projects
+- [ ] Project admin handover and a plan for lost passphrases (one admin per project, no recovery today)
+- [ ] Confirm with the KMS: where the master key lives and how it is backed up and rotated (the proto has no RPC to re-wrap root keys), and whether wrapped keys are bound to their project id
 
 ## Deferred
 
@@ -64,6 +72,7 @@
 - [x] Database startup check (exit with code 1 if either database is unreachable) and connection-loss logging for both databases
 - [ ] Require SSL (`sslmode=require` or stricter) on `DATABASE_URL` and `CIPSEQ_DATABASE_URL` in production, like `rediss://` for Redis
 - [ ] Return `503` instead of `500` from Dashboard routes while a database is unreachable
+- [ ] Backups and point-in-time recovery for the CipSeq database, with a tested restore (it holds the only copy of the wrapped keys)
 - [ ] Optionally require Redis and the KMS at startup too
 - [x] OpenAPI / Swagger documentation (`/api/v1/docs`, not served in production)
 - [ ] Drop the accepted `glob`/`minimatch` advisories (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249) once `@fastify/static` moves to glob 14; they only affect a startup glob over Swagger UI's own files

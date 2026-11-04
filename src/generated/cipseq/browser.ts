@@ -17,4 +17,28 @@ import * as Prisma from './internal/prismaNamespaceBrowser.js'
 export { Prisma }
 export * as $Enums from './enums.js'
 export * from './enums.js';
-
+/**
+ * Model Project
+ * 
+ */
+export type Project = Prisma.ProjectModel
+/**
+ * Model ProjectKeys
+ * 
+ */
+export type ProjectKeys = Prisma.ProjectKeysModel
+/**
+ * Model ProjectKeyVersion
+ * 
+ */
+export type ProjectKeyVersion = Prisma.ProjectKeyVersionModel
+/**
+ * Model ProjectMember
+ * 
+ */
+export type ProjectMember = Prisma.ProjectMemberModel
+/**
+ * Model AuditEvent
+ * 
+ */
+export type AuditEvent = Prisma.AuditEventModel
