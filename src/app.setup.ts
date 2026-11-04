@@ -16,6 +16,8 @@ export function configureApp(app: NestFastifyApplication): void {
   app.enableCors({
     origin: trustedOrigins,
     credentials: true,
+    // Fastify's default leaves out PATCH and DELETE, which browsers then block.
+    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE'],
   });
 
   app.useGlobalPipes(

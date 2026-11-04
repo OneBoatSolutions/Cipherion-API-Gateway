@@ -4,6 +4,7 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module.js';
+import { CipSeqModule } from './cipseq/cipseq.module.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
 import { HealthModule } from './health/health.module.js';
 import { envFilePath } from './config/env.js';
@@ -38,6 +39,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     AuthModule,
     HealthModule,
     DashboardModule,
+    CipSeqModule,
   ],
   controllers: [AppController],
   providers: [AppService],
