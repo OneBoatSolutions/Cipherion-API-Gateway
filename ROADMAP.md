@@ -61,6 +61,10 @@
 ## Operations
 
 - [x] Health and readiness endpoints (PostgreSQL and Redis)
+- [x] Database startup check (exit with code 1 if either database is unreachable) and connection-loss logging for both databases
+- [ ] Require SSL (`sslmode=require` or stricter) on `DATABASE_URL` and `CIPSEQ_DATABASE_URL` in production, like `rediss://` for Redis
+- [ ] Return `503` instead of `500` from Dashboard routes while a database is unreachable
+- [ ] Optionally require Redis and the KMS at startup too
 - [x] OpenAPI / Swagger documentation (`/api/v1/docs`, not served in production)
 - [ ] Drop the accepted `glob`/`minimatch` advisories (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249) once `@fastify/static` moves to glob 14; they only affect a startup glob over Swagger UI's own files
 - [ ] CI pipeline (lint, test, build)

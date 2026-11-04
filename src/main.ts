@@ -5,9 +5,13 @@ import {
 } from '@nestjs/platform-fastify';
 import { AppModule, ObserveInstrument } from './app.module.js';
 import { configureApp } from './app.setup.js';
+import { checkDatabasesOnStartup } from './lib/startup-checks.js';
 import { setupOpenApi } from './openapi.js';
 
 async function bootstrap() {
+  // Exits with code 1 if either database is unreachable.
+  await checkDatabasesOnStartup();
+
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),

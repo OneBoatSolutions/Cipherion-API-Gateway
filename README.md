@@ -77,8 +77,10 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 │   ├── auth/                # AuthController (/api/v1/auth/*), global AuthGuard, @Public() / @CurrentUser()
 │   ├── dashboard/           # Dashboard routes (/api/v1/dashboard/profile, /settings)
 │   ├── health/              # Liveness (/api/v1/health) and readiness (/api/v1/ready) endpoints
-│   ├── lib/prisma.ts        # Shared PrismaClient for the auth database
-│   ├── lib/cipseq-prisma.ts # Shared PrismaClient for the CipSeq database
+│   ├── lib/prisma.ts        # Shared pg pool and PrismaClient for the auth database
+│   ├── lib/cipseq-prisma.ts # Shared pg pool and PrismaClient for the CipSeq database
+│   ├── lib/database-watch.ts# Heartbeat and connection-loss logging for both pools
+│   ├── lib/startup-checks.ts# Exits with code 1 if a database is unreachable at startup
 │   ├── lib/redis.ts         # Shared Redis client (sessions, rate limits, caching)
 │   ├── lib/kms.ts           # Shared KMS gRPC client (mTLS) and its health client
 │   ├── kms/kms-call.ts      # kmsCall(): one KMS RPC with a 2 s deadline, gRPC status → HTTP error
@@ -252,7 +254,35 @@ LOG   [KMS] Connection restored
 
 `ECONNRESET` or `TLS: tlsv1 alert unknown ca` usually means the KMS doesn't trust the gateway's client certificate.
 
-### 5. Run the gateway
+### 5. Startup checks and connection logs
+
+Before Nest starts, the gateway runs `SELECT 1` on both databases (5-second timeout). If either fails, it logs which one and why, then **exits with code 1**, so Docker, Kubernetes or systemd treat it as a failed start:
+
+```
+LOG   [Startup] Connected to the auth and CipSeq databases
+ERROR [Startup] Can't connect to the CipSeq database (localhost:5432/cipherion_cipseq): 3D000 database "cipherion_cipseq" does not exist
+ERROR [Startup] Exiting: a database is unreachable
+```
+
+Only host, port and database name are logged, never the user or password. Redis and the KMS aren't required at startup: their outages are logged and reported by `/ready`.
+
+While the gateway runs, every dependency logs a lost connection once, with its reason, and its recovery once:
+
+| Dependency | Log context | Example reason |
+| --- | --- | --- |
+| Auth database | `[Database]` | `ECONNREFUSED`, `57P01 terminating connection due to administrator command` |
+| CipSeq database | `[CipSeqDatabase]` | same as above |
+| Redis | `[Redis]` | `ECONNREFUSED` |
+| KMS | `[KMS]` | `ECONNREFUSED`, `TLS: tlsv1 alert unknown ca` |
+
+```
+ERROR [Database] Connection lost, reconnecting: ECONNREFUSED
+LOG   [Database] Connection restored
+```
+
+The databases are checked by a `SELECT 1` every 5 seconds, so an outage is noticed even without traffic.
+
+### 6. Run the gateway
 
 ```bash
 # development
@@ -451,6 +481,7 @@ Requests that fail DTO validation return `400 Bad Request` in this format:
 - The KMS is reachable only from the gateway's private network. Each environment has its own gateway client certificate for mTLS; the private key file is readable only by the gateway's user and never committed. Rotate the client certificate before it expires.
 - `CIPSEQ_DATABASE_URL` points to a different database from `DATABASE_URL` (startup is refused otherwise). CipSeq holds key material, so preferably give it its own database user too, with access to that database only.
 - `NODE_ENV=production` is set, which also turns off the API docs (`/api/v1/docs`) and Better Auth's schema endpoint.
+- The orchestrator restarts the gateway when it exits (it exits with code 1 if a database is unreachable at startup), and starts the databases before the gateway.
 - The load balancer or orchestrator uses `/api/v1/health` as the liveness probe and `/api/v1/ready` as the readiness probe, so instances stop receiving traffic while either database, Redis or the KMS is unreachable.
 - `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` are set so that telemetry is sent.
 
