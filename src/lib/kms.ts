@@ -1,0 +1,64 @@
+import '../config/env.js';
+import { credentials, Metadata } from '@grpc/grpc-js';
+import { readFileSync } from 'node:fs';
+import { HealthClient } from '../generated/kms/grpc/health/v1/health.js';
+import { grpcCallBackfromNestClient } from '../generated/kms/v1/prototypeBufferV1.js';
+import { failureReason, watchKmsConnection } from '../kms/kms-connection.js';
+
+// Client for the Cipherion KMS over gRPC with mutual TLS: the gateway checks
+// the KMS certificate against KMS_CA_CERT and presents its own certificate.
+const address = process.env.KMS_ADDRESS;
+
+if (!address) {
+  throw new Error('KMS_ADDRESS is not configured');
+}
+
+const readPem = (name: string): Buffer => {
+  const path = process.env[name];
+  if (!path) {
+    throw new Error(`${name} is not configured`);
+  }
+  try {
+    return readFileSync(path);
+  } catch (error) {
+    throw new Error(`${name} can't be read from ${path}`, { cause: error });
+  }
+};
+
+export const kms = new grpcCallBackfromNestClient(
+  address,
+  credentials.createSsl(
+    readPem('KMS_CA_CERT'),
+    readPem('KMS_CLIENT_KEY'),
+    readPem('KMS_CLIENT_CERT'),
+  ),
+);
+
+// Standard grpc.health.v1 service on the same KMS server. It reuses the KMS
+// client's channel, so the probe checks the very connection the RPCs use.
+// The credentials argument is required by grpc-js but ignored when
+// channelOverride is set: health checks go over the KMS mTLS channel.
+export const kmsHealth = new HealthClient(
+  address,
+  credentials.createInsecure(),
+  {
+    channelOverride: kms.getChannel(),
+  },
+);
+
+// A health check made while the channel is failing fails at once, and its
+// details carry the socket error the channel itself doesn't expose.
+const describeFailure = (): Promise<string> =>
+  new Promise((resolve) => {
+    kmsHealth.check(
+      { service: '' },
+      new Metadata(),
+      { deadline: Date.now() + 1000 },
+      (error) =>
+        resolve(error ? failureReason(error.details) : 'connection dropped'),
+    );
+  });
+
+watchKmsConnection(kms.getChannel(), describeFailure);
+
+export const closeKms = (): void => kms.close();

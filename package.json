@@ -23,10 +23,13 @@
     "db:generate": "prisma generate --config prisma7.config.ts && prisma generate --config prisma7.cipseq.config.ts",
     "db:migrate": "prisma migrate dev --config prisma7.config.ts",
     "db:migrate:cipseq": "prisma migrate dev --config prisma7.cipseq.config.ts",
+    "proto:generate": "buf generate",
     "db:deploy": "prisma migrate deploy --config prisma7.config.ts && prisma migrate deploy --config prisma7.cipseq.config.ts"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "^2.16.0",
     "@fastify/static": "^10.1.8",
+    "@grpc/grpc-js": "^1.14.7",
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.0.1",
     "@nestjs/core": "^12.0.1",
@@ -46,6 +49,7 @@
     "rxjs": "^7.8.1"
   },
   "devDependencies": {
+    "@bufbuild/buf": "^1.75.0",
     "@nestjs/cli": "^12.0.0",
     "@nestjs/schematics": "^12.0.0",
     "@nestjs/testing": "^12.0.1",
@@ -59,6 +63,7 @@
     "prisma": "7.10.1",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
+    "ts-proto": "^2.18.3",
     "typescript": "^6.0.2",
     "vite": "^8.0.0",
     "vitest": "^4.1.2"

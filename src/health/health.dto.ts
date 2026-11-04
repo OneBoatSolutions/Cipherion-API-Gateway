@@ -17,6 +17,9 @@ export class ReadinessChecks {
 
   @ApiProperty({ enum: ['up', 'down'], example: 'up' })
   redis!: CheckStatus;
+
+  @ApiProperty({ enum: ['up', 'down'], example: 'up' })
+  kms!: CheckStatus;
 }
 
 export class ReadinessResponse {

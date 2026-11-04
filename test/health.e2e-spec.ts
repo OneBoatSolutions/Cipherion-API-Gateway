@@ -30,13 +30,14 @@ describe('Health (e2e)', () => {
     expect(response.json()).toEqual({ status: 'ok' });
   });
 
-  it('/api/v1/ready (GET) is public and checks both databases and Redis', async () => {
+  // Needs the KMS running locally with the mTLS certificates from .env.dev.
+  it('/api/v1/ready (GET) is public and checks both databases, Redis and the KMS', async () => {
     const response = await app.inject({ method: 'GET', url: '/api/v1/ready' });
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       status: 'ok',
-      checks: { database: 'up', cipseq: 'up', redis: 'up' },
+      checks: { database: 'up', cipseq: 'up', redis: 'up', kms: 'up' },
     });
   });
 

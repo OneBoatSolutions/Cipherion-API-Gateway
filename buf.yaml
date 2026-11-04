@@ -1,0 +1,8 @@
+# Protobuf module for the Cipherion KMS contract. The .proto files are copied
+# from the KMS, one folder per contract version (proto/kms/v1); update them in
+# the KMS first, then copy them here and run `npm run proto:generate`.
+
+# buf config format version (not the KMS API version, which is v1 in proto/kms/v1).
+version: v2
+modules:
+  - path: proto/kms

@@ -9,6 +9,7 @@ import { HealthModule } from './health/health.module.js';
 import { envFilePath } from './config/env.js';
 import { envSchema } from './config/env.schema.js';
 import { cipseqPrisma } from './lib/cipseq-prisma.js';
+import { closeKms } from './lib/kms.js';
 import { prisma } from './lib/prisma.js';
 import { redis } from './lib/redis.js';
 
@@ -47,6 +48,7 @@ export class AppModule implements OnApplicationShutdown {
       redis.quit(),
       prisma.$disconnect(),
       cipseqPrisma.$disconnect(),
+      Promise.resolve().then(closeKms),
     ]);
   }
 }
