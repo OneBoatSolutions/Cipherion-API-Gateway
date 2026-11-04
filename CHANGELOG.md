@@ -48,6 +48,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Separate CipSeq database: `CIPSEQ_DATABASE_URL` (validated by Joi), its own Prisma schema (`prisma/cipseq/schema.prisma`), config (`prisma7.cipseq.config.ts`), migrations folder and client (`src/generated/cipseq`), shared through `src/lib/cipseq-prisma.ts`. No tables yet; they arrive with the CipSeq endpoints.
 - `GET /api/v1/ready` also checks the CipSeq database (`cipseq` in `checks`), and its client is disconnected on shutdown.
 - `db:generate`, `db:migrate`, `db:migrate:cipseq` and `db:deploy` npm scripts covering both databases.
+- Cipherion KMS client over gRPC with mutual TLS (`src/lib/kms.ts`), configured by `KMS_ADDRESS`, `KMS_CA_CERT`, `KMS_CLIENT_CERT` and `KMS_CLIENT_KEY` (validated by Joi).
+- KMS contract `proto/kms/v1/prototypeBufferV1.proto` and the standard `grpc.health.v1` health proto, with typed clients generated into `src/generated/kms` by `ts-proto` through `buf` (`npm run proto:generate`).
+- `kmsCall()` (`src/kms/kms-call.ts`): one KMS RPC with a 2-second deadline and no retries, mapping gRPC status to HTTP (`UNAVAILABLE`/`DEADLINE_EXCEEDED` → 503, `INVALID_ARGUMENT`/`FAILED_PRECONDITION` → 400, `NOT_FOUND` → 404, `ALREADY_EXISTS` → 409, anything else → 502).
+- `GET /api/v1/ready` also checks the KMS (`kms` in `checks`): `grpc.health.v1.Health/Check` must answer `SERVING` within 2 seconds. A failing check is logged once with its reason, and again when it passes.
+- KMS connection logging like Redis's: `[KMS] Connection lost, reconnecting: <reason>` (e.g. `ECONNREFUSED`, `ECONNRESET` or a TLS alert) once per outage and `Connection restored` once it is back. The gateway connects to the KMS at startup and reconnects an idle channel, so outages are noticed without traffic.
+- Unit tests for the KMS call helper, connection watcher and readiness check, and env schema tests for the KMS variables.
 
 ### Changed
 
@@ -77,6 +83,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - API docs are never served in production: Swagger UI, the JSON document and the Better Auth `openAPI()` plugin (whose schema endpoint is public) are only enabled when `NODE_ENV` isn't `production`. The wildcard auth route is hidden from the docs.
 - Profile images are not supported: a Better Auth `before` hook rejects an `image` field on `/api/v1/auth/sign-up/email` and `/api/v1/auth/update-user` with `400`. The column stays because Better Auth's user schema requires it, but it is always `null`.
 - Startup is refused in production when `CIPSEQ_DATABASE_URL` points to the same database as `DATABASE_URL`, so CipSeq key material never shares the auth database.
+- The KMS connection always uses mutual TLS (no plaintext mode). KMS request data, which carries passphrases and key material, is never logged, and clients never see the KMS's error details.
 
 ### Removed
 

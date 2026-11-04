@@ -4,12 +4,13 @@ Instructions for AI coding agents (Claude Code, Codex, Windsurf, Cursor, etc.) w
 
 ## Project
 
-**Cipherion API Gateway** is the unified API gateway for the Cipherion product suite. It hosts the Dashboard and CipSeq backends as Nest modules; CipSeq delegates all crypto to the Cipherion KMS over gRPC + TLS and has its own PostgreSQL database. EnQrypt and Zentriq are deferred. See [README.md](README.md) for architecture and setup.
+**Cipherion API Gateway** is the unified API gateway for the Cipherion product suite. It hosts the Dashboard and CipSeq backends as Nest modules; CipSeq delegates all crypto to the Cipherion KMS over gRPC with mutual TLS and has its own PostgreSQL database. EnQrypt and Zentriq are deferred. See [README.md](README.md) for architecture and setup.
 
 - NestJS 12 on the Fastify adapter, TypeScript, ESM (`"type": "module"`; relative imports use the `.js` extension)
 - Two PostgreSQL databases through Prisma ORM 7 (`@prisma/adapter-pg`), each with its own schema, config, migrations and generated client (never edit generated code by hand):
   - auth (users, sessions, settings): `prisma/schema.prisma`, `prisma7.config.ts`, client `src/generated/prisma`, used through `src/lib/prisma.ts`
   - CipSeq (projects, groups, keys, invitations, devices, audit, billing): `prisma/cipseq/schema.prisma`, `prisma7.cipseq.config.ts`, client `src/generated/cipseq`, used through `src/lib/cipseq-prisma.ts`. No foreign keys to the auth database: reference users by the Better Auth user id
+- Cipherion KMS over gRPC with mutual TLS: contract in `proto/kms/v1/` (copied from the KMS, don't edit it here), typed client generated into `src/generated/kms` (never edit by hand), shared client in `src/lib/kms.ts`. Call RPCs only through `kmsCall()` in `src/kms/kms-call.ts` (deadline + gRPC→HTTP mapping), never retry them, and never log KMS request data (it carries passphrases and key material)
 - Better Auth for authentication ([src/auth.ts](src/auth.ts))
 - Environment validated with Joi in [src/config/env.schema.ts](src/config/env.schema.ts)
 
@@ -21,8 +22,9 @@ npm run build                                       # compile
 npm run lint                                        # oxlint (type-aware)
 npm run format                                      # prettier
 npm run test                                        # unit tests (vitest)
-npm run test:e2e                                    # e2e tests
+npm run test:e2e                                    # e2e tests (need the KMS running locally)
 npm run db:generate                                 # regenerate both Prisma clients
+npm run proto:generate                              # regenerate the KMS gRPC client after a .proto change
 npx prisma migrate dev --name <name> --config prisma7.config.ts          # auth database
 npx prisma migrate dev --name <name> --config prisma7.cipseq.config.ts   # CipSeq database
 ```

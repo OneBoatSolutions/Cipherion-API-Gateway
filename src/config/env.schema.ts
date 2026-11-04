@@ -66,6 +66,18 @@ export const envSchema = Joi.object({
       .required(),
   }),
 
+  // Cipherion KMS over gRPC with mutual TLS. The three paths point to PEM files.
+  KMS_ADDRESS: Joi.string()
+    .pattern(/^[^\s:/]+:\d{1,5}$/)
+    .required()
+    .messages({
+      'string.pattern.base':
+        '"KMS_ADDRESS" must be host:port, e.g. localhost:50051',
+    }),
+  KMS_CA_CERT: Joi.string().required(),
+  KMS_CLIENT_CERT: Joi.string().required(),
+  KMS_CLIENT_KEY: Joi.string().required(),
+
   OBSERVE_APP_KEY: Joi.string().optional(),
   OBSERVE_APP_SECRET: Joi.string().optional(),
 });

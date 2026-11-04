@@ -6,6 +6,10 @@ const baseEnv = {
   BETTER_AUTH_SECRET: 'x'.repeat(32),
   BETTER_AUTH_URL: 'http://localhost:3000',
   AUTH_TRUSTED_ORIGINS: 'http://localhost:3000',
+  KMS_ADDRESS: 'localhost:50051',
+  KMS_CA_CERT: '/certs/kms/ca.crt',
+  KMS_CLIENT_CERT: '/certs/kms/gateway.crt',
+  KMS_CLIENT_KEY: '/certs/kms/gateway.key',
 };
 
 const validate = (env: Record<string, string>) =>
@@ -84,5 +88,39 @@ describe('envSchema CIPSEQ_DATABASE_URL', () => {
   it('accepts a separate database in production, even with the same user', () => {
     const { error } = validate({ NODE_ENV: 'production', ...redis });
     expect(error).toBeUndefined();
+  });
+});
+
+describe('envSchema KMS', () => {
+  const redis = { REDIS_URL: 'redis://localhost:6379' };
+
+  it('accepts host:port addresses', () => {
+    for (const KMS_ADDRESS of ['localhost:50051', 'kms.internal:443', '10.0.0.5:50051']) {
+      expect(validate({ ...redis, KMS_ADDRESS }).error).toBeUndefined();
+    }
+  });
+
+  it('rejects an address without a port or with a scheme', () => {
+    for (const KMS_ADDRESS of ['localhost', 'https://kms.internal:443']) {
+      expect(validate({ ...redis, KMS_ADDRESS }).error?.message).toBe(
+        '"KMS_ADDRESS" must be host:port, e.g. localhost:50051',
+      );
+    }
+  });
+
+  it('requires the address and all three mTLS files', () => {
+    for (const name of [
+      'KMS_ADDRESS',
+      'KMS_CA_CERT',
+      'KMS_CLIENT_CERT',
+      'KMS_CLIENT_KEY',
+    ]) {
+      const { error } = envSchema.validate({
+        ...baseEnv,
+        ...redis,
+        [name]: undefined,
+      });
+      expect(error?.message).toBe(`"${name}" is required`);
+    }
   });
 });

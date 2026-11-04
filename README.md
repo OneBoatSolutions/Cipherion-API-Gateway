@@ -48,6 +48,7 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 | Framework | NestJS 12 with the Fastify adapter |
 | Database | PostgreSQL, Prisma ORM 7 (`@prisma/adapter-pg` driver adapter) |
 | Cache | Redis 7, `ioredis` |
+| KMS client | gRPC with mutual TLS (`@grpc/grpc-js`), types generated from `.proto` by `ts-proto` through `buf` |
 | Auth | Better Auth with the Prisma adapter and Redis secondary storage |
 | Validation | class-validator, class-transformer, Joi (environment) |
 | Observability | `@nestjs/observe` |
@@ -64,6 +65,8 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 │   └── cipseq/              # CipSeq database: schema.prisma and migrations/
 ├── prisma7.config.ts        # Prisma config for the auth database; loads .env.dev / .env.prod / .env.test from NODE_ENV
 ├── prisma7.cipseq.config.ts # Prisma config for the CipSeq database
+├── proto/kms/               # KMS gRPC contract copied from the KMS (v1/) and the standard grpc/health/v1 proto
+├── buf.yaml, buf.gen.yaml   # buf module and ts-proto generation into src/generated/kms
 ├── src/
 │   ├── main.ts              # Bootstrap: Fastify adapter, configureApp(), setupOpenApi(), port binding
 │   ├── app.setup.ts         # configureApp(): /api/v1 prefix, CORS, global ValidationPipe
@@ -77,7 +80,9 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 │   ├── lib/prisma.ts        # Shared PrismaClient for the auth database
 │   ├── lib/cipseq-prisma.ts # Shared PrismaClient for the CipSeq database
 │   ├── lib/redis.ts         # Shared Redis client (sessions, rate limits, caching)
-│   └── generated/           # Generated Prisma Clients, prisma/ and cipseq/ (do not edit by hand)
+│   ├── lib/kms.ts           # Shared KMS gRPC client (mTLS) and its health client
+│   ├── kms/kms-call.ts      # kmsCall(): one KMS RPC with a 2 s deadline, gRPC status → HTTP error
+│   └── generated/           # Generated clients: prisma/, cipseq/ (Prisma) and kms/ (gRPC). Do not edit by hand
 ├── test/                    # End-to-end tests (helpers/ cleans up test users in Postgres and Redis)
 ├── .env.example             # Template for environment variables
 └── package.json
@@ -92,6 +97,7 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 - **Node.js** 22 or later, and npm
 - **PostgreSQL** 14 or later, running locally, in Docker, or hosted
 - **Redis** 6.2 or later (`GETDEL` is required), running locally, in Docker, or hosted
+- **Cipherion KMS** running and reachable over gRPC with mutual TLS (locally on `localhost:50051`), plus a CA certificate for the KMS and a client certificate and key for the gateway
 
 To run both quickly with Docker:
 
@@ -144,6 +150,10 @@ The Prisma CLI configs (`prisma7.config.ts`, `prisma7.cipseq.config.ts`) choose 
 | `BETTER_AUTH_URL` | **Yes** | – | Public base URL of the gateway, e.g. `http://localhost:3000` |
 | `AUTH_TRUSTED_ORIGINS` | **Yes** | – | Comma-separated list of origins allowed to call auth endpoints (for example, the dashboard URL) |
 | `REDIS_URL` | **Yes** | – | Redis connection string (`redis://` or `rediss://` for TLS; `rediss://` is required when `NODE_ENV=production`), e.g. `redis://localhost:6379` |
+| `KMS_ADDRESS` | **Yes** | – | Cipherion KMS gRPC address as `host:port`, e.g. `localhost:50051` |
+| `KMS_CA_CERT` | **Yes** | – | Path to the PEM CA certificate that signed the KMS server certificate |
+| `KMS_CLIENT_CERT` | **Yes** | – | Path to the gateway's PEM client certificate (mutual TLS), signed by a CA the KMS trusts |
+| `KMS_CLIENT_KEY` | **Yes** | – | Path to the gateway's PEM client private key |
 | `OBSERVE_APP_KEY` | No | – | NestJS Observe app key |
 | `OBSERVE_APP_SECRET` | No | – | NestJS Observe app secret |
 
@@ -169,6 +179,11 @@ BETTER_AUTH_URL=http://localhost:3000
 AUTH_TRUSTED_ORIGINS="http://localhost:3000,http://localhost:5173"
 
 REDIS_URL=redis://localhost:6379
+
+KMS_ADDRESS=localhost:50051
+KMS_CA_CERT=/home/you/.cipherion/kms-tls/ca.crt
+KMS_CLIENT_CERT=/home/you/.cipherion/kms-tls/gateway.crt
+KMS_CLIENT_KEY=/home/you/.cipherion/kms-tls/gateway.key
 ```
 
 > Never commit `.env`, `.env.dev` or `.env.prod`. Only `.env.example` belongs in version control.
@@ -202,7 +217,42 @@ npx prisma studio --config prisma7.config.ts
 npx prisma studio --config prisma7.cipseq.config.ts
 ```
 
-### 4. Run the gateway
+### 4. Connect to the KMS
+
+CipSeq delegates every crypto operation to the Cipherion KMS over gRPC with **mutual TLS**: the gateway verifies the KMS certificate against `KMS_CA_CERT` and presents its own certificate (`KMS_CLIENT_CERT` / `KMS_CLIENT_KEY`). There is no plaintext mode.
+
+The contract lives in `proto/kms/v1/prototypeBufferV1.proto`, copied from the KMS. When the KMS contract changes, copy the new `.proto` over it and regenerate the typed client into `src/generated/kms`:
+
+```bash
+npm run proto:generate
+```
+
+The gateway calls the KMS through `kmsCall()` (`src/kms/kms-call.ts`):
+
+- **Deadline:** every call has a 2-second deadline.
+- **No retries:** creating or rotating keys twice isn't safe.
+- **Error mapping:**
+
+  | gRPC status from the KMS | HTTP status |
+  | --- | --- |
+  | `UNAVAILABLE`, `DEADLINE_EXCEEDED` | `503` |
+  | `INVALID_ARGUMENT`, `FAILED_PRECONDITION` | `400` |
+  | `NOT_FOUND` | `404` |
+  | `ALREADY_EXISTS` | `409` |
+  | anything else | `502` |
+
+- **No leaks:** clients get a generic message; the gRPC details go only to the `[KMS]` log. Request data, which includes passphrases, is never logged.
+
+The gateway connects to the KMS at startup and keeps the connection open. Like Redis, a lost connection is logged once with its reason and once when it is back:
+
+```
+ERROR [KMS] Connection lost, reconnecting: ECONNREFUSED
+LOG   [KMS] Connection restored
+```
+
+`ECONNRESET` or `TLS: tlsv1 alert unknown ca` usually means the KMS doesn't trust the gateway's client certificate.
+
+### 5. Run the gateway
 
 ```bash
 # development
@@ -240,7 +290,8 @@ The API documentation is at http://localhost:3000/api/v1/docs.
 | `npm run test` | Run unit tests (Vitest) |
 | `npm run test:watch` | Run unit tests in watch mode |
 | `npm run test:cov` | Run unit tests with coverage |
-| `npm run test:e2e` | Run end-to-end tests |
+| `npm run test:e2e` | Run end-to-end tests (needs both databases, Redis and the KMS running locally) |
+| `npm run proto:generate` | Regenerate the typed KMS gRPC client from `proto/kms` into `src/generated/kms` |
 
 ## API documentation
 
@@ -304,11 +355,11 @@ Both endpoints are public, so load balancers and orchestrators can call them wit
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/api/v1/health` | Liveness: `200 {"status":"ok"}` whenever the process is running. It never checks dependencies, so a database or Redis outage doesn't get healthy instances restarted. |
-| `GET` | `/api/v1/ready` | Readiness: checks the auth database and the CipSeq database (`SELECT 1`) and Redis (`PING`) together. `200` when all three answer; `503` when any is down or takes longer than 2 seconds. |
+| `GET` | `/api/v1/ready` | Readiness: checks the auth database and the CipSeq database (`SELECT 1`), Redis (`PING`) and the KMS (`grpc.health.v1.Health/Check` must answer `SERVING`) together. `200` when all four answer; `503` when any is down or takes longer than 2 seconds. |
 
 ```json
 // GET /api/v1/ready while Redis is down → 503
-{ "status": "error", "checks": { "database": "up", "cipseq": "up", "redis": "down" } }
+{ "status": "error", "checks": { "database": "up", "cipseq": "up", "redis": "down", "kms": "up" } }
 ```
 
 The response only says `up` or `down` for each dependency, never error details.
@@ -397,9 +448,10 @@ Requests that fail DTO validation return `400 Bad Request` in this format:
 - `REDIS_URL` points to a managed or replicated Redis over TLS. Startup is refused unless it uses `rediss://` when `NODE_ENV=production`. Auth requests answer `503` while Redis is unreachable.
 - Redis requires authentication: a dedicated ACL user with a strong password in the URL, e.g. `rediss://gateway:<password>@redis.internal:6380`. Never use the passwordless `default` user.
 - Redis is reachable only from the gateway's private network (VPC / security group / firewall); port 6379/6380 is never exposed to the public internet.
+- The KMS is reachable only from the gateway's private network. Each environment has its own gateway client certificate for mTLS; the private key file is readable only by the gateway's user and never committed. Rotate the client certificate before it expires.
 - `CIPSEQ_DATABASE_URL` points to a different database from `DATABASE_URL` (startup is refused otherwise). CipSeq holds key material, so preferably give it its own database user too, with access to that database only.
 - `NODE_ENV=production` is set, which also turns off the API docs (`/api/v1/docs`) and Better Auth's schema endpoint.
-- The load balancer or orchestrator uses `/api/v1/health` as the liveness probe and `/api/v1/ready` as the readiness probe, so instances stop receiving traffic while either database or Redis is unreachable.
+- The load balancer or orchestrator uses `/api/v1/health` as the liveness probe and `/api/v1/ready` as the readiness probe, so instances stop receiving traffic while either database, Redis or the KMS is unreachable.
 - `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` are set so that telemetry is sent.
 
 ## Observability
