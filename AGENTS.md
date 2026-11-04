@@ -10,6 +10,7 @@ Instructions for AI coding agents (Claude Code, Codex, Windsurf, Cursor, etc.) w
 - Two PostgreSQL databases through Prisma ORM 7 (`@prisma/adapter-pg`), each with its own schema, config, migrations and generated client (never edit generated code by hand):
   - auth (users, sessions, settings): `prisma/schema.prisma`, `prisma7.config.ts`, client `src/generated/prisma`, used through `src/lib/prisma.ts`
   - CipSeq (projects, groups, keys, invitations, devices, audit, billing): `prisma/cipseq/schema.prisma`, `prisma7.cipseq.config.ts`, client `src/generated/cipseq`, used through `src/lib/cipseq-prisma.ts`. No foreign keys to the auth database: reference users by the Better Auth user id
+  - Each database has one `pg` pool, exported from its `src/lib/*prisma.ts` file and watched by `src/lib/database-watch.ts`. Don't create other pools or Prisma clients; `src/main.ts` checks both databases at startup and exits with code 1 if either is unreachable
 - Cipherion KMS over gRPC with mutual TLS: contract in `proto/kms/v1/` (copied from the KMS, don't edit it here), typed client generated into `src/generated/kms` (never edit by hand), shared client in `src/lib/kms.ts`. Call RPCs only through `kmsCall()` in `src/kms/kms-call.ts` (deadline + gRPC→HTTP mapping), never retry them, and never log KMS request data (it carries passphrases and key material)
 - Better Auth for authentication ([src/auth.ts](src/auth.ts))
 - Environment validated with Joi in [src/config/env.schema.ts](src/config/env.schema.ts)
