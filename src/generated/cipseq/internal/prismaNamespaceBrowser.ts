@@ -55,6 +55,10 @@ export const ModelName = {
   ProjectKeys: 'ProjectKeys',
   ProjectKeyVersion: 'ProjectKeyVersion',
   ProjectMember: 'ProjectMember',
+  Group: 'Group',
+  GroupKeys: 'GroupKeys',
+  GroupKeyVersion: 'GroupKeyVersion',
+  GroupMember: 'GroupMember',
   AuditEvent: 'AuditEvent'
 } as const
 
@@ -120,6 +124,54 @@ export const ProjectMemberScalarFieldEnum = {
 } as const
 
 export type ProjectMemberScalarFieldEnum = (typeof ProjectMemberScalarFieldEnum)[keyof typeof ProjectMemberScalarFieldEnum]
+
+
+export const GroupScalarFieldEnum = {
+  id: 'id',
+  projectId: 'projectId',
+  name: 'name',
+  description: 'description',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  deletedAt: 'deletedAt'
+} as const
+
+export type GroupScalarFieldEnum = (typeof GroupScalarFieldEnum)[keyof typeof GroupScalarFieldEnum]
+
+
+export const GroupKeysScalarFieldEnum = {
+  groupId: 'groupId',
+  wrappedGroupRootKeyIv: 'wrappedGroupRootKeyIv',
+  wrappedGroupRootKey: 'wrappedGroupRootKey',
+  wrappedGroupRootKeyTag: 'wrappedGroupRootKeyTag',
+  wrappedGroupDataEncryptionKeyIv: 'wrappedGroupDataEncryptionKeyIv',
+  wrappedGroupDataEncryptionKey: 'wrappedGroupDataEncryptionKey',
+  wrappedGroupDataEncryptionKeyTag: 'wrappedGroupDataEncryptionKeyTag',
+  currentGdekVersion: 'currentGdekVersion',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type GroupKeysScalarFieldEnum = (typeof GroupKeysScalarFieldEnum)[keyof typeof GroupKeysScalarFieldEnum]
+
+
+export const GroupKeyVersionScalarFieldEnum = {
+  groupId: 'groupId',
+  gdekVersion: 'gdekVersion',
+  createdAt: 'createdAt'
+} as const
+
+export type GroupKeyVersionScalarFieldEnum = (typeof GroupKeyVersionScalarFieldEnum)[keyof typeof GroupKeyVersionScalarFieldEnum]
+
+
+export const GroupMemberScalarFieldEnum = {
+  groupId: 'groupId',
+  userId: 'userId',
+  role: 'role',
+  createdAt: 'createdAt'
+} as const
+
+export type GroupMemberScalarFieldEnum = (typeof GroupMemberScalarFieldEnum)[keyof typeof GroupMemberScalarFieldEnum]
 
 
 export const AuditEventScalarFieldEnum = {

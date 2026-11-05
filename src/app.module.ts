@@ -14,6 +14,7 @@ import { stopDatabaseWatches } from './lib/database-watch.js';
 import { closeKms } from './lib/kms.js';
 import { prisma } from './lib/prisma.js';
 import { redis } from './lib/redis.js';
+import { WorkspaceModule } from './workspace/workspace.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -40,6 +41,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     HealthModule,
     DashboardModule,
     CipSeqModule,
+    WorkspaceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

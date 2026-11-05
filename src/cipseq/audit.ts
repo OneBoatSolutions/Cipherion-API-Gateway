@@ -5,7 +5,26 @@ export type AuditAction =
   | 'project.initialized'
   | 'project.key_rotated'
   | 'project.updated'
-  | 'project.deleted';
+  | 'project.deleted'
+  | 'group.created'
+  | 'group.updated'
+  | 'group.deleted'
+  | 'group.key_rotated'
+  | 'group.member_role_changed'
+  | 'group.member_revoked';
+
+type AuditMetadata =
+  | { changed: string[] }
+  | { fromVersion: number; toVersion: number }
+  | { groupId: string; changed?: string[] }
+  | { groupId: string; fromVersion: number; toVersion: number }
+  | { groupId: string; targetUserId: string; role: string }
+  | {
+      groupId: string;
+      targetUserId: string;
+      fromVersion: number;
+      toVersion: number;
+    };
 
 // Runs inside the transaction of the change it records, so the two commit
 // together. Metadata must never hold passphrases or key material.
@@ -13,7 +32,7 @@ export function auditEvent(
   userId: string,
   action: AuditAction,
   projectId: string,
-  metadata?: { changed: string[] } | { fromVersion: number; toVersion: number },
+  metadata?: AuditMetadata,
 ) {
   return cipseqPrisma.auditEvent.create({
     data: { userId, action, projectId, metadata },

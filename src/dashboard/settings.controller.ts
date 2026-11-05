@@ -12,15 +12,10 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { prisma } from '../lib/prisma.js';
 import {
   DEFAULT_SETTINGS,
+  SETTINGS_FIELDS,
   SettingsResponse,
   UpdateSettingsDto,
 } from './settings.dto.js';
-
-const SETTINGS_FIELDS = {
-  timezone: true,
-  locale: true,
-  securityAlerts: true,
-} as const;
 
 @ApiTags('dashboard')
 @ApiCookieAuth()

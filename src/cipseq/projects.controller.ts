@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import {
-  BadGatewayException,
   BadRequestException,
   Body,
   ConflictException,
@@ -8,7 +7,6 @@ import {
   Delete,
   Get,
   HttpCode,
-  Logger,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -32,16 +30,10 @@ import {
 } from '@nestjs/swagger';
 import type { AuthUser } from '../auth/auth.types.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
-import { Prisma } from '../generated/cipseq/client.js';
-import { IncorrectPassphraseException } from '../kms/incorrect-passphrase.exception.js';
 import { kmsCall } from '../kms/kms-call.js';
 import { cipseqPrisma } from '../lib/cipseq-prisma.js';
 import { auditEvent } from './audit.js';
-import {
-  clearPassphraseAttempts,
-  releasePassphraseAttempt,
-  reservePassphraseAttempt,
-} from './passphrase-attempts.js';
+import { assertSameId, isUniqueViolation } from './cipseq-errors.js';
 import {
   findProjectForAdmin,
   findProjectForMember,
@@ -55,25 +47,9 @@ import {
   RotateProjectDto,
   UpdateProjectDto,
 } from './projects.dto.js';
+import { withPassphraseAttempt } from './with-passphrase-attempt.js';
 
 const FIRST_KEY_VERSION = 1;
-const logger = new Logger('CipSeq');
-
-// The key is bound to the project id, so a key returned for another project
-// must never be saved.
-function assertSameProject(sent: string, received: string): void {
-  if (sent !== received) {
-    logger.error('The KMS returned keys for a different project');
-    throw new BadGatewayException();
-  }
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === 'P2002'
-  );
-}
 
 @ApiTags('cipseq')
 @ApiCookieAuth()
@@ -97,7 +73,7 @@ export class ProjectsController {
     const wrapped = await kmsCall('createAndWrapNewProjectRootKey', {
       ProjectId: id,
     });
-    assertSameProject(id, wrapped.ProjectId);
+    assertSameId(id, wrapped.ProjectId);
 
     const [project] = await cipseqPrisma.$transaction([
       cipseqPrisma.project.create({
@@ -159,7 +135,7 @@ export class ProjectsController {
       WrappedProjectRootKeyTag: rootKey.wrappedProjectRootKeyTag,
       UserPassphrase: passphrase,
     });
-    assertSameProject(id, wrapped.ProjectId);
+    assertSameId(id, wrapped.ProjectId);
 
     const encryptionKey = {
       wrappedProjectEncryptionKeyIv: wrapped.WrappedProjectEncryptionKeyIV,
@@ -228,10 +204,7 @@ export class ProjectsController {
       );
     }
 
-    await reservePassphraseAttempt(id);
-
-    let toVersion: number;
-    try {
+    const toVersion = await withPassphraseAttempt(id, async () => {
       const keys = await cipseqPrisma.projectKeys.findUniqueOrThrow({
         where: { projectId: id },
       });
@@ -262,47 +235,45 @@ export class ProjectsController {
             keys.wrappedProjectEncryptionKeyTag,
         },
       );
-      assertSameProject(id, wrapped.ProjectId);
+      assertSameId(id, wrapped.ProjectId);
 
       const fromVersion = keys.currentKeyVersion;
-      toVersion = fromVersion + 1;
-      await cipseqPrisma.$transaction([
-        // The primary key rejects a second rotation from the same version.
-        cipseqPrisma.projectKeyVersion.create({
-          data: { projectId: id, version: toVersion },
-        }),
-        cipseqPrisma.projectKeys.update({
-          where: { projectId: id },
-          data: {
-            wrappedProjectEncryptionKeyIv:
-              wrapped.NewWrappedProjectEncryptionKeyIV,
-            wrappedProjectEncryptionKey: wrapped.NewWrappedProjectEncryptionKey,
-            wrappedProjectEncryptionKeyTag:
-              wrapped.NewWrappedProjectEncryptionKeyTag,
-            userPassphraseSalt: wrapped.NewUserPassphraseSalt,
-            currentKeyVersion: toVersion,
-          },
-        }),
-        auditEvent(user.id, 'project.key_rotated', id, {
-          fromVersion,
-          toVersion,
-        }),
-      ]);
-    } catch (error) {
-      // A wrong passphrase stays counted. Anything else says nothing about it.
-      if (error instanceof IncorrectPassphraseException) {
+      const nextVersion = fromVersion + 1;
+      try {
+        await cipseqPrisma.$transaction([
+          // The primary key rejects a second rotation from the same version.
+          cipseqPrisma.projectKeyVersion.create({
+            data: { projectId: id, version: nextVersion },
+          }),
+          cipseqPrisma.projectKeys.update({
+            where: { projectId: id },
+            data: {
+              wrappedProjectEncryptionKeyIv:
+                wrapped.NewWrappedProjectEncryptionKeyIV,
+              wrappedProjectEncryptionKey:
+                wrapped.NewWrappedProjectEncryptionKey,
+              wrappedProjectEncryptionKeyTag:
+                wrapped.NewWrappedProjectEncryptionKeyTag,
+              userPassphraseSalt: wrapped.NewUserPassphraseSalt,
+              currentKeyVersion: nextVersion,
+            },
+          }),
+          auditEvent(user.id, 'project.key_rotated', id, {
+            fromVersion,
+            toVersion: nextVersion,
+          }),
+        ]);
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new ConflictException(
+            'The project was rotated by another request',
+          );
+        }
         throw error;
       }
-      await releasePassphraseAttempt(id);
-      if (isUniqueViolation(error)) {
-        throw new ConflictException(
-          'The project was rotated by another request',
-        );
-      }
-      throw error;
-    }
+      return nextVersion;
+    });
 
-    await clearPassphraseAttempts(id);
     return toProjectResponse(
       { ...project, keys: { currentKeyVersion: toVersion } },
       user.id,

@@ -50,14 +50,17 @@
 - [x] Projects and initialisation with the user's passphrase
 - [x] Audit events for successful project writes
 - [x] Key rotation and key versions (old wrapped keys aren't kept; only the admin rotates)
-- [ ] Groups and group members (only the project admin creates or deletes a group and is a group admin by default; they can assign acting admins; add group RPCs that check a passphrase to the wrong-passphrase mapping and attempt limit)
-- [ ] Rotate the group data encryption key when a member is revoked, keeping the old wrapped versions (decide which RPC does this: the proto only has one that also creates a new group root key)
-- [ ] Invitations (send and accept; an acting admin's invitations and member removals need the project admin's approval)
-- [ ] Device registration and device key material (decide who provides the passphrase `CreateDeviceEnvelope` needs when a member registers a device)
+- [x] Groups and group members (only the project admin creates or deletes a group and is a group admin by default; they can assign acting admins)
+- [x] Rotate group keys manually and when a member is revoked (a new group root key and GDEK each time; old wrapped pairs aren't kept)
+- [x] `GET /workspace`: one read for everything the signed-in user is a part of
+- [ ] Invitations (send and accept; an acting admin's invitations and member removals need the project admin's approval; decide how to invite someone without an account, since the gateway sends no email; fill `notifications` in `/workspace`)
+- [ ] Device registration and device key material (decide who provides the passphrase `CreateDeviceEnvelope` needs when a member registers a device, and for remaining members after each rotation; add the RPC to the wrong-passphrase mapping and attempt limit, since it answers `502` today)
+- [ ] Device revocation (soft delete all versions of a device's or member's envelopes; decide whether revoking one device rotates the GDEK, since a stolen device can keep decrypting new data with a saved envelope until the next rotation)
 - [x] Per-project limit on passphrase attempts in Redis (the KMS is stateless and can't count them)
 - [ ] Test rotation against a KMS that accepts the connection and never answers (a closed port is tested; the deadline and its `503` mapping are only unit tested)
-- [ ] Rate-limit project routes (each create also calls the KMS)
+- [ ] Rate-limit project and group routes (their writes also call the KMS)
 - [ ] Paginate the project list
+- [ ] Revisit `/workspace` for very large accounts (return `memberCount` and load members per group; 51 groups with 10,002 members took 91–209 ms locally)
 - [ ] Audit reads and failed attempts
 - [ ] Restore and purge for soft-deleted projects
 - [ ] Project admin handover and a plan for lost passphrases (one admin per project, no recovery today)
@@ -76,6 +79,7 @@
 - [ ] Return `503` instead of `500` from Dashboard routes while a database is unreachable
 - [ ] Backups and point-in-time recovery for the CipSeq database, with a tested restore (it holds the only copy of the wrapped keys)
 - [ ] Optionally require Redis and the KMS at startup too
+- [ ] Compress responses before production (`/workspace` was 1.67 MB for 10,002 members, 97 KB gzipped)
 - [ ] Decide whether the public `/ready` response should name its dependencies (`database`, `cipseq`, `redis`, `kms`)
 - [x] OpenAPI / Swagger documentation (`/api/v1/docs`, not served in production)
 - [ ] Drop the accepted `glob`/`minimatch` advisories (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249) once `@fastify/static` moves to glob 14; they only affect a startup glob over Swagger UI's own files

@@ -80,12 +80,12 @@ describe('toHttpException', () => {
     );
   });
 
-  it('maps PERMISSION_DENIED to an incorrect passphrase on rotation', () => {
+  it.each([
+    'rotateWrappingKeyforProjectEncryptionKey',
+    'createAndWrapNewGroupRootKeyAndGroupDataEncryptionKey',
+  ])('maps PERMISSION_DENIED to an incorrect passphrase on %s', (method) => {
     expect(
-      toHttpException(
-        'rotateWrappingKeyforProjectEncryptionKey',
-        grpcError(status.PERMISSION_DENIED),
-      ),
+      toHttpException(method, grpcError(status.PERMISSION_DENIED)),
     ).toBeInstanceOf(IncorrectPassphraseException);
   });
 

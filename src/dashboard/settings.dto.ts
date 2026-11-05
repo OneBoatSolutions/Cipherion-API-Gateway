@@ -1,6 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsLocale, IsOptional, IsTimeZone } from 'class-validator';
 
+export const SETTINGS_FIELDS = {
+  timezone: true,
+  locale: true,
+  securityAlerts: true,
+} as const;
+
 // Same values as the column defaults on UserSettings in prisma/schema.prisma.
 export const DEFAULT_SETTINGS = {
   timezone: 'UTC',

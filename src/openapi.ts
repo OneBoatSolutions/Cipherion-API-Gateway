@@ -32,7 +32,11 @@ export async function setupOpenApi(app: NestFastifyApplication): Promise<void> {
       'dashboard',
       'Profile, settings and account activity of the signed-in user',
     )
-    .addTag('cipseq', 'CipSeq projects and their keys')
+    .addTag(
+      'workspace',
+      'Everything the signed-in user is a part of, in one read',
+    )
+    .addTag('cipseq', 'CipSeq projects, groups and their keys')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

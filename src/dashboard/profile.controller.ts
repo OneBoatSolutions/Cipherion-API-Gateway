@@ -21,7 +21,11 @@ import { auth } from '../auth.js';
 import type { AuthUser } from '../auth/auth.types.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { prisma } from '../lib/prisma.js';
-import { ProfileResponse, UpdateProfileDto } from './profile.dto.js';
+import {
+  ProfileResponse,
+  toProfileResponse,
+  UpdateProfileDto,
+} from './profile.dto.js';
 
 const PROFILE_FIELDS = {
   id: true,
@@ -41,8 +45,7 @@ export class ProfileController {
   @ApiOkResponse({ type: ProfileResponse })
   @Get()
   get(@CurrentUser() user: AuthUser): ProfileResponse {
-    const { id, name, email, emailVerified, createdAt } = user;
-    return { id, name, email, emailVerified, createdAt };
+    return toProfileResponse(user);
   }
 
   // Goes through Better Auth rather than Prisma so the user cached with the
