@@ -37,39 +37,18 @@ export type ProjectKeyVersionSumAggregateOutputType = {
 export type ProjectKeyVersionMinAggregateOutputType = {
   projectId: string | null
   version: number | null
-  wrappedProjectRootKeyIv: string | null
-  wrappedProjectRootKey: string | null
-  wrappedProjectRootKeyTag: string | null
-  wrappedProjectEncryptionKeyIv: string | null
-  wrappedProjectEncryptionKey: string | null
-  wrappedProjectEncryptionKeyTag: string | null
-  userPassphraseSalt: string | null
   createdAt: Date | null
 }
 
 export type ProjectKeyVersionMaxAggregateOutputType = {
   projectId: string | null
   version: number | null
-  wrappedProjectRootKeyIv: string | null
-  wrappedProjectRootKey: string | null
-  wrappedProjectRootKeyTag: string | null
-  wrappedProjectEncryptionKeyIv: string | null
-  wrappedProjectEncryptionKey: string | null
-  wrappedProjectEncryptionKeyTag: string | null
-  userPassphraseSalt: string | null
   createdAt: Date | null
 }
 
 export type ProjectKeyVersionCountAggregateOutputType = {
   projectId: number
   version: number
-  wrappedProjectRootKeyIv: number
-  wrappedProjectRootKey: number
-  wrappedProjectRootKeyTag: number
-  wrappedProjectEncryptionKeyIv: number
-  wrappedProjectEncryptionKey: number
-  wrappedProjectEncryptionKeyTag: number
-  userPassphraseSalt: number
   createdAt: number
   _all: number
 }
@@ -86,39 +65,18 @@ export type ProjectKeyVersionSumAggregateInputType = {
 export type ProjectKeyVersionMinAggregateInputType = {
   projectId?: true
   version?: true
-  wrappedProjectRootKeyIv?: true
-  wrappedProjectRootKey?: true
-  wrappedProjectRootKeyTag?: true
-  wrappedProjectEncryptionKeyIv?: true
-  wrappedProjectEncryptionKey?: true
-  wrappedProjectEncryptionKeyTag?: true
-  userPassphraseSalt?: true
   createdAt?: true
 }
 
 export type ProjectKeyVersionMaxAggregateInputType = {
   projectId?: true
   version?: true
-  wrappedProjectRootKeyIv?: true
-  wrappedProjectRootKey?: true
-  wrappedProjectRootKeyTag?: true
-  wrappedProjectEncryptionKeyIv?: true
-  wrappedProjectEncryptionKey?: true
-  wrappedProjectEncryptionKeyTag?: true
-  userPassphraseSalt?: true
   createdAt?: true
 }
 
 export type ProjectKeyVersionCountAggregateInputType = {
   projectId?: true
   version?: true
-  wrappedProjectRootKeyIv?: true
-  wrappedProjectRootKey?: true
-  wrappedProjectRootKeyTag?: true
-  wrappedProjectEncryptionKeyIv?: true
-  wrappedProjectEncryptionKey?: true
-  wrappedProjectEncryptionKeyTag?: true
-  userPassphraseSalt?: true
   createdAt?: true
   _all?: true
 }
@@ -212,13 +170,6 @@ export type ProjectKeyVersionGroupByArgs<ExtArgs extends runtime.Types.Extension
 export type ProjectKeyVersionGroupByOutputType = {
   projectId: string
   version: number
-  wrappedProjectRootKeyIv: string
-  wrappedProjectRootKey: string
-  wrappedProjectRootKeyTag: string
-  wrappedProjectEncryptionKeyIv: string
-  wrappedProjectEncryptionKey: string
-  wrappedProjectEncryptionKeyTag: string
-  userPassphraseSalt: string
   createdAt: Date
   _count: ProjectKeyVersionCountAggregateOutputType | null
   _avg: ProjectKeyVersionAvgAggregateOutputType | null
@@ -248,13 +199,6 @@ export type ProjectKeyVersionWhereInput = {
   NOT?: Prisma.ProjectKeyVersionWhereInput | Prisma.ProjectKeyVersionWhereInput[]
   projectId?: Prisma.UuidFilter<"ProjectKeyVersion"> | string
   version?: Prisma.IntFilter<"ProjectKeyVersion"> | number
-  wrappedProjectRootKeyIv?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  wrappedProjectRootKey?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  wrappedProjectRootKeyTag?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  wrappedProjectEncryptionKeyIv?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  wrappedProjectEncryptionKey?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  wrappedProjectEncryptionKeyTag?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  userPassphraseSalt?: Prisma.StringFilter<"ProjectKeyVersion"> | string
   createdAt?: Prisma.DateTimeFilter<"ProjectKeyVersion"> | Date | string
   project?: Prisma.XOR<Prisma.ProjectScalarRelationFilter, Prisma.ProjectWhereInput>
 }
@@ -262,13 +206,6 @@ export type ProjectKeyVersionWhereInput = {
 export type ProjectKeyVersionOrderByWithRelationInput = {
   projectId?: Prisma.SortOrder
   version?: Prisma.SortOrder
-  wrappedProjectRootKeyIv?: Prisma.SortOrder
-  wrappedProjectRootKey?: Prisma.SortOrder
-  wrappedProjectRootKeyTag?: Prisma.SortOrder
-  wrappedProjectEncryptionKeyIv?: Prisma.SortOrder
-  wrappedProjectEncryptionKey?: Prisma.SortOrder
-  wrappedProjectEncryptionKeyTag?: Prisma.SortOrder
-  userPassphraseSalt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   project?: Prisma.ProjectOrderByWithRelationInput
 }
@@ -280,13 +217,6 @@ export type ProjectKeyVersionWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.ProjectKeyVersionWhereInput | Prisma.ProjectKeyVersionWhereInput[]
   projectId?: Prisma.UuidFilter<"ProjectKeyVersion"> | string
   version?: Prisma.IntFilter<"ProjectKeyVersion"> | number
-  wrappedProjectRootKeyIv?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  wrappedProjectRootKey?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  wrappedProjectRootKeyTag?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  wrappedProjectEncryptionKeyIv?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  wrappedProjectEncryptionKey?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  wrappedProjectEncryptionKeyTag?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  userPassphraseSalt?: Prisma.StringFilter<"ProjectKeyVersion"> | string
   createdAt?: Prisma.DateTimeFilter<"ProjectKeyVersion"> | Date | string
   project?: Prisma.XOR<Prisma.ProjectScalarRelationFilter, Prisma.ProjectWhereInput>
 }, "projectId_version">
@@ -294,13 +224,6 @@ export type ProjectKeyVersionWhereUniqueInput = Prisma.AtLeast<{
 export type ProjectKeyVersionOrderByWithAggregationInput = {
   projectId?: Prisma.SortOrder
   version?: Prisma.SortOrder
-  wrappedProjectRootKeyIv?: Prisma.SortOrder
-  wrappedProjectRootKey?: Prisma.SortOrder
-  wrappedProjectRootKeyTag?: Prisma.SortOrder
-  wrappedProjectEncryptionKeyIv?: Prisma.SortOrder
-  wrappedProjectEncryptionKey?: Prisma.SortOrder
-  wrappedProjectEncryptionKeyTag?: Prisma.SortOrder
-  userPassphraseSalt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.ProjectKeyVersionCountOrderByAggregateInput
   _avg?: Prisma.ProjectKeyVersionAvgOrderByAggregateInput
@@ -315,25 +238,11 @@ export type ProjectKeyVersionScalarWhereWithAggregatesInput = {
   NOT?: Prisma.ProjectKeyVersionScalarWhereWithAggregatesInput | Prisma.ProjectKeyVersionScalarWhereWithAggregatesInput[]
   projectId?: Prisma.UuidWithAggregatesFilter<"ProjectKeyVersion"> | string
   version?: Prisma.IntWithAggregatesFilter<"ProjectKeyVersion"> | number
-  wrappedProjectRootKeyIv?: Prisma.StringWithAggregatesFilter<"ProjectKeyVersion"> | string
-  wrappedProjectRootKey?: Prisma.StringWithAggregatesFilter<"ProjectKeyVersion"> | string
-  wrappedProjectRootKeyTag?: Prisma.StringWithAggregatesFilter<"ProjectKeyVersion"> | string
-  wrappedProjectEncryptionKeyIv?: Prisma.StringWithAggregatesFilter<"ProjectKeyVersion"> | string
-  wrappedProjectEncryptionKey?: Prisma.StringWithAggregatesFilter<"ProjectKeyVersion"> | string
-  wrappedProjectEncryptionKeyTag?: Prisma.StringWithAggregatesFilter<"ProjectKeyVersion"> | string
-  userPassphraseSalt?: Prisma.StringWithAggregatesFilter<"ProjectKeyVersion"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ProjectKeyVersion"> | Date | string
 }
 
 export type ProjectKeyVersionCreateInput = {
   version: number
-  wrappedProjectRootKeyIv: string
-  wrappedProjectRootKey: string
-  wrappedProjectRootKeyTag: string
-  wrappedProjectEncryptionKeyIv: string
-  wrappedProjectEncryptionKey: string
-  wrappedProjectEncryptionKeyTag: string
-  userPassphraseSalt: string
   createdAt?: Date | string
   project: Prisma.ProjectCreateNestedOneWithoutKeyVersionsInput
 }
@@ -341,25 +250,11 @@ export type ProjectKeyVersionCreateInput = {
 export type ProjectKeyVersionUncheckedCreateInput = {
   projectId: string
   version: number
-  wrappedProjectRootKeyIv: string
-  wrappedProjectRootKey: string
-  wrappedProjectRootKeyTag: string
-  wrappedProjectEncryptionKeyIv: string
-  wrappedProjectEncryptionKey: string
-  wrappedProjectEncryptionKeyTag: string
-  userPassphraseSalt: string
   createdAt?: Date | string
 }
 
 export type ProjectKeyVersionUpdateInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  wrappedProjectRootKeyIv?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectRootKey?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectRootKeyTag?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKeyIv?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKey?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKeyTag?: Prisma.StringFieldUpdateOperationsInput | string
-  userPassphraseSalt?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneRequiredWithoutKeyVersionsNestedInput
 }
@@ -367,51 +262,23 @@ export type ProjectKeyVersionUpdateInput = {
 export type ProjectKeyVersionUncheckedUpdateInput = {
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  wrappedProjectRootKeyIv?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectRootKey?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectRootKeyTag?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKeyIv?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKey?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKeyTag?: Prisma.StringFieldUpdateOperationsInput | string
-  userPassphraseSalt?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type ProjectKeyVersionCreateManyInput = {
   projectId: string
   version: number
-  wrappedProjectRootKeyIv: string
-  wrappedProjectRootKey: string
-  wrappedProjectRootKeyTag: string
-  wrappedProjectEncryptionKeyIv: string
-  wrappedProjectEncryptionKey: string
-  wrappedProjectEncryptionKeyTag: string
-  userPassphraseSalt: string
   createdAt?: Date | string
 }
 
 export type ProjectKeyVersionUpdateManyMutationInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  wrappedProjectRootKeyIv?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectRootKey?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectRootKeyTag?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKeyIv?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKey?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKeyTag?: Prisma.StringFieldUpdateOperationsInput | string
-  userPassphraseSalt?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type ProjectKeyVersionUncheckedUpdateManyInput = {
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  wrappedProjectRootKeyIv?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectRootKey?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectRootKeyTag?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKeyIv?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKey?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKeyTag?: Prisma.StringFieldUpdateOperationsInput | string
-  userPassphraseSalt?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -433,13 +300,6 @@ export type ProjectKeyVersionProjectIdVersionCompoundUniqueInput = {
 export type ProjectKeyVersionCountOrderByAggregateInput = {
   projectId?: Prisma.SortOrder
   version?: Prisma.SortOrder
-  wrappedProjectRootKeyIv?: Prisma.SortOrder
-  wrappedProjectRootKey?: Prisma.SortOrder
-  wrappedProjectRootKeyTag?: Prisma.SortOrder
-  wrappedProjectEncryptionKeyIv?: Prisma.SortOrder
-  wrappedProjectEncryptionKey?: Prisma.SortOrder
-  wrappedProjectEncryptionKeyTag?: Prisma.SortOrder
-  userPassphraseSalt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -450,26 +310,12 @@ export type ProjectKeyVersionAvgOrderByAggregateInput = {
 export type ProjectKeyVersionMaxOrderByAggregateInput = {
   projectId?: Prisma.SortOrder
   version?: Prisma.SortOrder
-  wrappedProjectRootKeyIv?: Prisma.SortOrder
-  wrappedProjectRootKey?: Prisma.SortOrder
-  wrappedProjectRootKeyTag?: Prisma.SortOrder
-  wrappedProjectEncryptionKeyIv?: Prisma.SortOrder
-  wrappedProjectEncryptionKey?: Prisma.SortOrder
-  wrappedProjectEncryptionKeyTag?: Prisma.SortOrder
-  userPassphraseSalt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
 export type ProjectKeyVersionMinOrderByAggregateInput = {
   projectId?: Prisma.SortOrder
   version?: Prisma.SortOrder
-  wrappedProjectRootKeyIv?: Prisma.SortOrder
-  wrappedProjectRootKey?: Prisma.SortOrder
-  wrappedProjectRootKeyTag?: Prisma.SortOrder
-  wrappedProjectEncryptionKeyIv?: Prisma.SortOrder
-  wrappedProjectEncryptionKey?: Prisma.SortOrder
-  wrappedProjectEncryptionKeyTag?: Prisma.SortOrder
-  userPassphraseSalt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -529,25 +375,11 @@ export type IntFieldUpdateOperationsInput = {
 
 export type ProjectKeyVersionCreateWithoutProjectInput = {
   version: number
-  wrappedProjectRootKeyIv: string
-  wrappedProjectRootKey: string
-  wrappedProjectRootKeyTag: string
-  wrappedProjectEncryptionKeyIv: string
-  wrappedProjectEncryptionKey: string
-  wrappedProjectEncryptionKeyTag: string
-  userPassphraseSalt: string
   createdAt?: Date | string
 }
 
 export type ProjectKeyVersionUncheckedCreateWithoutProjectInput = {
   version: number
-  wrappedProjectRootKeyIv: string
-  wrappedProjectRootKey: string
-  wrappedProjectRootKeyTag: string
-  wrappedProjectEncryptionKeyIv: string
-  wrappedProjectEncryptionKey: string
-  wrappedProjectEncryptionKeyTag: string
-  userPassphraseSalt: string
   createdAt?: Date | string
 }
 
@@ -583,61 +415,26 @@ export type ProjectKeyVersionScalarWhereInput = {
   NOT?: Prisma.ProjectKeyVersionScalarWhereInput | Prisma.ProjectKeyVersionScalarWhereInput[]
   projectId?: Prisma.UuidFilter<"ProjectKeyVersion"> | string
   version?: Prisma.IntFilter<"ProjectKeyVersion"> | number
-  wrappedProjectRootKeyIv?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  wrappedProjectRootKey?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  wrappedProjectRootKeyTag?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  wrappedProjectEncryptionKeyIv?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  wrappedProjectEncryptionKey?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  wrappedProjectEncryptionKeyTag?: Prisma.StringFilter<"ProjectKeyVersion"> | string
-  userPassphraseSalt?: Prisma.StringFilter<"ProjectKeyVersion"> | string
   createdAt?: Prisma.DateTimeFilter<"ProjectKeyVersion"> | Date | string
 }
 
 export type ProjectKeyVersionCreateManyProjectInput = {
   version: number
-  wrappedProjectRootKeyIv: string
-  wrappedProjectRootKey: string
-  wrappedProjectRootKeyTag: string
-  wrappedProjectEncryptionKeyIv: string
-  wrappedProjectEncryptionKey: string
-  wrappedProjectEncryptionKeyTag: string
-  userPassphraseSalt: string
   createdAt?: Date | string
 }
 
 export type ProjectKeyVersionUpdateWithoutProjectInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  wrappedProjectRootKeyIv?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectRootKey?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectRootKeyTag?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKeyIv?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKey?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKeyTag?: Prisma.StringFieldUpdateOperationsInput | string
-  userPassphraseSalt?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type ProjectKeyVersionUncheckedUpdateWithoutProjectInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  wrappedProjectRootKeyIv?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectRootKey?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectRootKeyTag?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKeyIv?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKey?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKeyTag?: Prisma.StringFieldUpdateOperationsInput | string
-  userPassphraseSalt?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type ProjectKeyVersionUncheckedUpdateManyWithoutProjectInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  wrappedProjectRootKeyIv?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectRootKey?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectRootKeyTag?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKeyIv?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKey?: Prisma.StringFieldUpdateOperationsInput | string
-  wrappedProjectEncryptionKeyTag?: Prisma.StringFieldUpdateOperationsInput | string
-  userPassphraseSalt?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -646,13 +443,6 @@ export type ProjectKeyVersionUncheckedUpdateManyWithoutProjectInput = {
 export type ProjectKeyVersionSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   projectId?: boolean
   version?: boolean
-  wrappedProjectRootKeyIv?: boolean
-  wrappedProjectRootKey?: boolean
-  wrappedProjectRootKeyTag?: boolean
-  wrappedProjectEncryptionKeyIv?: boolean
-  wrappedProjectEncryptionKey?: boolean
-  wrappedProjectEncryptionKeyTag?: boolean
-  userPassphraseSalt?: boolean
   createdAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["projectKeyVersion"]>
@@ -660,13 +450,6 @@ export type ProjectKeyVersionSelect<ExtArgs extends runtime.Types.Extensions.Int
 export type ProjectKeyVersionSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   projectId?: boolean
   version?: boolean
-  wrappedProjectRootKeyIv?: boolean
-  wrappedProjectRootKey?: boolean
-  wrappedProjectRootKeyTag?: boolean
-  wrappedProjectEncryptionKeyIv?: boolean
-  wrappedProjectEncryptionKey?: boolean
-  wrappedProjectEncryptionKeyTag?: boolean
-  userPassphraseSalt?: boolean
   createdAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["projectKeyVersion"]>
@@ -674,13 +457,6 @@ export type ProjectKeyVersionSelectCreateManyAndReturn<ExtArgs extends runtime.T
 export type ProjectKeyVersionSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   projectId?: boolean
   version?: boolean
-  wrappedProjectRootKeyIv?: boolean
-  wrappedProjectRootKey?: boolean
-  wrappedProjectRootKeyTag?: boolean
-  wrappedProjectEncryptionKeyIv?: boolean
-  wrappedProjectEncryptionKey?: boolean
-  wrappedProjectEncryptionKeyTag?: boolean
-  userPassphraseSalt?: boolean
   createdAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["projectKeyVersion"]>
@@ -688,17 +464,10 @@ export type ProjectKeyVersionSelectUpdateManyAndReturn<ExtArgs extends runtime.T
 export type ProjectKeyVersionSelectScalar = {
   projectId?: boolean
   version?: boolean
-  wrappedProjectRootKeyIv?: boolean
-  wrappedProjectRootKey?: boolean
-  wrappedProjectRootKeyTag?: boolean
-  wrappedProjectEncryptionKeyIv?: boolean
-  wrappedProjectEncryptionKey?: boolean
-  wrappedProjectEncryptionKeyTag?: boolean
-  userPassphraseSalt?: boolean
   createdAt?: boolean
 }
 
-export type ProjectKeyVersionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"projectId" | "version" | "wrappedProjectRootKeyIv" | "wrappedProjectRootKey" | "wrappedProjectRootKeyTag" | "wrappedProjectEncryptionKeyIv" | "wrappedProjectEncryptionKey" | "wrappedProjectEncryptionKeyTag" | "userPassphraseSalt" | "createdAt", ExtArgs["result"]["projectKeyVersion"]>
+export type ProjectKeyVersionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"projectId" | "version" | "createdAt", ExtArgs["result"]["projectKeyVersion"]>
 export type ProjectKeyVersionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }
@@ -717,13 +486,6 @@ export type $ProjectKeyVersionPayload<ExtArgs extends runtime.Types.Extensions.I
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     projectId: string
     version: number
-    wrappedProjectRootKeyIv: string
-    wrappedProjectRootKey: string
-    wrappedProjectRootKeyTag: string
-    wrappedProjectEncryptionKeyIv: string
-    wrappedProjectEncryptionKey: string
-    wrappedProjectEncryptionKeyTag: string
-    userPassphraseSalt: string
     createdAt: Date
   }, ExtArgs["result"]["projectKeyVersion"]>
   composites: {}
@@ -1151,13 +913,6 @@ export interface Prisma__ProjectKeyVersionClient<T, Null = never, ExtArgs extend
 export interface ProjectKeyVersionFieldRefs {
   readonly projectId: Prisma.FieldRef<"ProjectKeyVersion", 'String'>
   readonly version: Prisma.FieldRef<"ProjectKeyVersion", 'Int'>
-  readonly wrappedProjectRootKeyIv: Prisma.FieldRef<"ProjectKeyVersion", 'String'>
-  readonly wrappedProjectRootKey: Prisma.FieldRef<"ProjectKeyVersion", 'String'>
-  readonly wrappedProjectRootKeyTag: Prisma.FieldRef<"ProjectKeyVersion", 'String'>
-  readonly wrappedProjectEncryptionKeyIv: Prisma.FieldRef<"ProjectKeyVersion", 'String'>
-  readonly wrappedProjectEncryptionKey: Prisma.FieldRef<"ProjectKeyVersion", 'String'>
-  readonly wrappedProjectEncryptionKeyTag: Prisma.FieldRef<"ProjectKeyVersion", 'String'>
-  readonly userPassphraseSalt: Prisma.FieldRef<"ProjectKeyVersion", 'String'>
   readonly createdAt: Prisma.FieldRef<"ProjectKeyVersion", 'DateTime'>
 }
     

@@ -1,5 +1,6 @@
 import {
   BadGatewayException,
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -7,10 +8,14 @@ import {
 } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.types.js';
 import { Prisma } from '../generated/cipseq/client.js';
+import { IncorrectPassphraseException } from '../kms/incorrect-passphrase.exception.js';
 import { ProjectsController } from './projects.controller.js';
 
 const mocks = vi.hoisted(() => ({
   kmsCall: vi.fn(),
+  reservePassphraseAttempt: vi.fn(),
+  releasePassphraseAttempt: vi.fn(),
+  clearPassphraseAttempts: vi.fn(),
   $transaction: vi.fn(),
   project: {
     create: vi.fn(),
@@ -24,6 +29,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../kms/kms-call.js', () => ({ kmsCall: mocks.kmsCall }));
+vi.mock('./passphrase-attempts.js', () => ({
+  reservePassphraseAttempt: mocks.reservePassphraseAttempt,
+  releasePassphraseAttempt: mocks.releasePassphraseAttempt,
+  clearPassphraseAttempts: mocks.clearPassphraseAttempts,
+}));
 vi.mock('../lib/cipseq-prisma.js', () => ({
   cipseqPrisma: {
     $transaction: mocks.$transaction,
@@ -163,7 +173,7 @@ describe('ProjectsController', () => {
       mocks.kmsCall.mockResolvedValue(encryptionKeyResponse);
     });
 
-    it('stores the wrapped keys and salt as version 1', async () => {
+    it('stores the wrapped key and salt, and records version 1 without them', async () => {
       await expect(
         controller.initialize(admin, id, { passphrase: PASSPHRASE }),
       ).resolves.toMatchObject({ id, role: 'ADMIN', keyVersion: 1 });
@@ -186,7 +196,7 @@ describe('ProjectsController', () => {
         userPassphraseSalt: 'salt',
       };
       expect(mocks.projectKeyVersion.create).toHaveBeenCalledWith({
-        data: { projectId: id, version: 1, ...rootKey, ...encryptionKey },
+        data: { projectId: id, version: 1 },
       });
       expect(mocks.projectKeys.update).toHaveBeenCalledWith({
         where: { projectId: id },
@@ -253,6 +263,188 @@ describe('ProjectsController', () => {
         controller.initialize(member, id, { passphrase: PASSPHRASE }),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(mocks.kmsCall).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('rotate', () => {
+    const NEW_PASSPHRASE = 'a brand new passphrase';
+    const passphrases = {
+      currentPassphrase: PASSPHRASE,
+      newPassphrase: NEW_PASSPHRASE,
+    };
+    const currentKeys = {
+      ...rootKey,
+      wrappedProjectEncryptionKeyIv: 'enc-iv',
+      wrappedProjectEncryptionKey: 'enc-key',
+      wrappedProjectEncryptionKeyTag: 'enc-tag',
+      userPassphraseSalt: 'salt',
+      currentKeyVersion: 1,
+    };
+    const rotated = {
+      ProjectId: id,
+      NewWrappedProjectEncryptionKeyIV: 'new-iv',
+      NewWrappedProjectEncryptionKey: 'new-key',
+      NewWrappedProjectEncryptionKeyTag: 'new-tag',
+      NewUserPassphraseSalt: 'new-salt',
+    };
+
+    beforeEach(() => {
+      mocks.project.findFirst.mockResolvedValue(row(1));
+      mocks.projectKeys.findUniqueOrThrow.mockResolvedValue(currentKeys);
+      mocks.kmsCall.mockResolvedValue(rotated);
+    });
+
+    it('stores the new wrapped key and salt, and bumps the version', async () => {
+      await expect(
+        controller.rotate(admin, id, passphrases),
+      ).resolves.toMatchObject({ id, role: 'ADMIN', keyVersion: 2 });
+
+      expect(mocks.kmsCall).toHaveBeenCalledWith(
+        'rotateWrappingKeyforProjectEncryptionKey',
+        {
+          ProjectId: id,
+          CurrentUserPassphrase: PASSPHRASE,
+          CurrentUserPassphraseSalt: 'salt',
+          NewUserPassphrase: NEW_PASSPHRASE,
+          CurrentWrappedProjectRootKeyIV: 'root-iv',
+          CurrentWrappedProjectRootKey: 'root-key',
+          CurrentWrappedProjectRootKeyTag: 'root-tag',
+          CurrentWrappedProjectEncryptionKeyIV: 'enc-iv',
+          CurrentWrappedProjectEncryptionKey: 'enc-key',
+          CurrentWrappedProjectEncryptionKeyTag: 'enc-tag',
+        },
+      );
+      expect(mocks.projectKeys.update).toHaveBeenCalledWith({
+        where: { projectId: id },
+        data: {
+          wrappedProjectEncryptionKeyIv: 'new-iv',
+          wrappedProjectEncryptionKey: 'new-key',
+          wrappedProjectEncryptionKeyTag: 'new-tag',
+          userPassphraseSalt: 'new-salt',
+          currentKeyVersion: 2,
+        },
+      });
+      expect(mocks.auditEvent.create).toHaveBeenCalledWith({
+        data: {
+          userId: admin.id,
+          action: 'project.key_rotated',
+          projectId: id,
+          metadata: { fromVersion: 1, toVersion: 2 },
+        },
+      });
+    });
+
+    it('records the new version without any key material', async () => {
+      await controller.rotate(admin, id, passphrases);
+
+      expect(mocks.projectKeyVersion.create).toHaveBeenCalledWith({
+        data: { projectId: id, version: 2 },
+      });
+    });
+
+    it('never writes either passphrase to the database', async () => {
+      await controller.rotate(admin, id, passphrases);
+
+      const written = JSON.stringify([
+        mocks.projectKeyVersion.create.mock.calls,
+        mocks.projectKeys.update.mock.calls,
+        mocks.auditEvent.create.mock.calls,
+      ]);
+      expect(written).not.toContain(PASSPHRASE);
+      expect(written).not.toContain(NEW_PASSPHRASE);
+    });
+
+    it('reserves an attempt before the KMS call and clears them on success', async () => {
+      await controller.rotate(admin, id, passphrases);
+
+      expect(
+        mocks.reservePassphraseAttempt.mock.invocationCallOrder[0],
+      ).toBeLessThan(mocks.kmsCall.mock.invocationCallOrder[0]);
+      expect(mocks.clearPassphraseAttempts).toHaveBeenCalledWith(id);
+      expect(mocks.releasePassphraseAttempt).not.toHaveBeenCalled();
+    });
+
+    it('keeps a wrong passphrase counted and stores nothing', async () => {
+      mocks.kmsCall.mockRejectedValue(new IncorrectPassphraseException());
+
+      await expect(
+        controller.rotate(admin, id, passphrases),
+      ).rejects.toBeInstanceOf(IncorrectPassphraseException);
+      expect(mocks.$transaction).not.toHaveBeenCalled();
+      expect(mocks.releasePassphraseAttempt).not.toHaveBeenCalled();
+      expect(mocks.clearPassphraseAttempts).not.toHaveBeenCalled();
+    });
+
+    it("doesn't call the KMS once the attempt limit is reached", async () => {
+      const tooMany = new Error('too many');
+      mocks.reservePassphraseAttempt.mockRejectedValue(tooMany);
+
+      await expect(controller.rotate(admin, id, passphrases)).rejects.toBe(
+        tooMany,
+      );
+      expect(mocks.kmsCall).not.toHaveBeenCalled();
+    });
+
+    it('gives the attempt back when the KMS is down', async () => {
+      mocks.kmsCall.mockRejectedValue(new ServiceUnavailableException());
+
+      await expect(
+        controller.rotate(admin, id, passphrases),
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      expect(mocks.releasePassphraseAttempt).toHaveBeenCalledWith(id);
+      expect(mocks.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('answers 409 and gives the attempt back when a concurrent rotation won', async () => {
+      mocks.$transaction.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      );
+
+      await expect(
+        controller.rotate(admin, id, passphrases),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(mocks.releasePassphraseAttempt).toHaveBeenCalledWith(id);
+    });
+
+    it('stores nothing when the KMS answers for another project', async () => {
+      mocks.kmsCall.mockResolvedValue({
+        ...rotated,
+        ProjectId: 'another-project',
+      });
+
+      await expect(
+        controller.rotate(admin, id, passphrases),
+      ).rejects.toBeInstanceOf(BadGatewayException);
+      expect(mocks.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('answers 409 without an attempt when the project is not initialised', async () => {
+      mocks.project.findFirst.mockResolvedValue(row(null));
+
+      await expect(
+        controller.rotate(admin, id, passphrases),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(mocks.reservePassphraseAttempt).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 without an attempt when the passphrase is unchanged', async () => {
+      await expect(
+        controller.rotate(admin, id, {
+          currentPassphrase: PASSPHRASE,
+          newPassphrase: PASSPHRASE,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(mocks.reservePassphraseAttempt).not.toHaveBeenCalled();
+    });
+
+    it('answers 403 to a member who is not the admin', async () => {
+      await expect(
+        controller.rotate(member, id, passphrases),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(mocks.reservePassphraseAttempt).not.toHaveBeenCalled();
     });
   });
 

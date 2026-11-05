@@ -7,6 +7,7 @@ import { AppModule } from './../src/app.module.js';
 import { configureApp } from './../src/app.setup.js';
 import { trustedOrigins } from './../src/config/env.js';
 import { cipseqPrisma } from './../src/lib/cipseq-prisma.js';
+import { redis } from './../src/lib/redis.js';
 import { uniqueClientIp } from './helpers/client-ip.js';
 import { deleteTestUser } from './helpers/delete-test-user.js';
 
@@ -145,10 +146,21 @@ describe('CipSeq projects (e2e)', () => {
     const version = await cipseqPrisma.projectKeyVersion.findUniqueOrThrow({
       where: { projectId_version: { projectId: created.id, version: 1 } },
     });
-    expect(version.wrappedProjectRootKey).toBe(keys.wrappedProjectRootKey);
-    expect(version.wrappedProjectEncryptionKey).not.toBe('');
-    expect(version.userPassphraseSalt).not.toBe('');
-    expect(JSON.stringify(version)).not.toContain(PASSPHRASE);
+    expect(Object.keys(version).sort()).toEqual([
+      'createdAt',
+      'projectId',
+      'version',
+    ]);
+
+    const initializedKeys = await cipseqPrisma.projectKeys.findUniqueOrThrow({
+      where: { projectId: created.id },
+    });
+    expect(initializedKeys.wrappedProjectRootKey).toBe(
+      keys.wrappedProjectRootKey,
+    );
+    expect(initializedKeys.wrappedProjectEncryptionKey).toBeTruthy();
+    expect(initializedKeys.userPassphraseSalt).toBeTruthy();
+    expect(JSON.stringify(initializedKeys)).not.toContain(PASSPHRASE);
 
     const second = await app.inject({
       method: 'POST',
@@ -246,6 +258,185 @@ describe('CipSeq projects (e2e)', () => {
       'project.deleted',
     ]);
     expect(JSON.stringify(events)).not.toContain(PASSPHRASE);
+  });
+
+  describe('rotate', () => {
+    const NEW_PASSPHRASE = 'a brand new passphrase';
+    const NEWER_PASSPHRASE = 'an even newer passphrase';
+    const WRONG_PASSPHRASE = 'not the right passphrase';
+
+    const initializedProject = async (): Promise<string> => {
+      const { id } = await createProject();
+      const response = await app.inject({
+        method: 'POST',
+        url: `${url}/${id}/initialize`,
+        headers: { cookie: adminCookie },
+        payload: { passphrase: PASSPHRASE },
+      });
+      expect(response.statusCode).toBe(200);
+      return id;
+    };
+
+    const rotate = (
+      id: string,
+      currentPassphrase: string,
+      newPassphrase: string,
+      cookie = adminCookie,
+    ) =>
+      app.inject({
+        method: 'POST',
+        url: `${url}/${id}/rotate`,
+        headers: { cookie },
+        payload: { currentPassphrase, newPassphrase },
+      });
+
+    const storedKeys = (projectId: string) =>
+      cipseqPrisma.projectKeys.findUniqueOrThrow({ where: { projectId } });
+
+    it('re-wraps the key and bumps the version on each rotation', async () => {
+      const id = await initializedProject();
+      const before = await storedKeys(id);
+
+      const first = await rotate(id, PASSPHRASE, NEW_PASSPHRASE);
+      expect(first.statusCode).toBe(200);
+      expect(first.json<Project>().keyVersion).toBe(2);
+
+      const after = await storedKeys(id);
+      expect(after.currentKeyVersion).toBe(2);
+      expect(after.wrappedProjectEncryptionKey).not.toBe(
+        before.wrappedProjectEncryptionKey,
+      );
+      expect(after.userPassphraseSalt).not.toBe(before.userPassphraseSalt);
+      expect(after.wrappedProjectRootKey).toBe(before.wrappedProjectRootKey);
+
+      // The KMS accepts the new passphrase, which proves the new wrap is usable.
+      const second = await rotate(id, NEW_PASSPHRASE, NEWER_PASSPHRASE);
+      expect(second.statusCode).toBe(200);
+      expect(second.json<Project>().keyVersion).toBe(3);
+
+      const versions = await cipseqPrisma.projectKeyVersion.findMany({
+        where: { projectId: id },
+        orderBy: { version: 'asc' },
+      });
+      expect(versions.map(({ version }) => version)).toEqual([1, 2, 3]);
+
+      const events = await cipseqPrisma.auditEvent.findMany({
+        where: { projectId: id, action: 'project.key_rotated' },
+        orderBy: { createdAt: 'asc' },
+      });
+      expect(events.map(({ metadata }) => metadata)).toEqual([
+        { fromVersion: 1, toVersion: 2 },
+        { fromVersion: 2, toVersion: 3 },
+      ]);
+      const stored = JSON.stringify([events, await storedKeys(id)]);
+      for (const passphrase of [PASSPHRASE, NEW_PASSPHRASE, NEWER_PASSPHRASE]) {
+        expect(stored).not.toContain(passphrase);
+      }
+    });
+
+    it('refuses the old passphrase after a rotation and changes nothing', async () => {
+      const id = await initializedProject();
+      await rotate(id, PASSPHRASE, NEW_PASSPHRASE);
+      const before = await storedKeys(id);
+
+      const response = await rotate(id, PASSPHRASE, NEWER_PASSPHRASE);
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ message: string }>().message).toBe(
+        'Incorrect passphrase',
+      );
+      await expect(storedKeys(id)).resolves.toEqual(before);
+    });
+
+    it('locks the project after 5 wrong passphrases, even for the right one', async () => {
+      const id = await initializedProject();
+
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const response = await rotate(id, WRONG_PASSPHRASE, NEW_PASSPHRASE);
+        expect(response.statusCode).toBe(403);
+      }
+
+      const limited = await rotate(id, WRONG_PASSPHRASE, NEW_PASSPHRASE);
+      expect(limited.statusCode).toBe(429);
+      const correct = await rotate(id, PASSPHRASE, NEW_PASSPHRASE);
+      expect(correct.statusCode).toBe(429);
+
+      await redis.del(`cipseq:passphrase-attempts:${id}`);
+      const unlocked = await rotate(id, PASSPHRASE, NEW_PASSPHRASE);
+      expect(unlocked.statusCode).toBe(200);
+    });
+
+    it('resets the wrong-passphrase count after a success', async () => {
+      const id = await initializedProject();
+
+      for (let attempt = 0; attempt < 4; attempt++) {
+        await rotate(id, WRONG_PASSPHRASE, NEW_PASSPHRASE);
+      }
+      const success = await rotate(id, PASSPHRASE, NEW_PASSPHRASE);
+      expect(success.statusCode).toBe(200);
+
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const response = await rotate(id, WRONG_PASSPHRASE, NEWER_PASSPHRASE);
+        expect(response.statusCode).toBe(403);
+      }
+    });
+
+    it('answers 404 to a non-member', async () => {
+      const id = await initializedProject();
+
+      const response = await rotate(
+        id,
+        PASSPHRASE,
+        NEW_PASSPHRASE,
+        otherCookie,
+      );
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('answers 403 to a member who is not the admin', async () => {
+      const id = await initializedProject();
+      const session = await app.inject({
+        method: 'GET',
+        url: '/api/v1/auth/get-session',
+        headers: { cookie: otherCookie },
+      });
+      await cipseqPrisma.projectMember.create({
+        data: {
+          projectId: id,
+          userId: session.json<{ user: { id: string } }>().user.id,
+        },
+      });
+
+      const response = await rotate(
+        id,
+        PASSPHRASE,
+        NEW_PASSPHRASE,
+        otherCookie,
+      );
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ message: string }>().message).not.toBe(
+        'Incorrect passphrase',
+      );
+    });
+
+    it('answers 409 when the project is not initialised', async () => {
+      const { id } = await createProject();
+
+      const response = await rotate(id, PASSPHRASE, NEW_PASSPHRASE);
+      expect(response.statusCode).toBe(409);
+    });
+
+    it('rejects an unchanged or short passphrase without echoing it', async () => {
+      const id = await initializedProject();
+
+      const unchanged = await rotate(id, PASSPHRASE, PASSPHRASE);
+      expect(unchanged.statusCode).toBe(400);
+      expect(unchanged.body).not.toContain(PASSPHRASE);
+
+      const short = await rotate(id, PASSPHRASE, 'too-short');
+      expect(short.statusCode).toBe(400);
+      expect(short.body).not.toContain('too-short');
+    });
   });
 
   it("hides a project from someone who isn't a member", async () => {

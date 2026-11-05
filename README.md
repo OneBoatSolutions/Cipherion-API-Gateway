@@ -37,7 +37,7 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 - **Configuration safety**: environment variables are checked with Joi when the app starts, so a misconfigured deployment fails immediately.
 - **Observability**: tracing, metrics, logs and error tracking through [NestJS Observe](https://observe.nestjs.com).
 - **Dashboard** *(in progress)*: profile, settings and account activity for the signed-in user. Billing/subscription is deferred.
-- **CipSeq** *(in progress)*: projects (available), key rotation, groups, invitations and device registration. CipSeq calls the Cipherion KMS over gRPC for every crypto operation and keeps its data, including an audit event for each operation, in a separate PostgreSQL database.
+- **CipSeq** *(in progress)*: projects and key rotation (available), groups, invitations and device registration. CipSeq calls the Cipherion KMS over gRPC for every crypto operation and keeps its data, including an audit event for each operation, in a separate PostgreSQL database.
 - **EnQrypt and Zentriq** *(deferred)*.
 
 ## Tech stack
@@ -242,6 +242,7 @@ The gateway calls the KMS through `kmsCall()` (`src/kms/kms-call.ts`):
   | `INVALID_ARGUMENT`, `FAILED_PRECONDITION` | `400` |
   | `NOT_FOUND` | `404` |
   | `ALREADY_EXISTS` | `409` |
+  | `PERMISSION_DENIED` from an RPC that checks a passphrase (rotation) | `403` |
   | anything else | `502` |
 
 - **No leaks:** clients get a generic message; the gRPC details go only to the `[KMS]` log. Request data, which includes passphrases, is never logged.
@@ -418,6 +419,7 @@ Routes under `/api/v1/cipseq/projects`. They need the session cookie. The KMS do
 | --- | --- | --- | --- |
 | `POST` | `/` | Signed-in user | Creates a project from `name` (1–100 characters) and `description` (1–500 characters). The caller becomes its one admin. Answers `201`. |
 | `POST` | `/:id/initialize` | Admin | Sets the project's `passphrase` (12–256 characters) and creates key version 1. Answers `409` if it is already initialised. |
+| `POST` | `/:id/rotate` | Admin | Changes the passphrase from `currentPassphrase` to `newPassphrase` (12–256 characters, different from the current one) and moves to the next key version. Answers `200` with the project, `403` for a wrong current passphrase, and `409` if the project isn't initialised or another rotation got there first. |
 | `GET` | `/` | Signed-in user | The caller's projects, newest first. |
 | `GET` | `/:id` | Member | One project. |
 | `PATCH` | `/:id` | Admin | Updates only the fields sent: `name` and `description`. |
@@ -438,9 +440,11 @@ Every project response has this shape. `role` is the caller's role, and `keyVers
 ```
 
 - **Access:** someone who isn't a member gets `404`, the same as for a project that doesn't exist. A member who isn't the admin gets `403` on admin routes.
-- **Passphrase:** it goes to the KMS and is never stored, logged or audited, and it can't be changed or recovered yet.
+- **Passphrase:** it goes to the KMS and is never stored, logged or audited. The admin can change it, but a lost passphrase can't be recovered.
+- **Rotation:** the KMS re-wraps the project encryption key under the new passphrase and a new salt. The key itself and the root key don't change, so anything wrapped under it stays valid. Old wrapped keys aren't kept: `projectKeyVersion` records only each version and its date.
+- **Attempt limit:** 5 wrong passphrases per project in 15 minutes, then `429`, even for the correct passphrase, until the window ends. Attempts are counted in Redis, so rotation answers `503` while Redis is unreachable. A successful rotation resets the count, and a KMS failure doesn't use up an attempt.
 - **KMS failures:** `503` when the KMS is unreachable or slower than 2 seconds. Other failures follow the `kmsCall()` mapping, usually `502`. Nothing is written, so the client can try again.
-- **Audit:** each successful write records an event in the same transaction: `project.created`, `project.initialized`, `project.updated` or `project.deleted`.
+- **Audit:** each successful write records an event in the same transaction: `project.created`, `project.initialized`, `project.key_rotated`, `project.updated` or `project.deleted`.
 
 ## Protecting routes
 
@@ -514,6 +518,7 @@ Requests that fail DTO validation return `400 Bad Request` in this format:
 - The KMS is reachable only from the gateway's private network. Each environment has its own gateway client certificate for mTLS; the private key file is readable only by the gateway's user and never committed. Rotate the client certificate before it expires.
 - `CIPSEQ_DATABASE_URL` points to a different database from `DATABASE_URL` (startup is refused otherwise). CipSeq holds key material, so preferably give it its own database user too, with access to that database only.
 - The CipSeq database has backups and point-in-time recovery, with a tested restore. The KMS is stateless, so this database holds the only copy of the wrapped keys: losing it makes the encrypted data unrecoverable.
+- CipSeq backups are protected and expire on a schedule. A backup from before a rotation still opens with the old passphrase, so after rotating because of a leak, old backups stay a risk until they expire.
 - `NODE_ENV=production` is set, which also turns off the API docs (`/api/v1/docs`) and Better Auth's schema endpoint.
 - The orchestrator restarts the gateway when it exits (it exits with code 1 if a database is unreachable at startup), and starts the databases before the gateway.
 - The load balancer or orchestrator uses `/api/v1/health` as the liveness probe and `/api/v1/ready` as the readiness probe, so instances stop receiving traffic while either database, Redis or the KMS is unreachable.

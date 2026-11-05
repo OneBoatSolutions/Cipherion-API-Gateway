@@ -107,13 +107,6 @@ export type ProjectKeysScalarFieldEnum = (typeof ProjectKeysScalarFieldEnum)[key
 export const ProjectKeyVersionScalarFieldEnum = {
   projectId: 'projectId',
   version: 'version',
-  wrappedProjectRootKeyIv: 'wrappedProjectRootKeyIv',
-  wrappedProjectRootKey: 'wrappedProjectRootKey',
-  wrappedProjectRootKeyTag: 'wrappedProjectRootKeyTag',
-  wrappedProjectEncryptionKeyIv: 'wrappedProjectEncryptionKeyIv',
-  wrappedProjectEncryptionKey: 'wrappedProjectEncryptionKey',
-  wrappedProjectEncryptionKeyTag: 'wrappedProjectEncryptionKeyTag',
-  userPassphraseSalt: 'userPassphraseSalt',
   createdAt: 'createdAt'
 } as const
 

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   BadGatewayException,
+  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -26,14 +27,21 @@ import {
   ApiOperation,
   ApiServiceUnavailableResponse,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { AuthUser } from '../auth/auth.types.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { Prisma } from '../generated/cipseq/client.js';
+import { IncorrectPassphraseException } from '../kms/incorrect-passphrase.exception.js';
 import { kmsCall } from '../kms/kms-call.js';
 import { cipseqPrisma } from '../lib/cipseq-prisma.js';
 import { auditEvent } from './audit.js';
+import {
+  clearPassphraseAttempts,
+  releasePassphraseAttempt,
+  reservePassphraseAttempt,
+} from './passphrase-attempts.js';
 import {
   findProjectForAdmin,
   findProjectForMember,
@@ -44,6 +52,7 @@ import {
   CreateProjectDto,
   InitializeProjectDto,
   ProjectResponse,
+  RotateProjectDto,
   UpdateProjectDto,
 } from './projects.dto.js';
 
@@ -163,12 +172,7 @@ export class ProjectsController {
       await cipseqPrisma.$transaction([
         // The primary key rejects a second initialisation that got this far.
         cipseqPrisma.projectKeyVersion.create({
-          data: {
-            projectId: id,
-            version: FIRST_KEY_VERSION,
-            ...rootKey,
-            ...encryptionKey,
-          },
+          data: { projectId: id, version: FIRST_KEY_VERSION },
         }),
         cipseqPrisma.projectKeys.update({
           where: { projectId: id },
@@ -185,6 +189,122 @@ export class ProjectsController {
 
     return toProjectResponse(
       { ...project, keys: { currentKeyVersion: FIRST_KEY_VERSION } },
+      user.id,
+    );
+  }
+
+  // Re-wraps the encryption key under a new passphrase and bumps the version. The
+  // old wrapped key is overwritten, so the old passphrase stops working. Neither
+  // passphrase is stored, logged or written to the audit trail.
+  @ApiOperation({ summary: "Change a project's passphrase" })
+  @ApiOkResponse({ type: ProjectResponse })
+  @ApiBadRequestResponse({
+    description: 'Validation failed, or the new passphrase is the current one',
+  })
+  @ApiForbiddenResponse({
+    description: 'Not the project admin, or an incorrect passphrase',
+  })
+  @ApiNotFoundResponse({ description: 'No such project' })
+  @ApiConflictResponse({
+    description: 'Not initialised, or a concurrent rotation got there first',
+  })
+  @ApiTooManyRequestsResponse({ description: 'Too many incorrect passphrases' })
+  @ApiServiceUnavailableResponse({ description: 'A dependency is unavailable' })
+  @ApiBadGatewayResponse({ description: 'The KMS call failed' })
+  @HttpCode(200)
+  @Post(':id/rotate')
+  async rotate(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() { currentPassphrase, newPassphrase }: RotateProjectDto,
+  ): Promise<ProjectResponse> {
+    const project = await findProjectForAdmin(id, user.id);
+    if (project.keys?.currentKeyVersion == null) {
+      throw new ConflictException('The project is not initialised');
+    }
+    if (currentPassphrase === newPassphrase) {
+      throw new BadRequestException(
+        'The new passphrase must be different from the current one',
+      );
+    }
+
+    await reservePassphraseAttempt(id);
+
+    let toVersion: number;
+    try {
+      const keys = await cipseqPrisma.projectKeys.findUniqueOrThrow({
+        where: { projectId: id },
+      });
+      if (
+        keys.currentKeyVersion === null ||
+        keys.userPassphraseSalt === null ||
+        keys.wrappedProjectEncryptionKeyIv === null ||
+        keys.wrappedProjectEncryptionKey === null ||
+        keys.wrappedProjectEncryptionKeyTag === null
+      ) {
+        throw new Error(`Project ${id} has a key version but no wrapped key`);
+      }
+
+      const wrapped = await kmsCall(
+        'rotateWrappingKeyforProjectEncryptionKey',
+        {
+          ProjectId: id,
+          CurrentUserPassphrase: currentPassphrase,
+          CurrentUserPassphraseSalt: keys.userPassphraseSalt,
+          NewUserPassphrase: newPassphrase,
+          CurrentWrappedProjectRootKeyIV: keys.wrappedProjectRootKeyIv,
+          CurrentWrappedProjectRootKey: keys.wrappedProjectRootKey,
+          CurrentWrappedProjectRootKeyTag: keys.wrappedProjectRootKeyTag,
+          CurrentWrappedProjectEncryptionKeyIV:
+            keys.wrappedProjectEncryptionKeyIv,
+          CurrentWrappedProjectEncryptionKey: keys.wrappedProjectEncryptionKey,
+          CurrentWrappedProjectEncryptionKeyTag:
+            keys.wrappedProjectEncryptionKeyTag,
+        },
+      );
+      assertSameProject(id, wrapped.ProjectId);
+
+      const fromVersion = keys.currentKeyVersion;
+      toVersion = fromVersion + 1;
+      await cipseqPrisma.$transaction([
+        // The primary key rejects a second rotation from the same version.
+        cipseqPrisma.projectKeyVersion.create({
+          data: { projectId: id, version: toVersion },
+        }),
+        cipseqPrisma.projectKeys.update({
+          where: { projectId: id },
+          data: {
+            wrappedProjectEncryptionKeyIv:
+              wrapped.NewWrappedProjectEncryptionKeyIV,
+            wrappedProjectEncryptionKey: wrapped.NewWrappedProjectEncryptionKey,
+            wrappedProjectEncryptionKeyTag:
+              wrapped.NewWrappedProjectEncryptionKeyTag,
+            userPassphraseSalt: wrapped.NewUserPassphraseSalt,
+            currentKeyVersion: toVersion,
+          },
+        }),
+        auditEvent(user.id, 'project.key_rotated', id, {
+          fromVersion,
+          toVersion,
+        }),
+      ]);
+    } catch (error) {
+      // A wrong passphrase stays counted. Anything else says nothing about it.
+      if (error instanceof IncorrectPassphraseException) {
+        throw error;
+      }
+      await releasePassphraseAttempt(id);
+      if (isUniqueViolation(error)) {
+        throw new ConflictException(
+          'The project was rotated by another request',
+        );
+      }
+      throw error;
+    }
+
+    await clearPassphraseAttempts(id);
+    return toProjectResponse(
+      { ...project, keys: { currentKeyVersion: toVersion } },
       user.id,
     );
   }

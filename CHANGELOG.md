@@ -59,9 +59,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Unit tests for the startup check and the database watcher.
 - CipSeq projects in a new `CipSeqModule`, under `/api/v1/cipseq/projects`: `POST /` (create with `name` and `description`; the caller becomes the project's one admin), `POST /:id/initialize` (set the passphrase), `GET /`, `GET /:id`, `PATCH /:id` (`name` and `description`) and `DELETE /:id` (soft delete). Responses never contain wrapped keys or salts; non-members get `404` and members who aren't the admin get `403` on writes.
 - Create calls `CreateAndWrapNewProjectRootKey` and initialize calls `CreateAndWrapNewProjectEncryptionKey` on the KMS. A KMS response for a different project id answers `502` and stores nothing.
-- CipSeq tables and migrations (`cipseq_projects`, `project_description`): `project`, `projectKeys` (current wrapped keys), `projectKeyVersion` (wrapped keys of each version), `projectMember` and `auditEvent`.
-- Audit events for successful project writes (`project.created`, `project.initialized`, `project.updated`, `project.deleted`), committed in the same transaction as the change.
+- CipSeq tables and migrations (`cipseq_projects`, `project_description`): `project`, `projectKeys` (current wrapped keys), `projectKeyVersion`, `projectMember` and `auditEvent`.
+- Audit events for successful project writes (`project.created`, `project.initialized`, `project.key_rotated`, `project.updated`, `project.deleted`), committed in the same transaction as the change.
 - Unit and e2e tests for the project endpoints.
+- `POST /api/v1/cipseq/projects/:id/rotate`: the project admin changes the passphrase with `currentPassphrase` and `newPassphrase`. It calls `RotateWrappingKeyforProjectEncryptionKey`, stores the new wrapped project encryption key and salt, and bumps the key version. A wrong current passphrase answers `403`, an uninitialised project or a concurrent rotation `409`.
+- Limit of 5 wrong passphrases per project in 15 minutes (`src/cipseq/passphrase-attempts.ts`), counted in Redis before the KMS call. Over the limit answers `429`, and `503` if Redis is unreachable.
+- Unit and e2e tests for rotation and the attempt limit.
 
 ### Changed
 
@@ -76,6 +79,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Sessions are cached in Redis and still stored in PostgreSQL (`storeSessionInDatabase`), which stays the source of truth.
 - The Joi environment schema moved from `app.module.ts` to `src/config/env.schema.ts`.
 - Project scope in README, AGENTS.md, ROADMAP and the OpenAPI description: the gateway now hosts the Dashboard and CipSeq (formerly written "Cipsec") backends as modules instead of routing to upstream services. CipSeq uses the Cipherion KMS over gRPC + TLS and its own PostgreSQL database. EnQrypt and Zentriq are deferred. Commit scopes now include `cipseq` and `kms`, and the Swagger document has a `dashboard` tag.
+- `kmsCall()` maps gRPC `PERMISSION_DENIED` to `403 Incorrect passphrase` for the rotation RPC. Other RPCs keep `502`, because there the status means the gateway itself was refused.
 
 ### Fixed
 
@@ -96,6 +100,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Startup is refused in production when `CIPSEQ_DATABASE_URL` points to the same database as `DATABASE_URL`, so CipSeq key material never shares the auth database.
 - The KMS connection always uses mutual TLS (no plaintext mode). KMS request data, which carries passphrases and key material, is never logged, and clients never see the KMS's error details.
 - Project passphrases go to the KMS and are never stored, logged or written to audit events. Only wrapped keys and salts are kept, in their own tables, so a project query can't return them by accident.
+- Old wrapped keys aren't kept after a rotation, so an old passphrase can't open anything in the live database. `projectKeyVersion` now holds only the version and its date (migration `drop_key_version_material`), and the README production checklist warns that older backups still open with the old passphrase.
 
 ### Removed
 

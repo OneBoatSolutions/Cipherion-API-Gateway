@@ -80,6 +80,29 @@ export class InitializeProjectDto {
   passphrase!: string;
 }
 
+export class RotateProjectDto {
+  @ApiProperty({
+    format: 'password',
+    maxLength: PASSPHRASE_MAX_LENGTH,
+    description: 'Sent to the KMS and never stored',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(PASSPHRASE_MAX_LENGTH)
+  currentPassphrase!: string;
+
+  @ApiProperty({
+    format: 'password',
+    minLength: PASSPHRASE_MIN_LENGTH,
+    maxLength: PASSPHRASE_MAX_LENGTH,
+    description: 'Sent to the KMS and never stored',
+  })
+  @IsString()
+  @MinLength(PASSPHRASE_MIN_LENGTH)
+  @MaxLength(PASSPHRASE_MAX_LENGTH)
+  newPassphrase!: string;
+}
+
 const isSent = (_: object, value: unknown) => value !== undefined;
 
 // Every field is optional, so a client sends only what it changes. ValidateIf
