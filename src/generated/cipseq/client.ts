@@ -62,6 +62,26 @@ export type ProjectKeyVersion = Prisma.ProjectKeyVersionModel
  */
 export type ProjectMember = Prisma.ProjectMemberModel
 /**
+ * Model Group
+ * 
+ */
+export type Group = Prisma.GroupModel
+/**
+ * Model GroupKeys
+ * 
+ */
+export type GroupKeys = Prisma.GroupKeysModel
+/**
+ * Model GroupKeyVersion
+ * 
+ */
+export type GroupKeyVersion = Prisma.GroupKeyVersionModel
+/**
+ * Model GroupMember
+ * 
+ */
+export type GroupMember = Prisma.GroupMemberModel
+/**
  * Model AuditEvent
  * 
  */

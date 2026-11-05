@@ -37,7 +37,7 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 - **Configuration safety**: environment variables are checked with Joi when the app starts, so a misconfigured deployment fails immediately.
 - **Observability**: tracing, metrics, logs and error tracking through [NestJS Observe](https://observe.nestjs.com).
 - **Dashboard** *(in progress)*: profile, settings and account activity for the signed-in user. Billing/subscription is deferred.
-- **CipSeq** *(in progress)*: projects and key rotation (available), groups, invitations and device registration. CipSeq calls the Cipherion KMS over gRPC for every crypto operation and keeps its data, including an audit event for each operation, in a separate PostgreSQL database.
+- **CipSeq** *(in progress)*: projects, groups and key rotation (available), invitations and device registration. CipSeq calls the Cipherion KMS over gRPC for every crypto operation and keeps its data, including an audit event for each operation, in a separate PostgreSQL database.
 - **EnQrypt and Zentriq** *(deferred)*.
 
 ## Tech stack
@@ -76,7 +76,8 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 │   ├── auth.ts              # Better Auth configuration
 │   ├── auth/                # AuthController (/api/v1/auth/*), global AuthGuard, @Public() / @CurrentUser()
 │   ├── dashboard/           # Dashboard routes (/api/v1/dashboard/profile, /settings)
-│   ├── cipseq/              # CipSeq routes (/api/v1/cipseq/projects), access checks and audit events
+│   ├── cipseq/              # CipSeq routes (/api/v1/cipseq/projects and their groups), access checks and audit events
+│   ├── workspace/           # GET /api/v1/workspace: everything the signed-in user is a part of
 │   ├── health/              # Liveness (/api/v1/health) and readiness (/api/v1/ready) endpoints
 │   ├── lib/prisma.ts        # Shared pg pool and PrismaClient for the auth database
 │   ├── lib/cipseq-prisma.ts # Shared pg pool and PrismaClient for the CipSeq database
@@ -242,7 +243,7 @@ The gateway calls the KMS through `kmsCall()` (`src/kms/kms-call.ts`):
   | `INVALID_ARGUMENT`, `FAILED_PRECONDITION` | `400` |
   | `NOT_FOUND` | `404` |
   | `ALREADY_EXISTS` | `409` |
-  | `PERMISSION_DENIED` from an RPC that checks a passphrase (rotation) | `403` |
+  | `PERMISSION_DENIED` from an RPC listed in `PASSPHRASE_CHECKING_METHODS` (project rotation, group keys) | `403` |
   | anything else | `502` |
 
 - **No leaks:** clients get a generic message; the gRPC details go only to the `[KMS]` log. Request data, which includes passphrases, is never logged.
@@ -411,6 +412,40 @@ Email and password are changed through Better Auth's `/api/v1/auth/change-email`
 
 Cipherion has no profile images. Better Auth's user table requires an `image` column, so the column stays, but `/api/v1/auth/sign-up/email` and `/api/v1/auth/update-user` reject an `image` field with `400` and it is always `null`.
 
+## Workspace
+
+`GET /api/v1/workspace` returns everything the signed-in user is a part of in one read, for sign-in and page load. Writes return the changed object, so a client doesn't need to reload it after each one.
+
+```json
+{
+  "profile": { "id": "...", "name": "Ada Lovelace", "email": "ada@cipherion.com", "emailVerified": true, "createdAt": "..." },
+  "settings": { "timezone": "UTC", "locale": "en", "securityAlerts": true },
+  "projects": [
+    {
+      "id": "...", "name": "Payments", "description": "...", "role": "ADMIN", "keyVersion": 2,
+      "createdAt": "...", "updatedAt": "...",
+      "groups": [
+        {
+          "id": "...", "projectId": "...", "name": "Finance", "description": "...", "role": "ADMIN", "gdekVersion": 3,
+          "createdAt": "...", "updatedAt": "...",
+          "members": [
+            { "userId": "...", "name": "Ada Lovelace", "email": "ada@cipherion.com", "role": "ADMIN", "createdAt": "..." }
+          ]
+        }
+      ]
+    }
+  ],
+  "notifications": []
+}
+```
+
+- **Who sees what:** a project's admin gets all its groups and their members. Anyone else gets the projects they belong to, the groups they belong to and those groups' members.
+- **Keys:** only the current version numbers. Wrapped keys and salts are never returned.
+- **Members:** `name` and `email` come from the auth database, and are `null` if the account no longer exists.
+- **Notifications:** always empty until the invitations and devices work arrives.
+- **Errors:** `401` without a session, and `503` if any query fails, so a client never shows a partial workspace as complete. The cause goes to the `[Workspace]` log.
+- **Cost:** each call runs several database queries (7 SQL statements when measured), so call it on sign-in and page load, not on a timer. There's no pagination yet.
+
 ## CipSeq projects
 
 Routes under `/api/v1/cipseq/projects`. They need the session cookie. The KMS does all the crypto, and the gateway stores the wrapped keys it returns.
@@ -442,9 +477,45 @@ Every project response has this shape. `role` is the caller's role, and `keyVers
 - **Access:** someone who isn't a member gets `404`, the same as for a project that doesn't exist. A member who isn't the admin gets `403` on admin routes.
 - **Passphrase:** it goes to the KMS and is never stored, logged or audited. The admin can change it, but a lost passphrase can't be recovered.
 - **Rotation:** the KMS re-wraps the project encryption key under the new passphrase and a new salt. The key itself and the root key don't change, so anything wrapped under it stays valid. Old wrapped keys aren't kept: `projectKeyVersion` records only each version and its date.
-- **Attempt limit:** 5 wrong passphrases per project in 15 minutes, then `429`, even for the correct passphrase, until the window ends. Attempts are counted in Redis, so rotation answers `503` while Redis is unreachable. A successful rotation resets the count, and a KMS failure doesn't use up an attempt.
+- **Attempt limit:** 5 wrong passphrases per project in 15 minutes, then `429`, even for the correct passphrase, until the window ends. Project rotation and the group endpoints that take a passphrase share this limit. Attempts are counted in Redis, so those routes answer `503` while Redis is unreachable. A successful call resets the count, and a KMS failure doesn't use up an attempt.
 - **KMS failures:** `503` when the KMS is unreachable or slower than 2 seconds. Other failures follow the `kmsCall()` mapping, usually `502`. Nothing is written, so the client can try again.
 - **Audit:** each successful write records an event in the same transaction: `project.created`, `project.initialized`, `project.key_rotated`, `project.updated` or `project.deleted`.
+
+## CipSeq groups
+
+Routes under `/api/v1/cipseq/projects/:projectId/groups`. They need the session cookie. Only the project admin can use them: being an admin is per project, so anyone can create their own project, but can't change or approve anything in a project they aren't the admin of. Groups are read through `GET /api/v1/workspace`.
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/` | Creates a group from `name` (1–100 characters), `description` (1–500 characters) and the project's `passphrase`, at GDEK version 1. The project admin becomes a group admin. Answers `201`, or `409` if the project isn't initialised. |
+| `PATCH` | `/:groupId` | Updates only the fields sent: `name` and `description`. |
+| `DELETE` | `/:groupId` | Soft delete, answering `204`: the API stops serving the group, but its rows and wrapped keys stay in the database. |
+| `POST` | `/:groupId/rotate` | Replaces the group's keys using the `passphrase`, and moves to the next GDEK version. |
+| `PATCH` | `/:groupId/members/:userId` | Sets `role` to `ADMIN` (an acting admin) or `MEMBER`. |
+| `POST` | `/:groupId/members/:userId/revoke` | Removes the member and rotates the keys in one transaction, using the `passphrase`. They stay a member of the project. |
+
+Create, update, rotate and revoke answer with the group, and the role change answers with `userId`, `role` and `createdAt`:
+
+```json
+{
+  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "projectId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+  "name": "Finance",
+  "description": "Invoices and payroll",
+  "role": "ADMIN",
+  "gdekVersion": 2,
+  "createdAt": "2026-11-05T06:36:46.000Z",
+  "updatedAt": "2026-11-05T06:36:46.000Z"
+}
+```
+
+- **Access:** someone outside the project gets `404`. Any other project member, including an acting admin, gets `403`. The project admin can't be demoted or revoked (`400`).
+- **Keys:** each create, rotate and revoke calls `CreateAndWrapNewGroupRootKeyAndGroupDataEncryptionKey`, which makes a new group root key and GDEK. Only the current pair is stored, in `groupKeys`. `groupKeyVersion` records each version number and its date.
+- **Old versions are gone for new devices:** because old pairs aren't kept, a device registered after a rotation can't get an envelope for an older version, so it can't read older data.
+- **Revocation protects future data only:** a revoked member's device may keep any GDEK it already received.
+- **Concurrent changes:** `409` if another rotation or revocation got there first. A revoke that loses this race changes nothing, so a member is never removed without a rotation, and it can be retried.
+- **Errors and passphrases:** a wrong passphrase answers `403`, and the attempt limit and KMS failures work as for projects. The passphrase is never stored, logged or audited.
+- **Audit:** `group.created`, `group.updated`, `group.deleted`, `group.key_rotated`, `group.member_role_changed` and `group.member_revoked`, each in the same transaction as the change.
 
 ## Protecting routes
 
@@ -518,7 +589,7 @@ Requests that fail DTO validation return `400 Bad Request` in this format:
 - The KMS is reachable only from the gateway's private network. Each environment has its own gateway client certificate for mTLS; the private key file is readable only by the gateway's user and never committed. Rotate the client certificate before it expires.
 - `CIPSEQ_DATABASE_URL` points to a different database from `DATABASE_URL` (startup is refused otherwise). CipSeq holds key material, so preferably give it its own database user too, with access to that database only.
 - The CipSeq database has backups and point-in-time recovery, with a tested restore. The KMS is stateless, so this database holds the only copy of the wrapped keys: losing it makes the encrypted data unrecoverable.
-- CipSeq backups are protected and expire on a schedule. A backup from before a rotation still opens with the old passphrase, so after rotating because of a leak, old backups stay a risk until they expire.
+- CipSeq backups are protected and expire on a schedule. A backup from before a rotation still opens with the old passphrase and holds the old group keys, so after rotating because of a leak, old backups stay a risk until they expire.
 - `NODE_ENV=production` is set, which also turns off the API docs (`/api/v1/docs`) and Better Auth's schema endpoint.
 - The orchestrator restarts the gateway when it exits (it exits with code 1 if a database is unreachable at startup), and starts the databases before the gateway.
 - The load balancer or orchestrator uses `/api/v1/health` as the liveness probe and `/api/v1/ready` as the readiness probe, so instances stop receiving traffic while either database, Redis or the KMS is unreachable.

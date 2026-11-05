@@ -103,7 +103,7 @@ export class RotateProjectDto {
   newPassphrase!: string;
 }
 
-const isSent = (_: object, value: unknown) => value !== undefined;
+export const isSent = (_: object, value: unknown) => value !== undefined;
 
 // Every field is optional, so a client sends only what it changes. ValidateIf
 // instead of IsOptional, which would let null through to these required columns.

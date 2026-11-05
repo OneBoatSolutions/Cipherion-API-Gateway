@@ -20,6 +20,16 @@ export class ProfileResponse {
   createdAt!: Date;
 }
 
+export function toProfileResponse({
+  id,
+  name,
+  email,
+  emailVerified,
+  createdAt,
+}: ProfileResponse): ProfileResponse {
+  return { id, name, email, emailVerified, createdAt };
+}
+
 // Email and password are changed through Better Auth's own endpoints
 // (/api/v1/auth/change-email, /api/v1/auth/change-password), not here.
 export class UpdateProfileDto {

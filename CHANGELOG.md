@@ -64,6 +64,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Unit and e2e tests for the project endpoints.
 - `POST /api/v1/cipseq/projects/:id/rotate`: the project admin changes the passphrase with `currentPassphrase` and `newPassphrase`. It calls `RotateWrappingKeyforProjectEncryptionKey`, stores the new wrapped project encryption key and salt, and bumps the key version. A wrong current passphrase answers `403`, an uninitialised project or a concurrent rotation `409`.
 - Limit of 5 wrong passphrases per project in 15 minutes (`src/cipseq/passphrase-attempts.ts`), counted in Redis before the KMS call. Over the limit answers `429`, and `503` if Redis is unreachable.
+- CipSeq groups under `/api/v1/cipseq/projects/:projectId/groups`, all project admin only: `POST /` (create with `name`, `description` and the project `passphrase`; the project admin becomes a group admin), `PATCH /:groupId` (`name` and `description`), `DELETE /:groupId` (soft delete), `POST /:groupId/rotate` (`passphrase`), `PATCH /:groupId/members/:userId` (`role`, for acting admins) and `POST /:groupId/members/:userId/revoke` (`passphrase`; removes the member and rotates in one transaction, and they stay in the project). The project admin can't be demoted or revoked.
+- Create, rotate and revoke call `CreateAndWrapNewGroupRootKeyAndGroupDataEncryptionKey`, which makes a new group root key and GDEK each time. The GDEK version goes up by one on every rotation and revocation. They share the project's passphrase attempt limit.
+- CipSeq group tables and migration (`cipseq_groups`): `group`, `groupKeys` (current wrapped keys and `currentGdekVersion`), `groupKeyVersion` (version numbers only) and `groupMember`.
+- Audit events for group writes: `group.created`, `group.updated`, `group.deleted`, `group.key_rotated`, `group.member_role_changed` and `group.member_revoked`.
+- `GET /api/v1/workspace` in a new `WorkspaceModule`: one read returning the signed-in user's profile, settings, projects, groups, current key versions, members and notifications (always empty for now). The project admin gets every group, anyone else only the groups they belong to. It answers `503` if a database is unavailable and is sent with `Cache-Control: no-store`.
+- Unit and e2e tests for groups and the workspace.
 - Unit and e2e tests for rotation and the attempt limit.
 
 ### Changed
@@ -79,7 +85,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Sessions are cached in Redis and still stored in PostgreSQL (`storeSessionInDatabase`), which stays the source of truth.
 - The Joi environment schema moved from `app.module.ts` to `src/config/env.schema.ts`.
 - Project scope in README, AGENTS.md, ROADMAP and the OpenAPI description: the gateway now hosts the Dashboard and CipSeq (formerly written "Cipsec") backends as modules instead of routing to upstream services. CipSeq uses the Cipherion KMS over gRPC + TLS and its own PostgreSQL database. EnQrypt and Zentriq are deferred. Commit scopes now include `cipseq` and `kms`, and the Swagger document has a `dashboard` tag.
-- `kmsCall()` maps gRPC `PERMISSION_DENIED` to `403 Incorrect passphrase` for the rotation RPC. Other RPCs keep `502`, because there the status means the gateway itself was refused.
+- `kmsCall()` maps gRPC `PERMISSION_DENIED` to `403 Incorrect passphrase` for the project rotation and group key RPCs. Other RPCs keep `502`, because there the status means the gateway itself was refused.
+- Reserving, releasing and clearing a passphrase attempt moved into `withPassphraseAttempt()` (`src/cipseq/with-passphrase-attempt.ts`), shared by project rotation and the group endpoints.
 
 ### Fixed
 
@@ -101,6 +108,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The KMS connection always uses mutual TLS (no plaintext mode). KMS request data, which carries passphrases and key material, is never logged, and clients never see the KMS's error details.
 - Project passphrases go to the KMS and are never stored, logged or written to audit events. Only wrapped keys and salts are kept, in their own tables, so a project query can't return them by accident.
 - Old wrapped keys aren't kept after a rotation, so an old passphrase can't open anything in the live database. `projectKeyVersion` now holds only the version and its date (migration `drop_key_version_material`), and the README production checklist warns that older backups still open with the old passphrase.
+- Old wrapped group key pairs aren't kept either: a rotation overwrites `groupKeys`. Wrapped keys stay in their own table, so a group query or `/workspace` can't return them by accident.
 
 ### Removed
 

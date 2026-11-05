@@ -31,6 +31,7 @@ export type KmsMethod = Exclude<keyof grpcCallBackfromNestClient, keyof Client>;
 // other RPC that status means the gateway itself was refused.
 const PASSPHRASE_CHECKING_METHODS: ReadonlySet<string> = new Set<KmsMethod>([
   'rotateWrappingKeyforProjectEncryptionKey',
+  'createAndWrapNewGroupRootKeyAndGroupDataEncryptionKey',
 ]);
 
 // Parameters<> resolves to the last overload: (request, metadata, options, callback).
