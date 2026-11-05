@@ -17,6 +17,7 @@ import {
 } from '@grpc/grpc-js';
 import type { grpcCallBackfromNestClient } from '../generated/kms/v1/prototypeBufferV1.js';
 import { kms } from '../lib/kms.js';
+import { IncorrectPassphraseException } from './incorrect-passphrase.exception.js';
 
 // Same budget as the readiness checks and Redis commands: a KMS call that
 // doesn't answer in time fails instead of holding the request open.
@@ -25,6 +26,12 @@ export const KMS_DEADLINE_MS = 2000;
 export const KMS_UNAVAILABLE = 'Unavailable. Please try again shortly.';
 
 export type KmsMethod = Exclude<keyof grpcCallBackfromNestClient, keyof Client>;
+
+// For these RPCs the KMS answers PERMISSION_DENIED to a wrong passphrase. On any
+// other RPC that status means the gateway itself was refused.
+const PASSPHRASE_CHECKING_METHODS: ReadonlySet<string> = new Set<KmsMethod>([
+  'rotateWrappingKeyforProjectEncryptionKey',
+]);
 
 // Parameters<> resolves to the last overload: (request, metadata, options, callback).
 type Signature<M extends KmsMethod> = Parameters<grpcCallBackfromNestClient[M]>;
@@ -68,6 +75,14 @@ export function toHttpException(
 ): HttpException {
   const summary = `${method} failed: ${status[error.code] ?? error.code} ${error.details}`;
 
+  if (
+    error.code === status.PERMISSION_DENIED &&
+    PASSPHRASE_CHECKING_METHODS.has(method)
+  ) {
+    logger.warn(summary);
+    return new IncorrectPassphraseException();
+  }
+
   switch (error.code) {
     case status.UNAVAILABLE:
     case status.DEADLINE_EXCEEDED:
@@ -84,8 +99,8 @@ export function toHttpException(
       logger.warn(summary);
       return new ConflictException();
     default:
-      // Includes UNAUTHENTICATED / PERMISSION_DENIED: the gateway's own
-      // credentials or setup are wrong, which isn't the caller's fault.
+      // Includes UNAUTHENTICATED and any other PERMISSION_DENIED: the gateway's
+      // own credentials or setup are wrong, which isn't the caller's fault.
       logger.error(summary);
       return new BadGatewayException();
   }

@@ -53,18 +53,12 @@ model ProjectKeys {
   @@map("projectKeys")
 }
 
-// The wrapped keys of every version, including the current one.
+// One row per key version. It holds no key material: only ProjectKeys has the
+// wrapped keys, so an old passphrase can't open anything once it is rotated.
 model ProjectKeyVersion {
-  projectId                      String   @db.Uuid
-  version                        Int
-  wrappedProjectRootKeyIv        String
-  wrappedProjectRootKey          String
-  wrappedProjectRootKeyTag       String
-  wrappedProjectEncryptionKeyIv  String
-  wrappedProjectEncryptionKey    String
-  wrappedProjectEncryptionKeyTag String
-  userPassphraseSalt             String
-  createdAt                      DateTime @default(now())
+  projectId String   @db.Uuid
+  version   Int
+  createdAt DateTime @default(now())
 
   project Project @relation(fields: [projectId], references: [id])
 

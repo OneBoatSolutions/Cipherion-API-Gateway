@@ -49,11 +49,13 @@
 - [ ] Optional concurrency limit on KMS calls, if the KMS needs protection from bursts
 - [x] Projects and initialisation with the user's passphrase
 - [x] Audit events for successful project writes
-- [ ] Key rotation and key versions (decide whether old wrapped keys are deleted: a kept row still opens with the old passphrase; only the admin rotates; map the KMS's wrong-passphrase status)
-- [ ] Groups and group members (only the project admin creates or deletes a group and is a group admin by default; they can assign acting admins)
+- [x] Key rotation and key versions (old wrapped keys aren't kept; only the admin rotates)
+- [ ] Groups and group members (only the project admin creates or deletes a group and is a group admin by default; they can assign acting admins; add group RPCs that check a passphrase to the wrong-passphrase mapping and attempt limit)
+- [ ] Rotate the group data encryption key when a member is revoked, keeping the old wrapped versions (decide which RPC does this: the proto only has one that also creates a new group root key)
 - [ ] Invitations (send and accept; an acting admin's invitations and member removals need the project admin's approval)
 - [ ] Device registration and device key material (decide who provides the passphrase `CreateDeviceEnvelope` needs when a member registers a device)
-- [ ] Per-project limit on passphrase attempts in Redis, before any endpoint verifies a passphrase (the KMS is stateless and can't count them)
+- [x] Per-project limit on passphrase attempts in Redis (the KMS is stateless and can't count them)
+- [ ] Test rotation against a KMS that accepts the connection and never answers (a closed port is tested; the deadline and its `503` mapping are only unit tested)
 - [ ] Rate-limit project routes (each create also calls the KMS)
 - [ ] Paginate the project list
 - [ ] Audit reads and failed attempts
@@ -74,6 +76,7 @@
 - [ ] Return `503` instead of `500` from Dashboard routes while a database is unreachable
 - [ ] Backups and point-in-time recovery for the CipSeq database, with a tested restore (it holds the only copy of the wrapped keys)
 - [ ] Optionally require Redis and the KMS at startup too
+- [ ] Decide whether the public `/ready` response should name its dependencies (`database`, `cipseq`, `redis`, `kms`)
 - [x] OpenAPI / Swagger documentation (`/api/v1/docs`, not served in production)
 - [ ] Drop the accepted `glob`/`minimatch` advisories (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249) once `@fastify/static` moves to glob 14; they only affect a startup glob over Swagger UI's own files
 - [ ] CI pipeline (lint, test, build)

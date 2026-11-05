@@ -3,6 +3,7 @@ import { cipseqPrisma } from '../lib/cipseq-prisma.js';
 export type AuditAction =
   | 'project.created'
   | 'project.initialized'
+  | 'project.key_rotated'
   | 'project.updated'
   | 'project.deleted';
 
@@ -12,7 +13,7 @@ export function auditEvent(
   userId: string,
   action: AuditAction,
   projectId: string,
-  metadata?: { changed: string[] },
+  metadata?: { changed: string[] } | { fromVersion: number; toVersion: number },
 ) {
   return cipseqPrisma.auditEvent.create({
     data: { userId, action, projectId, metadata },

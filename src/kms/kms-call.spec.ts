@@ -6,6 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { Metadata, type ServiceError, status } from '@grpc/grpc-js';
+import { IncorrectPassphraseException } from './incorrect-passphrase.exception.js';
 import { KMS_DEADLINE_MS, kmsCall, toHttpException } from './kms-call.js';
 
 const { createAndWrapNewProjectRootKey } = vi.hoisted(() => ({
@@ -77,6 +78,24 @@ describe('toHttpException', () => {
     expect(toHttpException('method', grpcError(code))).toBeInstanceOf(
       Exception,
     );
+  });
+
+  it('maps PERMISSION_DENIED to an incorrect passphrase on rotation', () => {
+    expect(
+      toHttpException(
+        'rotateWrappingKeyforProjectEncryptionKey',
+        grpcError(status.PERMISSION_DENIED),
+      ),
+    ).toBeInstanceOf(IncorrectPassphraseException);
+  });
+
+  it('keeps PERMISSION_DENIED a gateway fault on RPCs without a passphrase check', () => {
+    expect(
+      toHttpException(
+        'createAndWrapNewProjectRootKey',
+        grpcError(status.PERMISSION_DENIED),
+      ),
+    ).toBeInstanceOf(BadGatewayException);
   });
 
   it('never exposes the KMS error details to the client', () => {
