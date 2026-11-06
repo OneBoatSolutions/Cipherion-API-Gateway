@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
     findUnique: vi.fn(),
     update: vi.fn(),
   },
+  groupMemberRemovalRequest: { update: vi.fn(), updateMany: vi.fn() },
   auditEvent: { create: vi.fn() },
 }));
 
@@ -45,6 +46,7 @@ vi.mock('../lib/cipseq-prisma.js', () => ({
     groupKeys: mocks.groupKeys,
     groupKeyVersion: mocks.groupKeyVersion,
     groupMember: mocks.groupMember,
+    groupMemberRemovalRequest: mocks.groupMemberRemovalRequest,
     auditEvent: mocks.auditEvent,
   },
 }));
@@ -483,6 +485,19 @@ describe('GroupsController', () => {
       expect(JSON.stringify(mocks.auditEvent.create.mock.calls)).not.toContain(
         PASSPHRASE,
       );
+    });
+
+    it('cancels any pending removal request for the member', async () => {
+      await revoke();
+
+      expect(mocks.groupMemberRemovalRequest.updateMany).toHaveBeenCalledWith({
+        where: { groupId, targetUserId: target, status: 'PENDING_APPROVAL' },
+        data: {
+          status: 'CANCELLED',
+          reviewedByUserId: admin.id,
+          reviewedAt: expect.any(Date),
+        },
+      });
     });
 
     it('protects the project admin', async () => {

@@ -30,14 +30,10 @@ import {
 } from '@nestjs/swagger';
 import type { AuthUser } from '../auth/auth.types.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
-import { kmsCall } from '../kms/kms-call.js';
 import { cipseqPrisma } from '../lib/cipseq-prisma.js';
 import { auditEvent } from './audit.js';
-import {
-  assertSameId,
-  isRecordNotFound,
-  isUniqueViolation,
-} from './cipseq-errors.js';
+import { isRecordNotFound, isUniqueViolation } from './cipseq-errors.js';
+import { createGroupKeys, revokeGroupMember } from './group-keys.js';
 import {
   currentGdekVersion,
   findGroupForAdmin,
@@ -57,52 +53,6 @@ import { withPassphraseAttempt } from './with-passphrase-attempt.js';
 
 const FIRST_GDEK_VERSION = 1;
 const MEMBER_FIELDS = { userId: true, role: true, createdAt: true } as const;
-
-// Creating, rotating and revoking all use this RPC, which makes a new group root
-// key and GDEK each time. The passphrase goes to the KMS and is then dropped: it
-// is never stored, logged or written to the audit trail.
-async function createGroupKeys(
-  projectId: string,
-  groupId: string,
-  passphrase: string,
-) {
-  const keys = await cipseqPrisma.projectKeys.findUniqueOrThrow({
-    where: { projectId },
-  });
-  if (
-    keys.userPassphraseSalt === null ||
-    keys.wrappedProjectEncryptionKeyIv === null ||
-    keys.wrappedProjectEncryptionKey === null ||
-    keys.wrappedProjectEncryptionKeyTag === null
-  ) {
-    throw new ConflictException('The project is not initialised');
-  }
-
-  const wrapped = await kmsCall(
-    'createAndWrapNewGroupRootKeyAndGroupDataEncryptionKey',
-    {
-      GroupId: groupId,
-      WrappedProjectRootKeyIV: keys.wrappedProjectRootKeyIv,
-      WrappedProjectRootKey: keys.wrappedProjectRootKey,
-      WrappedProjectRootKeyTag: keys.wrappedProjectRootKeyTag,
-      WrappedProjectEncryptionKeyIV: keys.wrappedProjectEncryptionKeyIv,
-      WrappedProjectEncryptionKey: keys.wrappedProjectEncryptionKey,
-      WrappedProjectEncryptionKeyTag: keys.wrappedProjectEncryptionKeyTag,
-      UserPassphrase: passphrase,
-      UserPassphraseSalt: keys.userPassphraseSalt,
-    },
-  );
-  assertSameId(groupId, wrapped.GroupId);
-
-  return {
-    wrappedGroupRootKeyIv: wrapped.WrappedGroupRootKeyIV,
-    wrappedGroupRootKey: wrapped.WrappedGroupRootKey,
-    wrappedGroupRootKeyTag: wrapped.WrappedGroupRootKeyTag,
-    wrappedGroupDataEncryptionKeyIv: wrapped.WrappedGroupDataEncryptionKeyIV,
-    wrappedGroupDataEncryptionKey: wrapped.WrappedGroupDataEncryptionKey,
-    wrappedGroupDataEncryptionKeyTag: wrapped.WrappedGroupDataEncryptionKeyTag,
-  };
-}
 
 @ApiTags('cipseq')
 @ApiCookieAuth()
@@ -322,8 +272,6 @@ export class GroupsController {
     }
   }
 
-  // The member's removal and the new keys commit together, so a member is never
-  // removed without a rotation. The project member row stays.
   @ApiOperation({
     summary: 'Revoke a member from a group and rotate its keys',
   })
@@ -367,47 +315,12 @@ export class GroupsController {
       throw new NotFoundException();
     }
 
-    const fromVersion = currentGdekVersion(group);
-    const toVersion = fromVersion + 1;
-
-    await withPassphraseAttempt(projectId, async () => {
-      const keys = await createGroupKeys(projectId, groupId, passphrase);
-      try {
-        await cipseqPrisma.$transaction([
-          // The primary key rejects a second rotation from the same version.
-          cipseqPrisma.groupKeyVersion.create({
-            data: { groupId, gdekVersion: toVersion },
-          }),
-          cipseqPrisma.groupKeys.update({
-            where: { groupId },
-            data: { ...keys, currentGdekVersion: toVersion },
-          }),
-          cipseqPrisma.groupMember.delete({
-            where: { groupId_userId: { groupId, userId } },
-          }),
-          auditEvent(user.id, 'group.member_revoked', projectId, {
-            groupId,
-            targetUserId: userId,
-            fromVersion,
-            toVersion,
-          }),
-        ]);
-      } catch (error) {
-        if (isUniqueViolation(error)) {
-          throw new ConflictException(
-            'The group was rotated by another request',
-          );
-        }
-        if (isRecordNotFound(error)) {
-          throw new NotFoundException();
-        }
-        throw error;
-      }
+    return revokeGroupMember({
+      actorUserId: user.id,
+      projectId,
+      group,
+      targetUserId: userId,
+      passphrase,
     });
-
-    return toGroupResponse(
-      { ...group, keys: { currentGdekVersion: toVersion } },
-      'ADMIN',
-    );
   }
 }

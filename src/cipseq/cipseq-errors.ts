@@ -1,4 +1,4 @@
-import { BadGatewayException, Logger } from '@nestjs/common';
+import { BadGatewayException, ConflictException, Logger } from '@nestjs/common';
 import { Prisma } from '../generated/cipseq/client.js';
 
 const logger = new Logger('CipSeq');
@@ -24,4 +24,19 @@ export function isRecordNotFound(error: unknown): boolean {
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === 'P2025'
   );
+}
+
+// For a write that only applies while a row still has the expected status, so
+// two people can't both act on one invitation or request.
+export async function whileStatusCurrent<T>(
+  write: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await write();
+  } catch (error) {
+    if (isRecordNotFound(error)) {
+      throw new ConflictException('This has already been handled');
+    }
+    throw error;
+  }
 }

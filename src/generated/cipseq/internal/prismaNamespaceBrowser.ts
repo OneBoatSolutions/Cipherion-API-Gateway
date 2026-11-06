@@ -59,6 +59,8 @@ export const ModelName = {
   GroupKeys: 'GroupKeys',
   GroupKeyVersion: 'GroupKeyVersion',
   GroupMember: 'GroupMember',
+  GroupInvitation: 'GroupInvitation',
+  GroupMemberRemovalRequest: 'GroupMemberRemovalRequest',
   AuditEvent: 'AuditEvent'
 } as const
 
@@ -172,6 +174,35 @@ export const GroupMemberScalarFieldEnum = {
 } as const
 
 export type GroupMemberScalarFieldEnum = (typeof GroupMemberScalarFieldEnum)[keyof typeof GroupMemberScalarFieldEnum]
+
+
+export const GroupInvitationScalarFieldEnum = {
+  id: 'id',
+  groupId: 'groupId',
+  inviteeEmail: 'inviteeEmail',
+  invitedByUserId: 'invitedByUserId',
+  status: 'status',
+  reviewedByUserId: 'reviewedByUserId',
+  reviewedAt: 'reviewedAt',
+  respondedAt: 'respondedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type GroupInvitationScalarFieldEnum = (typeof GroupInvitationScalarFieldEnum)[keyof typeof GroupInvitationScalarFieldEnum]
+
+
+export const GroupMemberRemovalRequestScalarFieldEnum = {
+  id: 'id',
+  groupId: 'groupId',
+  targetUserId: 'targetUserId',
+  requestedByUserId: 'requestedByUserId',
+  status: 'status',
+  reviewedByUserId: 'reviewedByUserId',
+  reviewedAt: 'reviewedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type GroupMemberRemovalRequestScalarFieldEnum = (typeof GroupMemberRemovalRequestScalarFieldEnum)[keyof typeof GroupMemberRemovalRequestScalarFieldEnum]
 
 
 export const AuditEventScalarFieldEnum = {

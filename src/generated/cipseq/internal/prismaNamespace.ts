@@ -405,6 +405,8 @@ export const ModelName = {
   GroupKeys: 'GroupKeys',
   GroupKeyVersion: 'GroupKeyVersion',
   GroupMember: 'GroupMember',
+  GroupInvitation: 'GroupInvitation',
+  GroupMemberRemovalRequest: 'GroupMemberRemovalRequest',
   AuditEvent: 'AuditEvent'
 } as const
 
@@ -421,7 +423,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "project" | "projectKeys" | "projectKeyVersion" | "projectMember" | "group" | "groupKeys" | "groupKeyVersion" | "groupMember" | "auditEvent"
+    modelProps: "project" | "projectKeys" | "projectKeyVersion" | "projectMember" | "group" | "groupKeys" | "groupKeyVersion" | "groupMember" | "groupInvitation" | "groupMemberRemovalRequest" | "auditEvent"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1017,6 +1019,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    GroupInvitation: {
+      payload: Prisma.$GroupInvitationPayload<ExtArgs>
+      fields: Prisma.GroupInvitationFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.GroupInvitationFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupInvitationPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.GroupInvitationFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupInvitationPayload>
+        }
+        findFirst: {
+          args: Prisma.GroupInvitationFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupInvitationPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.GroupInvitationFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupInvitationPayload>
+        }
+        findMany: {
+          args: Prisma.GroupInvitationFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupInvitationPayload>[]
+        }
+        create: {
+          args: Prisma.GroupInvitationCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupInvitationPayload>
+        }
+        createMany: {
+          args: Prisma.GroupInvitationCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.GroupInvitationCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupInvitationPayload>[]
+        }
+        delete: {
+          args: Prisma.GroupInvitationDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupInvitationPayload>
+        }
+        update: {
+          args: Prisma.GroupInvitationUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupInvitationPayload>
+        }
+        deleteMany: {
+          args: Prisma.GroupInvitationDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.GroupInvitationUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.GroupInvitationUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupInvitationPayload>[]
+        }
+        upsert: {
+          args: Prisma.GroupInvitationUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupInvitationPayload>
+        }
+        aggregate: {
+          args: Prisma.GroupInvitationAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateGroupInvitation>
+        }
+        groupBy: {
+          args: Prisma.GroupInvitationGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GroupInvitationGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.GroupInvitationCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GroupInvitationCountAggregateOutputType> | number
+        }
+      }
+    }
+    GroupMemberRemovalRequest: {
+      payload: Prisma.$GroupMemberRemovalRequestPayload<ExtArgs>
+      fields: Prisma.GroupMemberRemovalRequestFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.GroupMemberRemovalRequestFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.GroupMemberRemovalRequestFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>
+        }
+        findFirst: {
+          args: Prisma.GroupMemberRemovalRequestFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.GroupMemberRemovalRequestFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>
+        }
+        findMany: {
+          args: Prisma.GroupMemberRemovalRequestFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>[]
+        }
+        create: {
+          args: Prisma.GroupMemberRemovalRequestCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>
+        }
+        createMany: {
+          args: Prisma.GroupMemberRemovalRequestCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.GroupMemberRemovalRequestCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>[]
+        }
+        delete: {
+          args: Prisma.GroupMemberRemovalRequestDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>
+        }
+        update: {
+          args: Prisma.GroupMemberRemovalRequestUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>
+        }
+        deleteMany: {
+          args: Prisma.GroupMemberRemovalRequestDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.GroupMemberRemovalRequestUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.GroupMemberRemovalRequestUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>[]
+        }
+        upsert: {
+          args: Prisma.GroupMemberRemovalRequestUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>
+        }
+        aggregate: {
+          args: Prisma.GroupMemberRemovalRequestAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateGroupMemberRemovalRequest>
+        }
+        groupBy: {
+          args: Prisma.GroupMemberRemovalRequestGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GroupMemberRemovalRequestGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.GroupMemberRemovalRequestCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GroupMemberRemovalRequestCountAggregateOutputType> | number
+        }
+      }
+    }
     AuditEvent: {
       payload: Prisma.$AuditEventPayload<ExtArgs>
       fields: Prisma.AuditEventFieldRefs
@@ -1226,6 +1376,35 @@ export const GroupMemberScalarFieldEnum = {
 export type GroupMemberScalarFieldEnum = (typeof GroupMemberScalarFieldEnum)[keyof typeof GroupMemberScalarFieldEnum]
 
 
+export const GroupInvitationScalarFieldEnum = {
+  id: 'id',
+  groupId: 'groupId',
+  inviteeEmail: 'inviteeEmail',
+  invitedByUserId: 'invitedByUserId',
+  status: 'status',
+  reviewedByUserId: 'reviewedByUserId',
+  reviewedAt: 'reviewedAt',
+  respondedAt: 'respondedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type GroupInvitationScalarFieldEnum = (typeof GroupInvitationScalarFieldEnum)[keyof typeof GroupInvitationScalarFieldEnum]
+
+
+export const GroupMemberRemovalRequestScalarFieldEnum = {
+  id: 'id',
+  groupId: 'groupId',
+  targetUserId: 'targetUserId',
+  requestedByUserId: 'requestedByUserId',
+  status: 'status',
+  reviewedByUserId: 'reviewedByUserId',
+  reviewedAt: 'reviewedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type GroupMemberRemovalRequestScalarFieldEnum = (typeof GroupMemberRemovalRequestScalarFieldEnum)[keyof typeof GroupMemberRemovalRequestScalarFieldEnum]
+
+
 export const AuditEventScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -1338,6 +1517,34 @@ export type EnumGroupRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$Prisma
  * Reference to a field of type 'GroupRole[]'
  */
 export type ListEnumGroupRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'GroupRole[]'>
+    
+
+
+/**
+ * Reference to a field of type 'InvitationStatus'
+ */
+export type EnumInvitationStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'InvitationStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'InvitationStatus[]'
+ */
+export type ListEnumInvitationStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'InvitationStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'RemovalRequestStatus'
+ */
+export type EnumRemovalRequestStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RemovalRequestStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'RemovalRequestStatus[]'
+ */
+export type ListEnumRemovalRequestStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RemovalRequestStatus[]'>
     
 
 
@@ -1527,6 +1734,8 @@ export type GlobalOmitConfig = {
   groupKeys?: Prisma.GroupKeysOmit
   groupKeyVersion?: Prisma.GroupKeyVersionOmit
   groupMember?: Prisma.GroupMemberOmit
+  groupInvitation?: Prisma.GroupInvitationOmit
+  groupMemberRemovalRequest?: Prisma.GroupMemberRemovalRequestOmit
   auditEvent?: Prisma.AuditEventOmit
 }
 

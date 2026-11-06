@@ -15,3 +15,25 @@ export const GroupRole = {
 } as const
 
 export type GroupRole = (typeof GroupRole)[keyof typeof GroupRole]
+
+
+export const InvitationStatus = {
+  PENDING_APPROVAL: 'PENDING_APPROVAL',
+  REJECTED: 'REJECTED',
+  PENDING_ACCEPTANCE: 'PENDING_ACCEPTANCE',
+  ACCEPTED: 'ACCEPTED',
+  DECLINED: 'DECLINED',
+  CANCELLED: 'CANCELLED'
+} as const
+
+export type InvitationStatus = (typeof InvitationStatus)[keyof typeof InvitationStatus]
+
+
+export const RemovalRequestStatus = {
+  PENDING_APPROVAL: 'PENDING_APPROVAL',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  CANCELLED: 'CANCELLED'
+} as const
+
+export type RemovalRequestStatus = (typeof RemovalRequestStatus)[keyof typeof RemovalRequestStatus]

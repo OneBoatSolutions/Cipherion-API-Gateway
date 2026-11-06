@@ -1,7 +1,11 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { cipseqPrisma } from '../lib/cipseq-prisma.js';
 import type { GroupResponse, GroupRole } from './groups.dto.js';
-import { findProjectForAdmin, type ProjectRow } from './project-access.js';
+import {
+  findProjectForAdmin,
+  findProjectForMember,
+  type ProjectRow,
+} from './project-access.js';
 
 export const GROUP_FIELDS = {
   id: true,
@@ -63,4 +67,52 @@ export async function findGroupForAdmin(
     throw new NotFoundException();
   }
   return { project, group };
+}
+
+export interface GroupAccess {
+  project: ProjectRow;
+  group: GroupRow;
+  isProjectAdmin: boolean;
+  isGroupAdmin: boolean;
+}
+
+// The project admin and the group's own members. Anyone else in the project gets
+// 404, so they can't confirm that a group they aren't in exists.
+export async function findGroupForMember(
+  projectId: string,
+  groupId: string,
+  userId: string,
+): Promise<GroupAccess> {
+  const project = await findProjectForMember(projectId, userId);
+  const group = await cipseqPrisma.group.findFirst({
+    where: { id: groupId, projectId, deletedAt: null },
+    select: {
+      ...GROUP_FIELDS,
+      members: { where: { userId }, select: { role: true } },
+    },
+  });
+  const isProjectAdmin = project.adminUserId === userId;
+  const member = group?.members[0];
+  if (!group || (!isProjectAdmin && !member)) {
+    throw new NotFoundException();
+  }
+  return {
+    project,
+    group,
+    isProjectAdmin,
+    isGroupAdmin: isProjectAdmin || member?.role === 'ADMIN',
+  };
+}
+
+// The project admin and acting admins.
+export async function findGroupForGroupAdmin(
+  projectId: string,
+  groupId: string,
+  userId: string,
+): Promise<GroupAccess> {
+  const access = await findGroupForMember(projectId, groupId, userId);
+  if (!access.isGroupAdmin) {
+    throw new ForbiddenException();
+  }
+  return access;
 }

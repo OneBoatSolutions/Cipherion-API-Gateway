@@ -68,8 +68,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Create, rotate and revoke call `CreateAndWrapNewGroupRootKeyAndGroupDataEncryptionKey`, which makes a new group root key and GDEK each time. The GDEK version goes up by one on every rotation and revocation. They share the project's passphrase attempt limit.
 - CipSeq group tables and migration (`cipseq_groups`): `group`, `groupKeys` (current wrapped keys and `currentGdekVersion`), `groupKeyVersion` (version numbers only) and `groupMember`.
 - Audit events for group writes: `group.created`, `group.updated`, `group.deleted`, `group.key_rotated`, `group.member_role_changed` and `group.member_revoked`.
-- `GET /api/v1/workspace` in a new `WorkspaceModule`: one read returning the signed-in user's profile, settings, projects, groups, current key versions, members and notifications (always empty for now). The project admin gets every group, anyone else only the groups they belong to. It answers `503` if a database is unavailable and is sent with `Cache-Control: no-store`.
+- `GET /api/v1/workspace` in a new `WorkspaceModule`: one read returning the signed-in user's profile, settings, projects, groups, current key versions, members and notifications. The project admin gets every group, anyone else only the groups they belong to. It answers `503` if a database is unavailable and is sent with `Cache-Control: no-store`.
 - Unit and e2e tests for groups and the workspace.
+- In-app invitations under `/api/v1/cipseq/projects/:projectId/groups/:groupId/invitations`: `POST /` (`email`), `POST /:id/approve`, `POST /:id/reject` and `POST /:id/cancel`. Nothing is emailed. A project admin's invitation goes straight to the invitee, and an acting admin's waits for the project admin's approval.
+- `POST /api/v1/cipseq/invitations/:id/accept` and `/decline` for the signed-in user whose email matches. Accepting adds them to the project and the group as a `MEMBER`, with no key change.
+- Removal requests under `/api/v1/cipseq/projects/:projectId/groups/:groupId/removal-requests`: an acting admin asks with `POST /` (`userId`), and the project admin uses `POST /:id/approve` (`passphrase`; revokes and rotates in one transaction) or `POST /:id/reject`. The requester or project admin can use `POST /:id/cancel`.
+- CipSeq invitation tables and migration (`cipseq_invitations`): `groupInvitation` and `groupMemberRemovalRequest`, with partial unique indexes allowing one open invitation per group and email, and one pending request per group and member.
+- `GET /api/v1/workspace` returns `notifications` (`INVITATION_RECEIVED`, `INVITATION_APPROVAL`, `REMOVAL_APPROVAL`), and `pendingInvitations` and `pendingRemovals` on each group for the project admin and acting admins.
+- Audit events: `invitation.created`, `.approved`, `.rejected`, `.cancelled`, `.accepted` and `.declined`, and `removal_request.created`, `.rejected` and `.cancelled`.
+- Unit and e2e tests for invitations and removal requests.
 - Unit and e2e tests for rotation and the attempt limit.
 
 ### Changed
@@ -87,6 +94,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Project scope in README, AGENTS.md, ROADMAP and the OpenAPI description: the gateway now hosts the Dashboard and CipSeq (formerly written "Cipsec") backends as modules instead of routing to upstream services. CipSeq uses the Cipherion KMS over gRPC + TLS and its own PostgreSQL database. EnQrypt and Zentriq are deferred. Commit scopes now include `cipseq` and `kms`, and the Swagger document has a `dashboard` tag.
 - `kmsCall()` maps gRPC `PERMISSION_DENIED` to `403 Incorrect passphrase` for the project rotation and group key RPCs. Other RPCs keep `502`, because there the status means the gateway itself was refused.
 - Reserving, releasing and clearing a passphrase attempt moved into `withPassphraseAttempt()` (`src/cipseq/with-passphrase-attempt.ts`), shared by project rotation and the group endpoints.
+- A direct member revoke now also cancels any pending removal request for that member. Group key creation and revocation moved into `src/cipseq/group-keys.ts`, shared with approving a removal request.
 
 ### Fixed
 

@@ -11,9 +11,20 @@ export type AuditAction =
   | 'group.deleted'
   | 'group.key_rotated'
   | 'group.member_role_changed'
-  | 'group.member_revoked';
+  | 'group.member_revoked'
+  | 'invitation.created'
+  | 'invitation.approved'
+  | 'invitation.rejected'
+  | 'invitation.cancelled'
+  | 'invitation.accepted'
+  | 'invitation.declined'
+  | 'removal_request.created'
+  | 'removal_request.rejected'
+  | 'removal_request.cancelled';
 
 type AuditMetadata =
+  | { groupId: string; invitationId: string }
+  | { groupId: string; requestId: string; targetUserId: string }
   | { changed: string[] }
   | { fromVersion: number; toVersion: number }
   | { groupId: string; changed?: string[] }
@@ -24,6 +35,7 @@ type AuditMetadata =
       targetUserId: string;
       fromVersion: number;
       toVersion: number;
+      requestId?: string;
     };
 
 // Runs inside the transaction of the change it records, so the two commit
