@@ -400,13 +400,15 @@ export const ModelName = {
   Project: 'Project',
   ProjectKeys: 'ProjectKeys',
   ProjectKeyVersion: 'ProjectKeyVersion',
-  ProjectMember: 'ProjectMember',
   Group: 'Group',
   GroupKeys: 'GroupKeys',
   GroupKeyVersion: 'GroupKeyVersion',
   GroupMember: 'GroupMember',
   GroupInvitation: 'GroupInvitation',
-  GroupMemberRemovalRequest: 'GroupMemberRemovalRequest',
+  Device: 'Device',
+  GroupDevice: 'GroupDevice',
+  DeviceEnvelope: 'DeviceEnvelope',
+  EnvelopeJob: 'EnvelopeJob',
   AuditEvent: 'AuditEvent'
 } as const
 
@@ -423,7 +425,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "project" | "projectKeys" | "projectKeyVersion" | "projectMember" | "group" | "groupKeys" | "groupKeyVersion" | "groupMember" | "groupInvitation" | "groupMemberRemovalRequest" | "auditEvent"
+    modelProps: "project" | "projectKeys" | "projectKeyVersion" | "group" | "groupKeys" | "groupKeyVersion" | "groupMember" | "groupInvitation" | "device" | "groupDevice" | "deviceEnvelope" | "envelopeJob" | "auditEvent"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -646,80 +648,6 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.ProjectKeyVersionCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.ProjectKeyVersionCountAggregateOutputType> | number
-        }
-      }
-    }
-    ProjectMember: {
-      payload: Prisma.$ProjectMemberPayload<ExtArgs>
-      fields: Prisma.ProjectMemberFieldRefs
-      operations: {
-        findUnique: {
-          args: Prisma.ProjectMemberFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectMemberPayload> | null
-        }
-        findUniqueOrThrow: {
-          args: Prisma.ProjectMemberFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectMemberPayload>
-        }
-        findFirst: {
-          args: Prisma.ProjectMemberFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectMemberPayload> | null
-        }
-        findFirstOrThrow: {
-          args: Prisma.ProjectMemberFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectMemberPayload>
-        }
-        findMany: {
-          args: Prisma.ProjectMemberFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectMemberPayload>[]
-        }
-        create: {
-          args: Prisma.ProjectMemberCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectMemberPayload>
-        }
-        createMany: {
-          args: Prisma.ProjectMemberCreateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        createManyAndReturn: {
-          args: Prisma.ProjectMemberCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectMemberPayload>[]
-        }
-        delete: {
-          args: Prisma.ProjectMemberDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectMemberPayload>
-        }
-        update: {
-          args: Prisma.ProjectMemberUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectMemberPayload>
-        }
-        deleteMany: {
-          args: Prisma.ProjectMemberDeleteManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateMany: {
-          args: Prisma.ProjectMemberUpdateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateManyAndReturn: {
-          args: Prisma.ProjectMemberUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectMemberPayload>[]
-        }
-        upsert: {
-          args: Prisma.ProjectMemberUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectMemberPayload>
-        }
-        aggregate: {
-          args: Prisma.ProjectMemberAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregateProjectMember>
-        }
-        groupBy: {
-          args: Prisma.ProjectMemberGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.ProjectMemberGroupByOutputType>[]
-        }
-        count: {
-          args: Prisma.ProjectMemberCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.ProjectMemberCountAggregateOutputType> | number
         }
       }
     }
@@ -1093,77 +1021,299 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
-    GroupMemberRemovalRequest: {
-      payload: Prisma.$GroupMemberRemovalRequestPayload<ExtArgs>
-      fields: Prisma.GroupMemberRemovalRequestFieldRefs
+    Device: {
+      payload: Prisma.$DevicePayload<ExtArgs>
+      fields: Prisma.DeviceFieldRefs
       operations: {
         findUnique: {
-          args: Prisma.GroupMemberRemovalRequestFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload> | null
+          args: Prisma.DeviceFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DevicePayload> | null
         }
         findUniqueOrThrow: {
-          args: Prisma.GroupMemberRemovalRequestFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>
+          args: Prisma.DeviceFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DevicePayload>
         }
         findFirst: {
-          args: Prisma.GroupMemberRemovalRequestFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload> | null
+          args: Prisma.DeviceFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DevicePayload> | null
         }
         findFirstOrThrow: {
-          args: Prisma.GroupMemberRemovalRequestFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>
+          args: Prisma.DeviceFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DevicePayload>
         }
         findMany: {
-          args: Prisma.GroupMemberRemovalRequestFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>[]
+          args: Prisma.DeviceFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DevicePayload>[]
         }
         create: {
-          args: Prisma.GroupMemberRemovalRequestCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>
+          args: Prisma.DeviceCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DevicePayload>
         }
         createMany: {
-          args: Prisma.GroupMemberRemovalRequestCreateManyArgs<ExtArgs>
+          args: Prisma.DeviceCreateManyArgs<ExtArgs>
           result: BatchPayload
         }
         createManyAndReturn: {
-          args: Prisma.GroupMemberRemovalRequestCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>[]
+          args: Prisma.DeviceCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DevicePayload>[]
         }
         delete: {
-          args: Prisma.GroupMemberRemovalRequestDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>
+          args: Prisma.DeviceDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DevicePayload>
         }
         update: {
-          args: Prisma.GroupMemberRemovalRequestUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>
+          args: Prisma.DeviceUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DevicePayload>
         }
         deleteMany: {
-          args: Prisma.GroupMemberRemovalRequestDeleteManyArgs<ExtArgs>
+          args: Prisma.DeviceDeleteManyArgs<ExtArgs>
           result: BatchPayload
         }
         updateMany: {
-          args: Prisma.GroupMemberRemovalRequestUpdateManyArgs<ExtArgs>
+          args: Prisma.DeviceUpdateManyArgs<ExtArgs>
           result: BatchPayload
         }
         updateManyAndReturn: {
-          args: Prisma.GroupMemberRemovalRequestUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>[]
+          args: Prisma.DeviceUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DevicePayload>[]
         }
         upsert: {
-          args: Prisma.GroupMemberRemovalRequestUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupMemberRemovalRequestPayload>
+          args: Prisma.DeviceUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DevicePayload>
         }
         aggregate: {
-          args: Prisma.GroupMemberRemovalRequestAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregateGroupMemberRemovalRequest>
+          args: Prisma.DeviceAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDevice>
         }
         groupBy: {
-          args: Prisma.GroupMemberRemovalRequestGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.GroupMemberRemovalRequestGroupByOutputType>[]
+          args: Prisma.DeviceGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeviceGroupByOutputType>[]
         }
         count: {
-          args: Prisma.GroupMemberRemovalRequestCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.GroupMemberRemovalRequestCountAggregateOutputType> | number
+          args: Prisma.DeviceCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeviceCountAggregateOutputType> | number
+        }
+      }
+    }
+    GroupDevice: {
+      payload: Prisma.$GroupDevicePayload<ExtArgs>
+      fields: Prisma.GroupDeviceFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.GroupDeviceFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupDevicePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.GroupDeviceFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupDevicePayload>
+        }
+        findFirst: {
+          args: Prisma.GroupDeviceFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupDevicePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.GroupDeviceFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupDevicePayload>
+        }
+        findMany: {
+          args: Prisma.GroupDeviceFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupDevicePayload>[]
+        }
+        create: {
+          args: Prisma.GroupDeviceCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupDevicePayload>
+        }
+        createMany: {
+          args: Prisma.GroupDeviceCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.GroupDeviceCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupDevicePayload>[]
+        }
+        delete: {
+          args: Prisma.GroupDeviceDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupDevicePayload>
+        }
+        update: {
+          args: Prisma.GroupDeviceUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupDevicePayload>
+        }
+        deleteMany: {
+          args: Prisma.GroupDeviceDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.GroupDeviceUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.GroupDeviceUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupDevicePayload>[]
+        }
+        upsert: {
+          args: Prisma.GroupDeviceUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GroupDevicePayload>
+        }
+        aggregate: {
+          args: Prisma.GroupDeviceAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateGroupDevice>
+        }
+        groupBy: {
+          args: Prisma.GroupDeviceGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GroupDeviceGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.GroupDeviceCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GroupDeviceCountAggregateOutputType> | number
+        }
+      }
+    }
+    DeviceEnvelope: {
+      payload: Prisma.$DeviceEnvelopePayload<ExtArgs>
+      fields: Prisma.DeviceEnvelopeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DeviceEnvelopeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceEnvelopePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DeviceEnvelopeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceEnvelopePayload>
+        }
+        findFirst: {
+          args: Prisma.DeviceEnvelopeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceEnvelopePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DeviceEnvelopeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceEnvelopePayload>
+        }
+        findMany: {
+          args: Prisma.DeviceEnvelopeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceEnvelopePayload>[]
+        }
+        create: {
+          args: Prisma.DeviceEnvelopeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceEnvelopePayload>
+        }
+        createMany: {
+          args: Prisma.DeviceEnvelopeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DeviceEnvelopeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceEnvelopePayload>[]
+        }
+        delete: {
+          args: Prisma.DeviceEnvelopeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceEnvelopePayload>
+        }
+        update: {
+          args: Prisma.DeviceEnvelopeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceEnvelopePayload>
+        }
+        deleteMany: {
+          args: Prisma.DeviceEnvelopeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DeviceEnvelopeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DeviceEnvelopeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceEnvelopePayload>[]
+        }
+        upsert: {
+          args: Prisma.DeviceEnvelopeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceEnvelopePayload>
+        }
+        aggregate: {
+          args: Prisma.DeviceEnvelopeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDeviceEnvelope>
+        }
+        groupBy: {
+          args: Prisma.DeviceEnvelopeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeviceEnvelopeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DeviceEnvelopeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeviceEnvelopeCountAggregateOutputType> | number
+        }
+      }
+    }
+    EnvelopeJob: {
+      payload: Prisma.$EnvelopeJobPayload<ExtArgs>
+      fields: Prisma.EnvelopeJobFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.EnvelopeJobFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeJobPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.EnvelopeJobFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeJobPayload>
+        }
+        findFirst: {
+          args: Prisma.EnvelopeJobFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeJobPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.EnvelopeJobFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeJobPayload>
+        }
+        findMany: {
+          args: Prisma.EnvelopeJobFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeJobPayload>[]
+        }
+        create: {
+          args: Prisma.EnvelopeJobCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeJobPayload>
+        }
+        createMany: {
+          args: Prisma.EnvelopeJobCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.EnvelopeJobCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeJobPayload>[]
+        }
+        delete: {
+          args: Prisma.EnvelopeJobDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeJobPayload>
+        }
+        update: {
+          args: Prisma.EnvelopeJobUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeJobPayload>
+        }
+        deleteMany: {
+          args: Prisma.EnvelopeJobDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.EnvelopeJobUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.EnvelopeJobUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeJobPayload>[]
+        }
+        upsert: {
+          args: Prisma.EnvelopeJobUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeJobPayload>
+        }
+        aggregate: {
+          args: Prisma.EnvelopeJobAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateEnvelopeJob>
+        }
+        groupBy: {
+          args: Prisma.EnvelopeJobGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.EnvelopeJobGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.EnvelopeJobCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.EnvelopeJobCountAggregateOutputType> | number
         }
       }
     }
@@ -1319,15 +1469,6 @@ export const ProjectKeyVersionScalarFieldEnum = {
 export type ProjectKeyVersionScalarFieldEnum = (typeof ProjectKeyVersionScalarFieldEnum)[keyof typeof ProjectKeyVersionScalarFieldEnum]
 
 
-export const ProjectMemberScalarFieldEnum = {
-  projectId: 'projectId',
-  userId: 'userId',
-  createdAt: 'createdAt'
-} as const
-
-export type ProjectMemberScalarFieldEnum = (typeof ProjectMemberScalarFieldEnum)[keyof typeof ProjectMemberScalarFieldEnum]
-
-
 export const GroupScalarFieldEnum = {
   id: 'id',
   projectId: 'projectId',
@@ -1391,18 +1532,62 @@ export const GroupInvitationScalarFieldEnum = {
 export type GroupInvitationScalarFieldEnum = (typeof GroupInvitationScalarFieldEnum)[keyof typeof GroupInvitationScalarFieldEnum]
 
 
-export const GroupMemberRemovalRequestScalarFieldEnum = {
+export const DeviceScalarFieldEnum = {
   id: 'id',
-  groupId: 'groupId',
-  targetUserId: 'targetUserId',
-  requestedByUserId: 'requestedByUserId',
+  userId: 'userId',
+  name: 'name',
+  publicKey: 'publicKey',
   status: 'status',
-  reviewedByUserId: 'reviewedByUserId',
-  reviewedAt: 'reviewedAt',
+  revokedAt: 'revokedAt',
   createdAt: 'createdAt'
 } as const
 
-export type GroupMemberRemovalRequestScalarFieldEnum = (typeof GroupMemberRemovalRequestScalarFieldEnum)[keyof typeof GroupMemberRemovalRequestScalarFieldEnum]
+export type DeviceScalarFieldEnum = (typeof DeviceScalarFieldEnum)[keyof typeof DeviceScalarFieldEnum]
+
+
+export const GroupDeviceScalarFieldEnum = {
+  id: 'id',
+  groupId: 'groupId',
+  deviceId: 'deviceId',
+  status: 'status',
+  reviewedByUserId: 'reviewedByUserId',
+  reviewedAt: 'reviewedAt',
+  revokedByUserId: 'revokedByUserId',
+  revokedAt: 'revokedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type GroupDeviceScalarFieldEnum = (typeof GroupDeviceScalarFieldEnum)[keyof typeof GroupDeviceScalarFieldEnum]
+
+
+export const DeviceEnvelopeScalarFieldEnum = {
+  id: 'id',
+  groupId: 'groupId',
+  deviceId: 'deviceId',
+  envelopeVersion: 'envelopeVersion',
+  envelopeJson: 'envelopeJson',
+  createdAt: 'createdAt',
+  deletedAt: 'deletedAt'
+} as const
+
+export type DeviceEnvelopeScalarFieldEnum = (typeof DeviceEnvelopeScalarFieldEnum)[keyof typeof DeviceEnvelopeScalarFieldEnum]
+
+
+export const EnvelopeJobScalarFieldEnum = {
+  groupId: 'groupId',
+  jobId: 'jobId',
+  kind: 'kind',
+  gdekVersion: 'gdekVersion',
+  status: 'status',
+  failureReason: 'failureReason',
+  envelopeCount: 'envelopeCount',
+  startedAt: 'startedAt',
+  lastActiveAt: 'lastActiveAt',
+  finishedAt: 'finishedAt',
+  dismissedAt: 'dismissedAt'
+} as const
+
+export type EnvelopeJobScalarFieldEnum = (typeof EnvelopeJobScalarFieldEnum)[keyof typeof EnvelopeJobScalarFieldEnum]
 
 
 export const AuditEventScalarFieldEnum = {
@@ -1535,16 +1720,72 @@ export type ListEnumInvitationStatusFieldRefInput<$PrismaModel> = FieldRefInputT
 
 
 /**
- * Reference to a field of type 'RemovalRequestStatus'
+ * Reference to a field of type 'DeviceStatus'
  */
-export type EnumRemovalRequestStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RemovalRequestStatus'>
+export type EnumDeviceStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeviceStatus'>
     
 
 
 /**
- * Reference to a field of type 'RemovalRequestStatus[]'
+ * Reference to a field of type 'DeviceStatus[]'
  */
-export type ListEnumRemovalRequestStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RemovalRequestStatus[]'>
+export type ListEnumDeviceStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeviceStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'GroupDeviceStatus'
+ */
+export type EnumGroupDeviceStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'GroupDeviceStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'GroupDeviceStatus[]'
+ */
+export type ListEnumGroupDeviceStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'GroupDeviceStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'EnvelopeJobKind'
+ */
+export type EnumEnvelopeJobKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EnvelopeJobKind'>
+    
+
+
+/**
+ * Reference to a field of type 'EnvelopeJobKind[]'
+ */
+export type ListEnumEnvelopeJobKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EnvelopeJobKind[]'>
+    
+
+
+/**
+ * Reference to a field of type 'EnvelopeJobStatus'
+ */
+export type EnumEnvelopeJobStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EnvelopeJobStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'EnvelopeJobStatus[]'
+ */
+export type ListEnumEnvelopeJobStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EnvelopeJobStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'EnvelopeJobFailure'
+ */
+export type EnumEnvelopeJobFailureFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EnvelopeJobFailure'>
+    
+
+
+/**
+ * Reference to a field of type 'EnvelopeJobFailure[]'
+ */
+export type ListEnumEnvelopeJobFailureFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EnvelopeJobFailure[]'>
     
 
 
@@ -1729,13 +1970,15 @@ export type GlobalOmitConfig = {
   project?: Prisma.ProjectOmit
   projectKeys?: Prisma.ProjectKeysOmit
   projectKeyVersion?: Prisma.ProjectKeyVersionOmit
-  projectMember?: Prisma.ProjectMemberOmit
   group?: Prisma.GroupOmit
   groupKeys?: Prisma.GroupKeysOmit
   groupKeyVersion?: Prisma.GroupKeyVersionOmit
   groupMember?: Prisma.GroupMemberOmit
   groupInvitation?: Prisma.GroupInvitationOmit
-  groupMemberRemovalRequest?: Prisma.GroupMemberRemovalRequestOmit
+  device?: Prisma.DeviceOmit
+  groupDevice?: Prisma.GroupDeviceOmit
+  deviceEnvelope?: Prisma.DeviceEnvelopeOmit
+  envelopeJob?: Prisma.EnvelopeJobOmit
   auditEvent?: Prisma.AuditEventOmit
 }
 

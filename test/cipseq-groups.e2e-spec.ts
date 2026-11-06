@@ -31,9 +31,9 @@ const NEW_PASSPHRASE = 'a different long passphrase';
 const WRONG_PASSPHRASE = 'not the right passphrase';
 const GROUP = { name: 'Finance', description: 'Invoices and payroll' };
 
-// Runs against the .env.dev databases and needs the KMS running. Until the
-// invitations branch exists, other members are added directly to the database.
-// The test users and their CipSeq rows are removed afterwards.
+// Runs against the .env.dev databases and needs the KMS running. Other members
+// are added directly to the database. The test users and their CipSeq rows are
+// removed afterwards.
 describe('CipSeq groups (e2e)', () => {
   let app: NestFastifyApplication;
   let admin: TestUser;
@@ -108,19 +108,11 @@ describe('CipSeq groups (e2e)', () => {
     return response.json<Group>();
   };
 
-  const addMember = async (
-    projectId: string,
+  const addMember = (
     groupId: string,
     userId: string,
-    role: 'ADMIN' | 'MEMBER' = 'MEMBER',
-  ) => {
-    await cipseqPrisma.projectMember.upsert({
-      where: { projectId_userId: { projectId, userId } },
-      create: { projectId, userId },
-      update: {},
-    });
-    await cipseqPrisma.groupMember.create({ data: { groupId, userId, role } });
-  };
+    role: 'ACTING_ADMIN' | 'MEMBER' = 'MEMBER',
+  ) => cipseqPrisma.groupMember.create({ data: { groupId, userId, role } });
 
   const storedKeys = (groupId: string) =>
     cipseqPrisma.groupKeys.findUniqueOrThrow({ where: { groupId } });
@@ -152,7 +144,6 @@ describe('CipSeq groups (e2e)', () => {
       cipseqPrisma.groupKeys.deleteMany({ where: groupWhere }),
       cipseqPrisma.group.deleteMany({ where }),
       cipseqPrisma.auditEvent.deleteMany({ where }),
-      cipseqPrisma.projectMember.deleteMany({ where }),
       cipseqPrisma.projectKeyVersion.deleteMany({ where }),
       cipseqPrisma.projectKeys.deleteMany({ where }),
       cipseqPrisma.project.deleteMany({ where: { id: { in: projectIds } } }),
@@ -163,7 +154,7 @@ describe('CipSeq groups (e2e)', () => {
     await app.close();
   });
 
-  it('creates at v1, rotates to v2 and revokes to v3 with a new pair each time', async () => {
+  it('creates at v1, rotates to v2, and revoking changes no keys', async () => {
     const projectId = await createProject();
     const group = await createGroup(projectId);
     const url = `/cipseq/projects/${projectId}/groups/${group.id}`;
@@ -185,19 +176,18 @@ describe('CipSeq groups (e2e)', () => {
       v1.wrappedGroupDataEncryptionKey,
     );
 
-    await addMember(projectId, group.id, member.id);
+    await addMember(group.id, member.id);
     const revoked = await call(
       admin,
       'POST',
       `${url}/members/${member.id}/revoke`,
-      { passphrase: PASSPHRASE },
     );
     expect(revoked.statusCode).toBe(200);
-    expect(revoked.json<Group>().gdekVersion).toBe(3);
+    expect(revoked.json<Group>().gdekVersion).toBe(2);
 
-    const v3 = await storedKeys(group.id);
-    expect(v3.currentGdekVersion).toBe(3);
-    expect(v3.wrappedGroupDataEncryptionKey).not.toBe(
+    const afterRevoke = await storedKeys(group.id);
+    expect(afterRevoke.currentGdekVersion).toBe(2);
+    expect(afterRevoke.wrappedGroupDataEncryptionKey).toBe(
       v2.wrappedGroupDataEncryptionKey,
     );
 
@@ -206,24 +196,22 @@ describe('CipSeq groups (e2e)', () => {
       where: { groupId: group.id },
       orderBy: { gdekVersion: 'asc' },
     });
-    expect(versions.map(({ gdekVersion }) => gdekVersion)).toEqual([1, 2, 3]);
+    expect(versions.map(({ gdekVersion }) => gdekVersion)).toEqual([1, 2]);
     expect(Object.keys(versions[0]).sort()).toEqual([
       'createdAt',
       'gdekVersion',
       'groupId',
     ]);
 
-    // Revoked from the group only: they stay in the project.
     await expect(
       cipseqPrisma.groupMember.count({
         where: { groupId: group.id, userId: member.id },
       }),
     ).resolves.toBe(0);
-    await expect(
-      cipseqPrisma.projectMember.count({
-        where: { projectId, userId: member.id },
-      }),
-    ).resolves.toBe(1);
+
+    // They were in only this group, so the project is gone for them too.
+    const gone = await call(member, 'GET', `/cipseq/projects/${projectId}`);
+    expect(gone.statusCode).toBe(404);
 
     const events = await cipseqPrisma.auditEvent.findMany({
       where: { projectId, action: { startsWith: 'group.' } },
@@ -245,14 +233,48 @@ describe('CipSeq groups (e2e)', () => {
     const project = workspace
       .json<{ projects: { id: string; groups: Group[] }[] }>()
       .projects.find(({ id }) => id === projectId);
-    expect(project?.groups[0].gdekVersion).toBe(3);
+    expect(project?.groups[0].gdekVersion).toBe(2);
+  });
+
+  it('allows one rotation every 48 hours', async () => {
+    const projectId = await createProject();
+    const group = await createGroup(projectId);
+    const url = `/cipseq/projects/${projectId}/groups/${group.id}/rotate`;
+    const body = { passphrase: PASSPHRASE };
+
+    // Creating the group doesn't start the 48 hours.
+    expect((await call(admin, 'POST', url, body)).statusCode).toBe(200);
+
+    const tooSoon = await call(admin, 'POST', url, body);
+    expect(tooSoon.statusCode).toBe(409);
+    expect(
+      Date.parse(
+        tooSoon.json<{ rotationAllowedAt: string }>().rotationAllowedAt,
+      ),
+    ).toBeGreaterThan(Date.now());
+
+    // A wrong passphrase isn't even checked inside the 48 hours.
+    const key = `cipseq:passphrase-attempts:${projectId}`;
+    await redis.del(key);
+    const wrong = await call(admin, 'POST', url, {
+      passphrase: WRONG_PASSPHRASE,
+    });
+    expect(wrong.statusCode).toBe(409);
+    await expect(redis.get(key)).resolves.toBeNull();
+
+    await cipseqPrisma.groupKeyVersion.update({
+      where: { groupId_gdekVersion: { groupId: group.id, gdekVersion: 2 } },
+      data: { createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000 - 1000) },
+    });
+    const later = await call(admin, 'POST', url, body);
+    expect(later.statusCode).toBe(200);
+    expect(later.json<Group>().gdekVersion).toBe(3);
   });
 
   it('refuses a wrong passphrase with 403 and changes nothing', async () => {
     const projectId = await createProject();
     const group = await createGroup(projectId);
     const url = `/cipseq/projects/${projectId}/groups/${group.id}`;
-    await addMember(projectId, group.id, member.id);
     const before = await storedKeys(group.id);
 
     const rotated = await call(admin, 'POST', `${url}/rotate`, {
@@ -262,14 +284,6 @@ describe('CipSeq groups (e2e)', () => {
     expect(rotated.json<{ message: string }>().message).toBe(
       'Incorrect passphrase',
     );
-
-    const revoked = await call(
-      admin,
-      'POST',
-      `${url}/members/${member.id}/revoke`,
-      { passphrase: WRONG_PASSPHRASE },
-    );
-    expect(revoked.statusCode).toBe(403);
 
     const created = await call(
       admin,
@@ -284,11 +298,6 @@ describe('CipSeq groups (e2e)', () => {
     expect(after.wrappedGroupDataEncryptionKey).toBe(
       before.wrappedGroupDataEncryptionKey,
     );
-    await expect(
-      cipseqPrisma.groupMember.count({
-        where: { groupId: group.id, userId: member.id },
-      }),
-    ).resolves.toBe(1);
     await expect(
       cipseqPrisma.group.count({ where: { projectId } }),
     ).resolves.toBe(1);
@@ -350,11 +359,11 @@ describe('CipSeq groups (e2e)', () => {
     }
   });
 
-  it('lets only the project admin write', async () => {
+  it('lets only the project admin change a group', async () => {
     const projectId = await createProject();
     const group = await createGroup(projectId);
-    await addMember(projectId, group.id, acting.id, 'ADMIN');
-    await addMember(projectId, group.id, member.id);
+    await addMember(group.id, acting.id, 'ACTING_ADMIN');
+    await addMember(group.id, member.id);
     const groups = `/cipseq/projects/${projectId}/groups`;
     const url = `${groups}/${group.id}`;
     const passphrase = { passphrase: PASSPHRASE };
@@ -367,8 +376,7 @@ describe('CipSeq groups (e2e)', () => {
       ['POST', groups, { ...GROUP, ...passphrase }],
       ['PATCH', url, { name: 'Accounts' }],
       ['POST', `${url}/rotate`, passphrase],
-      ['PATCH', `${url}/members/${member.id}`, { role: 'ADMIN' }],
-      ['POST', `${url}/members/${member.id}/revoke`, passphrase],
+      ['PATCH', `${url}/members/${member.id}`, { role: 'ACTING_ADMIN' }],
       ['DELETE', url, undefined],
     ];
 
@@ -389,7 +397,7 @@ describe('CipSeq groups (e2e)', () => {
     const theirs = await createProject(member);
     const someoneElses = await createProject();
     const group = await createGroup(someoneElses);
-    await addMember(someoneElses, group.id, member.id);
+    await addMember(group.id, member.id);
 
     const own = await call(
       member,
@@ -408,22 +416,52 @@ describe('CipSeq groups (e2e)', () => {
     expect(other.statusCode).toBe(403);
   });
 
-  it('sets acting admins and protects the project admin', async () => {
+  it('sets one acting admin per group and protects the project admin', async () => {
     const projectId = await createProject();
     const group = await createGroup(projectId);
     const url = `/cipseq/projects/${projectId}/groups/${group.id}`;
-    await addMember(projectId, group.id, member.id);
+    await addMember(group.id, member.id);
+    await addMember(group.id, acting.id);
 
     const promoted = await call(admin, 'PATCH', `${url}/members/${member.id}`, {
-      role: 'ADMIN',
+      role: 'ACTING_ADMIN',
     });
     expect(promoted.statusCode).toBe(200);
-    expect(promoted.json<{ role: string }>().role).toBe('ADMIN');
+    expect(promoted.json<{ role: string }>().role).toBe('ACTING_ADMIN');
 
-    const invalid = await call(admin, 'PATCH', `${url}/members/${member.id}`, {
-      role: 'OWNER',
+    const second = await call(admin, 'PATCH', `${url}/members/${acting.id}`, {
+      role: 'ACTING_ADMIN',
     });
-    expect(invalid.statusCode).toBe(400);
+    expect(second.statusCode).toBe(409);
+
+    // Changing the first back frees the role, and two at once can't both win.
+    const demotedFirst = await call(
+      admin,
+      'PATCH',
+      `${url}/members/${member.id}`,
+      { role: 'MEMBER' },
+    );
+    expect(demotedFirst.statusCode).toBe(200);
+    const race = await Promise.all(
+      [member, acting].map(({ id }) =>
+        call(admin, 'PATCH', `${url}/members/${id}`, {
+          role: 'ACTING_ADMIN',
+        }),
+      ),
+    );
+    expect(
+      race.map(({ statusCode }) => statusCode).sort((a, b) => a - b),
+    ).toEqual([200, 409]);
+
+    for (const role of ['OWNER', 'ADMIN']) {
+      const invalid = await call(
+        admin,
+        'PATCH',
+        `${url}/members/${member.id}`,
+        { role },
+      );
+      expect(invalid.statusCode).toBe(400);
+    }
 
     const demoted = await call(admin, 'PATCH', `${url}/members/${admin.id}`, {
       role: 'MEMBER',
@@ -434,12 +472,11 @@ describe('CipSeq groups (e2e)', () => {
       admin,
       'POST',
       `${url}/members/${admin.id}/revoke`,
-      { passphrase: PASSPHRASE },
     );
     expect(revoked.statusCode).toBe(400);
 
     const missing = await call(admin, 'PATCH', `${url}/members/nobody`, {
-      role: 'ADMIN',
+      role: 'MEMBER',
     });
     expect(missing.statusCode).toBe(404);
 
@@ -447,9 +484,95 @@ describe('CipSeq groups (e2e)', () => {
       admin,
       'POST',
       `${url}/members/nobody/revoke`,
-      { passphrase: PASSPHRASE },
     );
     expect(revokeMissing.statusCode).toBe(404);
+  });
+
+  it('applies the revoke rules to acting admins', async () => {
+    const projectId = await createProject();
+    const groups = `/cipseq/projects/${projectId}/groups`;
+    const first = await createGroup(projectId);
+    const second = await createGroup(projectId);
+    const url = `${groups}/${first.id}`;
+    await addMember(first.id, acting.id, 'ACTING_ADMIN');
+    await addMember(first.id, member.id);
+    // The other group's acting admin is also a member of the first group.
+    await addMember(second.id, outsider.id, 'ACTING_ADMIN');
+    await addMember(first.id, outsider.id);
+
+    const revoke = (user: TestUser, userId: string, groupUrl = url) =>
+      call(user, 'POST', `${groupUrl}/members/${userId}/revoke`);
+
+    expect((await revoke(acting, admin.id)).statusCode).toBe(400);
+    expect((await revoke(acting, acting.id)).statusCode).toBe(400);
+    // Only in their own group.
+    expect(
+      (await revoke(acting, member.id, `${groups}/${second.id}`)).statusCode,
+    ).toBe(404);
+    expect((await revoke(member, acting.id)).statusCode).toBe(403);
+
+    const revoked = await revoke(acting, member.id);
+    expect(revoked.statusCode).toBe(200);
+    expect(revoked.json<Group>().role).toBe('ACTING_ADMIN');
+
+    // Roles are per group: here they're a plain member, and they keep their role
+    // in the group they run. Only the project admin can remove them from that one.
+    expect((await revoke(acting, outsider.id)).statusCode).toBe(200);
+    const stillActing = await cipseqPrisma.groupMember.findUniqueOrThrow({
+      where: { groupId_userId: { groupId: second.id, userId: outsider.id } },
+    });
+    expect(stillActing.role).toBe('ACTING_ADMIN');
+    expect(
+      (await revoke(admin, outsider.id, `${groups}/${second.id}`)).statusCode,
+    ).toBe(200);
+  });
+
+  it('removes someone from the whole project', async () => {
+    const projectId = await createProject();
+    const first = await createGroup(projectId);
+    const second = await createGroup(projectId);
+    await addMember(first.id, member.id);
+    await addMember(second.id, member.id);
+    await addMember(first.id, acting.id, 'ACTING_ADMIN');
+    const url = `/cipseq/projects/${projectId}/members`;
+
+    expect(
+      (await call(acting, 'POST', `${url}/${member.id}/revoke`)).statusCode,
+    ).toBe(403);
+    expect(
+      (await call(admin, 'POST', `${url}/${admin.id}/revoke`)).statusCode,
+    ).toBe(400);
+    expect((await call(admin, 'POST', `${url}/nobody/revoke`)).statusCode).toBe(
+      404,
+    );
+
+    const before = await storedKeys(first.id);
+    const removed = await call(admin, 'POST', `${url}/${member.id}/revoke`);
+    expect(removed.statusCode).toBe(204);
+
+    await expect(
+      cipseqPrisma.groupMember.count({
+        where: { group: { projectId }, userId: member.id },
+      }),
+    ).resolves.toBe(0);
+    const after = await storedKeys(first.id);
+    expect(after.currentGdekVersion).toBe(before.currentGdekVersion);
+    const gone = await call(member, 'GET', `/cipseq/projects/${projectId}`);
+    expect(gone.statusCode).toBe(404);
+  });
+
+  it('keeps a project for its admin, even with no groups left', async () => {
+    const projectId = await createProject();
+    const group = await createGroup(projectId);
+    await addMember(group.id, member.id);
+    const url = `/cipseq/projects/${projectId}`;
+
+    const deleted = await call(admin, 'DELETE', `${url}/groups/${group.id}`);
+    expect(deleted.statusCode).toBe(204);
+
+    expect((await call(admin, 'GET', url)).statusCode).toBe(200);
+    // Their only group is gone, so they aren't a part of the project any more.
+    expect((await call(member, 'GET', url)).statusCode).toBe(404);
   });
 
   it('updates, validates and soft deletes a group', async () => {

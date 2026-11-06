@@ -51,20 +51,31 @@
 - [x] Audit events for successful project writes
 - [x] Key rotation and key versions (old wrapped keys aren't kept; only the admin rotates)
 - [x] Groups and group members (only the project admin creates or deletes a group and is a group admin by default; they can assign acting admins)
-- [x] Rotate group keys manually and when a member is revoked (a new group root key and GDEK each time; old wrapped pairs aren't kept)
+- [x] Rotate group keys manually, project admin only, at most once per group in 48 hours (a new group root key and GDEK each time; old wrapped pairs aren't kept)
 - [x] `GET /workspace`: one read for everything the signed-in user is a part of
 - [x] In-app invitations (send, accept and decline; an acting admin's invitations need the project admin's approval; shown in `/workspace` notifications)
-- [x] Removal requests from acting admins, approved by the project admin with the passphrase
+- [x] Project-wide removal by the project admin only; acting admins remove members and devices from their own group
 - [ ] Require verified emails before production (anyone can sign up with an invited address and accept; this needs email sending, so it also means delivering invitations by email)
 - [ ] Expire invitations that stay open
-- [ ] Add device requests to `/workspace` notifications
-- [ ] Device registration and device key material (decide who provides the passphrase `CreateDeviceEnvelope` needs when a member registers a device, and for remaining members after each rotation; add the RPC to the wrong-passphrase mapping and attempt limit, since it answers `502` today)
-- [ ] Device revocation (soft delete all versions of a device's or member's envelopes; decide whether revoking one device rotates the GDEK, since a stolen device can keep decrypting new data with a saved envelope until the next rotation)
+- [x] Add device requests to `/workspace` notifications
+- [x] Device registration and approval, with envelopes created by a background job that holds the passphrase in memory only
+- [x] Device and member revocation (soft delete all versions of the envelopes, with no rotation)
+- [x] Show envelope jobs as in progress, stopped or completed, and resume a stopped one with the passphrase
+- [ ] Certificate branch: port 3443, device certificates, enrol and renew, `POST /cipseq/crypto/encrypt` and `/decrypt`, Better Auth bearer plugin and fixed 1-day sessions. This is what delivers envelopes to devices, and proves a device is genuine
+- [ ] Agree with the team: the updated KMS proto with `IssueDeviceCertificate`, `/api/v1/cipseq` paths, the 1-day session, what encrypt returns while a device's new envelope isn't ready (a 10,000-device job takes about 5 minutes), and who generates and protects pins B and C
+- [ ] Ask the KMS team why `CreateDeviceEnvelope` slows from about 90 ms to 120–146 ms after a few minutes of sustained load, and how many calls at once it can take (a 10,000-device job took 314 s at 5 at a time; the KMS alone stayed at about 50% CPU)
+- [ ] Decide whether to allow one early rotation after a revocation (a modified engine can keep a revoked envelope until the next rotation, and the 48-hour limit can extend that)
+- [ ] Limit repeat `request-approval` calls after a refusal
+- [ ] Alert the project admin by email or push when an envelope job stops (today they see it only on their next `/workspace` load)
+- [ ] Let a running envelope job finish before shutdown (a deploy interrupts it, and the admin has to resume it)
+- [ ] Retention for old envelope versions (they're kept indefinitely: about 26 MB and 2,000 audit rows per rotation of a 10,000-device group)
+- [ ] Make `envelopeCount` on `ENVELOPES_COMPLETED` exact (it's the number missing when the job or its last resume started)
+- [ ] Test a KMS that stops during a job against the real KMS (only unit tested)
 - [x] Per-project limit on passphrase attempts in Redis (the KMS is stateless and can't count them)
 - [ ] Test rotation against a KMS that accepts the connection and never answers (a closed port is tested; the deadline and its `503` mapping are only unit tested)
-- [ ] Rate-limit project, group and invitation routes (group writes also call the KMS, and invitations can be created without limit)
+- [ ] Rate-limit project, group, invitation and device routes (group writes also call the KMS, and invitations and devices can be created without limit)
 - [ ] Paginate the project list
-- [ ] Revisit `/workspace` for very large accounts (return `memberCount` and load members per group; 51 groups with 10,003 members and 51 notifications took 134–319 ms locally, with 12 SQL statements)
+- [ ] Revisit `/workspace` for very large accounts (return `memberCount` and load members per group; a 10,000-member group with one device each took 262–558 ms locally and returned 2.8 MB)
 - [ ] Audit reads and failed attempts
 - [ ] Restore and purge for soft-deleted projects
 - [ ] Project admin handover and a plan for lost passphrases (one admin per project, no recovery today)
@@ -83,7 +94,7 @@
 - [ ] Return `503` instead of `500` from Dashboard routes while a database is unreachable
 - [ ] Backups and point-in-time recovery for the CipSeq database, with a tested restore (it holds the only copy of the wrapped keys)
 - [ ] Optionally require Redis and the KMS at startup too
-- [ ] Compress responses before production (`/workspace` was 1.71 MB for 10,003 members, 109 KB gzipped)
+- [ ] Compress responses before production (`/workspace` was 2.26 MB for 10,000 members and devices, 102 KB gzipped)
 - [ ] Decide whether the public `/ready` response should name its dependencies (`database`, `cipseq`, `redis`, `kms`)
 - [x] OpenAPI / Swagger documentation (`/api/v1/docs`, not served in production)
 - [ ] Drop the accepted `glob`/`minimatch` advisories (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249) once `@fastify/static` moves to glob 14; they only affect a startup glob over Swagger UI's own files

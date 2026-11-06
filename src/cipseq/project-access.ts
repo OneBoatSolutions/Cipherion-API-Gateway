@@ -37,14 +37,26 @@ export function toProjectResponse(
   };
 }
 
-// A project that doesn't exist, was deleted, or that the user isn't a member of
-// all answer 404, so non-members can't discover which projects exist.
+// A project has no direct members: it belongs to its admin and to whoever is in
+// one of its live groups.
+export function projectsOf(userId: string) {
+  return {
+    deletedAt: null,
+    OR: [
+      { adminUserId: userId },
+      { groups: { some: { deletedAt: null, members: { some: { userId } } } } },
+    ],
+  };
+}
+
+// A project that doesn't exist, was deleted, or that the user isn't a part of all
+// answer 404, so outsiders can't discover which projects exist.
 export async function findProjectForMember(
   projectId: string,
   userId: string,
 ): Promise<ProjectRow> {
   const project = await cipseqPrisma.project.findFirst({
-    where: { id: projectId, deletedAt: null, members: { some: { userId } } },
+    where: { id: projectId, ...projectsOf(userId) },
     select: PROJECT_FIELDS,
   });
   if (!project) {

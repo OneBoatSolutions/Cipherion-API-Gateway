@@ -28,7 +28,6 @@ model Project {
 
   keys        ProjectKeys?
   keyVersions ProjectKeyVersion[]
-  members     ProjectMember[]
   groups      Group[]
 
   @@map("project")
@@ -67,21 +66,11 @@ model ProjectKeyVersion {
   @@map("projectKeyVersion")
 }
 
-model ProjectMember {
-  projectId String   @db.Uuid
-  // Better Auth user id.
-  userId    String
-  createdAt DateTime @default(now())
-
-  project Project @relation(fields: [projectId], references: [id])
-
-  @@id([projectId, userId])
-  @@index([userId])
-  @@map("projectMember")
-}
-
+// ADMIN is the project admin only. A partial unique index in the migration allows
+// one ACTING_ADMIN per group.
 enum GroupRole {
   ADMIN
+  ACTING_ADMIN
   MEMBER
 }
 
@@ -96,12 +85,14 @@ model Group {
   // Soft delete: the wrapped keys stay, because removing them can't be undone.
   deletedAt   DateTime?
 
-  project         Project                     @relation(fields: [projectId], references: [id])
-  keys            GroupKeys?
-  keyVersions     GroupKeyVersion[]
-  members         GroupMember[]
-  invitations     GroupInvitation[]
-  removalRequests GroupMemberRemovalRequest[]
+  project     Project           @relation(fields: [projectId], references: [id])
+  keys        GroupKeys?
+  keyVersions GroupKeyVersion[]
+  members     GroupMember[]
+  invitations GroupInvitation[]
+  devices     GroupDevice[]
+  envelopes   DeviceEnvelope[]
+  envelopeJob EnvelopeJob?
 
   @@index([projectId])
   @@map("group")
@@ -161,13 +152,6 @@ enum InvitationStatus {
   CANCELLED
 }
 
-enum RemovalRequestStatus {
-  PENDING_APPROVAL
-  APPROVED
-  REJECTED
-  CANCELLED
-}
-
 // A partial unique index in the migration allows one open invitation per group
 // and email. An acting admin's invitation waits for the project admin's approval.
 model GroupInvitation {
@@ -190,23 +174,124 @@ model GroupInvitation {
   @@map("groupInvitation")
 }
 
-// A partial unique index in the migration allows one pending request per group
-// and member.
-model GroupMemberRemovalRequest {
-  id                String               @id @default(uuid(7)) @db.Uuid
-  groupId           String               @db.Uuid
+enum DeviceStatus {
+  ACTIVE
+  REVOKED
+}
+
+// A device is registered once and can be in groups of many projects. REVOKED is
+// the device's user revoking it everywhere, and its id can't be used again.
+model Device {
+  // dvc_ + 43 base64url characters, supplied by the device.
+  id        String       @id
+  // Better Auth user id.
+  userId    String
+  name      String?
+  // The ML-KEM-1024 public key that envelopes are wrapped for.
+  publicKey String
+  status    DeviceStatus @default(ACTIVE)
+  revokedAt DateTime?
+  createdAt DateTime     @default(now())
+
+  groups    GroupDevice[]
+  envelopes DeviceEnvelope[]
+
+  @@index([userId])
+  @@map("device")
+}
+
+enum GroupDeviceStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  REVOKED
+}
+
+// A device's approval for one group. A partial unique index in the migration
+// allows one open row per group and device; closed rows stay as history.
+model GroupDevice {
+  id               String            @id @default(uuid(7)) @db.Uuid
+  groupId          String            @db.Uuid
+  deviceId         String
+  status           GroupDeviceStatus
   // Better Auth user ids.
-  targetUserId      String
-  requestedByUserId String
-  status            RemovalRequestStatus
-  reviewedByUserId  String?
-  reviewedAt        DateTime?
-  createdAt         DateTime             @default(now())
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  revokedByUserId  String?
+  revokedAt        DateTime?
+  createdAt        DateTime          @default(now())
+
+  group  Group  @relation(fields: [groupId], references: [id])
+  device Device @relation(fields: [deviceId], references: [id])
+
+  @@index([deviceId, status])
+  @@index([groupId, status])
+  @@map("groupDevice")
+}
+
+// The GDEK wrapped for one device. Soft deleted on revocation. A partial unique
+// index in the migration allows one live envelope per group, device and version.
+model DeviceEnvelope {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  groupId         String    @db.Uuid
+  deviceId        String
+  // Follows the GDEK version.
+  envelopeVersion Int
+  // Signed by the KMS, so stored exactly as it was returned.
+  envelopeJson    String
+  createdAt       DateTime  @default(now())
+  deletedAt       DateTime?
+
+  group  Group  @relation(fields: [groupId], references: [id])
+  device Device @relation(fields: [deviceId], references: [id])
+
+  @@index([deviceId])
+  @@index([groupId, envelopeVersion])
+  @@map("deviceEnvelope")
+}
+
+enum EnvelopeJobKind {
+  ROTATION
+  APPROVAL
+  RENEWAL
+}
+
+enum EnvelopeJobStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum EnvelopeJobFailure {
+  WRONG_PASSPHRASE
+  KMS_UNAVAILABLE
+  INTERRUPTED
+}
+
+// The group's latest background envelope job, so the project admin can see it
+// running, finished or stopped. It never holds the passphrase, so only the admin
+// re-entering it can resume a stopped job. A crash can't record itself, so a
+// RUNNING row whose lastActiveAt has gone stale counts as interrupted.
+model EnvelopeJob {
+  groupId       String              @id @db.Uuid
+  // Only the job that wrote this id can update the row, so an older job that's
+  // still finishing can't overwrite a newer one.
+  jobId         String              @db.Uuid
+  kind          EnvelopeJobKind
+  gdekVersion   Int
+  status        EnvelopeJobStatus
+  failureReason EnvelopeJobFailure?
+  // How many envelopes were missing when it started.
+  envelopeCount Int
+  startedAt     DateTime
+  lastActiveAt  DateTime
+  finishedAt    DateTime?
+  // When the project admin dismissed the completed notification.
+  dismissedAt   DateTime?
 
   group Group @relation(fields: [groupId], references: [id])
 
-  @@index([groupId, status])
-  @@map("groupMemberRemovalRequest")
+  @@map("envelopeJob")
 }
 
 // No foreign key to Project, so the audit trail outlives the project.

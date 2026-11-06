@@ -54,13 +54,15 @@ export const ModelName = {
   Project: 'Project',
   ProjectKeys: 'ProjectKeys',
   ProjectKeyVersion: 'ProjectKeyVersion',
-  ProjectMember: 'ProjectMember',
   Group: 'Group',
   GroupKeys: 'GroupKeys',
   GroupKeyVersion: 'GroupKeyVersion',
   GroupMember: 'GroupMember',
   GroupInvitation: 'GroupInvitation',
-  GroupMemberRemovalRequest: 'GroupMemberRemovalRequest',
+  Device: 'Device',
+  GroupDevice: 'GroupDevice',
+  DeviceEnvelope: 'DeviceEnvelope',
+  EnvelopeJob: 'EnvelopeJob',
   AuditEvent: 'AuditEvent'
 } as const
 
@@ -117,15 +119,6 @@ export const ProjectKeyVersionScalarFieldEnum = {
 } as const
 
 export type ProjectKeyVersionScalarFieldEnum = (typeof ProjectKeyVersionScalarFieldEnum)[keyof typeof ProjectKeyVersionScalarFieldEnum]
-
-
-export const ProjectMemberScalarFieldEnum = {
-  projectId: 'projectId',
-  userId: 'userId',
-  createdAt: 'createdAt'
-} as const
-
-export type ProjectMemberScalarFieldEnum = (typeof ProjectMemberScalarFieldEnum)[keyof typeof ProjectMemberScalarFieldEnum]
 
 
 export const GroupScalarFieldEnum = {
@@ -191,18 +184,62 @@ export const GroupInvitationScalarFieldEnum = {
 export type GroupInvitationScalarFieldEnum = (typeof GroupInvitationScalarFieldEnum)[keyof typeof GroupInvitationScalarFieldEnum]
 
 
-export const GroupMemberRemovalRequestScalarFieldEnum = {
+export const DeviceScalarFieldEnum = {
   id: 'id',
-  groupId: 'groupId',
-  targetUserId: 'targetUserId',
-  requestedByUserId: 'requestedByUserId',
+  userId: 'userId',
+  name: 'name',
+  publicKey: 'publicKey',
   status: 'status',
-  reviewedByUserId: 'reviewedByUserId',
-  reviewedAt: 'reviewedAt',
+  revokedAt: 'revokedAt',
   createdAt: 'createdAt'
 } as const
 
-export type GroupMemberRemovalRequestScalarFieldEnum = (typeof GroupMemberRemovalRequestScalarFieldEnum)[keyof typeof GroupMemberRemovalRequestScalarFieldEnum]
+export type DeviceScalarFieldEnum = (typeof DeviceScalarFieldEnum)[keyof typeof DeviceScalarFieldEnum]
+
+
+export const GroupDeviceScalarFieldEnum = {
+  id: 'id',
+  groupId: 'groupId',
+  deviceId: 'deviceId',
+  status: 'status',
+  reviewedByUserId: 'reviewedByUserId',
+  reviewedAt: 'reviewedAt',
+  revokedByUserId: 'revokedByUserId',
+  revokedAt: 'revokedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type GroupDeviceScalarFieldEnum = (typeof GroupDeviceScalarFieldEnum)[keyof typeof GroupDeviceScalarFieldEnum]
+
+
+export const DeviceEnvelopeScalarFieldEnum = {
+  id: 'id',
+  groupId: 'groupId',
+  deviceId: 'deviceId',
+  envelopeVersion: 'envelopeVersion',
+  envelopeJson: 'envelopeJson',
+  createdAt: 'createdAt',
+  deletedAt: 'deletedAt'
+} as const
+
+export type DeviceEnvelopeScalarFieldEnum = (typeof DeviceEnvelopeScalarFieldEnum)[keyof typeof DeviceEnvelopeScalarFieldEnum]
+
+
+export const EnvelopeJobScalarFieldEnum = {
+  groupId: 'groupId',
+  jobId: 'jobId',
+  kind: 'kind',
+  gdekVersion: 'gdekVersion',
+  status: 'status',
+  failureReason: 'failureReason',
+  envelopeCount: 'envelopeCount',
+  startedAt: 'startedAt',
+  lastActiveAt: 'lastActiveAt',
+  finishedAt: 'finishedAt',
+  dismissedAt: 'dismissedAt'
+} as const
+
+export type EnvelopeJobScalarFieldEnum = (typeof EnvelopeJobScalarFieldEnum)[keyof typeof EnvelopeJobScalarFieldEnum]
 
 
 export const AuditEventScalarFieldEnum = {

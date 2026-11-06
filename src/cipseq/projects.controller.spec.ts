@@ -125,7 +125,6 @@ describe('ProjectsController', () => {
         description: DESCRIPTION,
         adminUserId: admin.id,
         keys: { create: rootKey },
-        members: { create: { userId: admin.id } },
       });
       expect(mocks.kmsCall).toHaveBeenCalledWith(
         'createAndWrapNewProjectRootKey',
@@ -465,7 +464,20 @@ describe('ProjectsController', () => {
       ]);
       expect(mocks.project.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { deletedAt: null, members: { some: { userId: member.id } } },
+          where: {
+            deletedAt: null,
+            OR: [
+              { adminUserId: member.id },
+              {
+                groups: {
+                  some: {
+                    deletedAt: null,
+                    members: { some: { userId: member.id } },
+                  },
+                },
+              },
+            ],
+          },
         }),
       );
     });
@@ -483,7 +495,17 @@ describe('ProjectsController', () => {
           where: {
             id,
             deletedAt: null,
-            members: { some: { userId: member.id } },
+            OR: [
+              { adminUserId: member.id },
+              {
+                groups: {
+                  some: {
+                    deletedAt: null,
+                    members: { some: { userId: member.id } },
+                  },
+                },
+              },
+            ],
           },
         }),
       );

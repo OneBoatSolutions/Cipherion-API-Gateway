@@ -32,6 +32,7 @@ export type KmsMethod = Exclude<keyof grpcCallBackfromNestClient, keyof Client>;
 const PASSPHRASE_CHECKING_METHODS: ReadonlySet<string> = new Set<KmsMethod>([
   'rotateWrappingKeyforProjectEncryptionKey',
   'createAndWrapNewGroupRootKeyAndGroupDataEncryptionKey',
+  'createDeviceEnvelope',
 ]);
 
 // Parameters<> resolves to the last overload: (request, metadata, options, callback).

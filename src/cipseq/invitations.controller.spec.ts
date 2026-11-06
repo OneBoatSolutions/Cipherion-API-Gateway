@@ -13,7 +13,8 @@ const mocks = vi.hoisted(() => ({
   project: { findFirst: vi.fn() },
   group: { findFirst: vi.fn() },
   groupMember: { create: vi.fn(), findUnique: vi.fn() },
-  projectMember: { upsert: vi.fn() },
+  device: { findMany: vi.fn() },
+  groupDevice: { createMany: vi.fn() },
   groupInvitation: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
   auditEvent: { create: vi.fn() },
   user: { findUnique: vi.fn() },
@@ -25,7 +26,8 @@ vi.mock('../lib/cipseq-prisma.js', () => ({
     project: mocks.project,
     group: mocks.group,
     groupMember: mocks.groupMember,
-    projectMember: mocks.projectMember,
+    device: mocks.device,
+    groupDevice: mocks.groupDevice,
     groupInvitation: mocks.groupInvitation,
     auditEvent: mocks.auditEvent,
   },
@@ -98,7 +100,7 @@ describe('InvitationsController', () => {
       controller.create(user, projectId, groupId, { email });
 
     it("starts the project admin's invitation at PENDING_ACCEPTANCE, lower-cased", async () => {
-      mocks.group.findFirst.mockResolvedValue(groupRow('ADMIN'));
+      mocks.group.findFirst.mockResolvedValue(groupRow('ACTING_ADMIN'));
       mocks.groupInvitation.create.mockResolvedValue(
         invitationRow('PENDING_ACCEPTANCE', admin.id),
       );
@@ -132,7 +134,7 @@ describe('InvitationsController', () => {
     });
 
     it("starts an acting admin's invitation at PENDING_APPROVAL", async () => {
-      mocks.group.findFirst.mockResolvedValue(groupRow('ADMIN'));
+      mocks.group.findFirst.mockResolvedValue(groupRow('ACTING_ADMIN'));
       mocks.groupInvitation.create.mockResolvedValue(invitationRow());
 
       await create(acting);
@@ -164,7 +166,7 @@ describe('InvitationsController', () => {
     });
 
     it('answers 409 for someone already in the group', async () => {
-      mocks.group.findFirst.mockResolvedValue(groupRow('ADMIN'));
+      mocks.group.findFirst.mockResolvedValue(groupRow('ACTING_ADMIN'));
       mocks.user.findUnique.mockResolvedValue({ id: 'new-1' });
       mocks.groupMember.findUnique.mockResolvedValue({ userId: 'new-1' });
 
@@ -173,7 +175,7 @@ describe('InvitationsController', () => {
     });
 
     it('answers 409 when an invitation is already open', async () => {
-      mocks.group.findFirst.mockResolvedValue(groupRow('ADMIN'));
+      mocks.group.findFirst.mockResolvedValue(groupRow('ACTING_ADMIN'));
       mocks.groupInvitation.create.mockRejectedValue(duplicate);
 
       await expect(create(admin)).rejects.toBeInstanceOf(ConflictException);
@@ -182,7 +184,7 @@ describe('InvitationsController', () => {
 
   describe('approve and reject', () => {
     beforeEach(() => {
-      mocks.group.findFirst.mockResolvedValue(groupRow('ADMIN'));
+      mocks.group.findFirst.mockResolvedValue(groupRow('ACTING_ADMIN'));
     });
 
     it('moves an approved invitation on to the invitee', async () => {
@@ -254,7 +256,7 @@ describe('InvitationsController', () => {
     });
 
     it('lets the project admin cancel anyone’s invitation', async () => {
-      mocks.group.findFirst.mockResolvedValue(groupRow('ADMIN'));
+      mocks.group.findFirst.mockResolvedValue(groupRow('ACTING_ADMIN'));
       mocks.groupInvitation.update.mockResolvedValue(
         invitationRow('CANCELLED'),
       );
@@ -265,7 +267,7 @@ describe('InvitationsController', () => {
     });
 
     it('refuses another member', async () => {
-      mocks.group.findFirst.mockResolvedValue(groupRow('ADMIN'));
+      mocks.group.findFirst.mockResolvedValue(groupRow('ACTING_ADMIN'));
 
       await expect(
         controller.cancel(member, projectId, groupId, id),
@@ -292,9 +294,10 @@ describe('InvitationResponsesController', () => {
     mocks.groupInvitation.update.mockResolvedValue(
       invitationRow('ACCEPTED', admin.id),
     );
+    mocks.device.findMany.mockResolvedValue([{ id: 'dvc_1' }]);
   });
 
-  it('adds the invitee to the project and the group as a member', async () => {
+  it('adds the invitee to the group, and asks to approve their active devices', async () => {
     await expect(controller.accept(invitee, id)).resolves.toMatchObject({
       projectId,
       status: 'ACCEPTED',
@@ -315,13 +318,17 @@ describe('InvitationResponsesController', () => {
         data: { status: 'ACCEPTED', respondedAt: expect.any(Date) },
       }),
     );
-    expect(mocks.projectMember.upsert).toHaveBeenCalledWith({
-      where: { projectId_userId: { projectId, userId: invitee.id } },
-      create: { projectId, userId: invitee.id },
-      update: {},
-    });
     expect(mocks.groupMember.create).toHaveBeenCalledWith({
       data: { groupId, userId: invitee.id, role: 'MEMBER' },
+    });
+    expect(mocks.device.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: invitee.id, status: 'ACTIVE' },
+      }),
+    );
+    expect(mocks.groupDevice.createMany).toHaveBeenCalledWith({
+      data: [{ groupId, deviceId: 'dvc_1', status: 'PENDING_APPROVAL' }],
+      skipDuplicates: true,
     });
   });
 
@@ -372,6 +379,5 @@ describe('InvitationResponsesController', () => {
       status: 'DECLINED',
     });
     expect(mocks.groupMember.create).not.toHaveBeenCalled();
-    expect(mocks.projectMember.upsert).not.toHaveBeenCalled();
   });
 });

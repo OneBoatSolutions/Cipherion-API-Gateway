@@ -86,7 +86,10 @@ describe('CipSeq projects (e2e)', () => {
     const where = { projectId: { in: createdIds } };
     await cipseqPrisma.$transaction([
       cipseqPrisma.auditEvent.deleteMany({ where }),
-      cipseqPrisma.projectMember.deleteMany({ where }),
+      cipseqPrisma.groupMember.deleteMany({ where: { group: where } }),
+      cipseqPrisma.groupKeyVersion.deleteMany({ where: { group: where } }),
+      cipseqPrisma.groupKeys.deleteMany({ where: { group: where } }),
+      cipseqPrisma.group.deleteMany({ where }),
       cipseqPrisma.projectKeyVersion.deleteMany({ where }),
       cipseqPrisma.projectKeys.deleteMany({ where }),
       cipseqPrisma.project.deleteMany({ where: { id: { in: createdIds } } }),
@@ -400,10 +403,22 @@ describe('CipSeq projects (e2e)', () => {
         url: '/api/v1/auth/get-session',
         headers: { cookie: otherCookie },
       });
-      await cipseqPrisma.projectMember.create({
+      const group = await app.inject({
+        method: 'POST',
+        url: `/api/v1/cipseq/projects/${id}/groups`,
+        headers: { cookie: adminCookie },
+        payload: {
+          name: 'Finance',
+          description: 'Invoices and payroll',
+          passphrase: PASSPHRASE,
+        },
+      });
+      expect(group.statusCode).toBe(201);
+      await cipseqPrisma.groupMember.create({
         data: {
-          projectId: id,
+          groupId: group.json<{ id: string }>().id,
           userId: session.json<{ user: { id: string } }>().user.id,
+          role: 'MEMBER',
         },
       });
 

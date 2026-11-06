@@ -21,17 +21,25 @@ const mocks = vi.hoisted(() => ({
   projectKeys: { findUniqueOrThrow: vi.fn() },
   group: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
   groupKeys: { update: vi.fn() },
-  groupKeyVersion: { create: vi.fn() },
+  groupKeyVersion: { create: vi.fn(), findFirst: vi.fn() },
   groupMember: {
     delete: vi.fn(),
-    findUnique: vi.fn(),
+    findFirst: vi.fn(),
     update: vi.fn(),
   },
-  groupMemberRemovalRequest: { update: vi.fn(), updateMany: vi.fn() },
+  device: { findMany: vi.fn() },
+  groupDevice: { updateMany: vi.fn() },
+  deviceEnvelope: { updateMany: vi.fn() },
   auditEvent: { create: vi.fn() },
+  countMissingEnvelopes: vi.fn(),
+  startEnvelopeJob: vi.fn(),
 }));
 
 vi.mock('../kms/kms-call.js', () => ({ kmsCall: mocks.kmsCall }));
+vi.mock('./device-envelopes.js', () => ({
+  countMissingEnvelopes: mocks.countMissingEnvelopes,
+  startEnvelopeJob: mocks.startEnvelopeJob,
+}));
 vi.mock('./passphrase-attempts.js', () => ({
   reservePassphraseAttempt: mocks.reservePassphraseAttempt,
   releasePassphraseAttempt: mocks.releasePassphraseAttempt,
@@ -46,7 +54,9 @@ vi.mock('../lib/cipseq-prisma.js', () => ({
     groupKeys: mocks.groupKeys,
     groupKeyVersion: mocks.groupKeyVersion,
     groupMember: mocks.groupMember,
-    groupMemberRemovalRequest: mocks.groupMemberRemovalRequest,
+    device: mocks.device,
+    groupDevice: mocks.groupDevice,
+    deviceEnvelope: mocks.deviceEnvelope,
     auditEvent: mocks.auditEvent,
   },
 }));
@@ -69,7 +79,10 @@ const projectRow = (currentKeyVersion: number | null = 1) => ({
   keys: { currentKeyVersion },
 });
 
-const groupRow = (currentGdekVersion = 1) => ({
+const groupRow = (
+  currentGdekVersion = 1,
+  members: { role: string }[] = [],
+) => ({
   id: groupId,
   projectId,
   name: 'Finance',
@@ -77,6 +90,7 @@ const groupRow = (currentGdekVersion = 1) => ({
   createdAt: date,
   updatedAt: date,
   keys: { currentGdekVersion },
+  members,
 });
 
 const groupResponse = (gdekVersion: number) => ({
@@ -163,14 +177,7 @@ describe('GroupsController', () => {
       'updateMember',
       (user) =>
         controller.updateMember(user, projectId, groupId, target, {
-          role: 'ADMIN',
-        }),
-    ],
-    [
-      'revoke',
-      (user) =>
-        controller.revoke(user, projectId, groupId, target, {
-          passphrase: PASSPHRASE,
+          role: 'ACTING_ADMIN',
         }),
     ],
   ];
@@ -183,7 +190,8 @@ describe('GroupsController', () => {
     mocks.project.findFirst.mockResolvedValue(projectRow());
     mocks.group.findFirst.mockResolvedValue(groupRow());
     mocks.projectKeys.findUniqueOrThrow.mockResolvedValue(projectKeys);
-    mocks.groupMember.findUnique.mockResolvedValue({ userId: target });
+    mocks.device.findMany.mockResolvedValue([]);
+    mocks.countMissingEnvelopes.mockResolvedValue(3);
     mocks.kmsCall.mockImplementation((_method, request: { GroupId: string }) =>
       Promise.resolve(kmsResponse(request.GroupId)),
     );
@@ -244,6 +252,7 @@ describe('GroupsController', () => {
         keys: { create: { ...storedKeys, currentGdekVersion: 1 } },
         keyVersions: { create: { gdekVersion: 1 } },
         members: { create: { userId: admin.id, role: 'ADMIN' } },
+        devices: { create: [] },
       });
       expect(mocks.kmsCall).toHaveBeenCalledWith(
         'createAndWrapNewGroupRootKeyAndGroupDataEncryptionKey',
@@ -262,6 +271,28 @@ describe('GroupsController', () => {
       );
       expect(JSON.stringify(mocks.auditEvent.create.mock.calls)).not.toContain(
         PASSPHRASE,
+      );
+    });
+
+    it("asks for approval of the creator's active devices", async () => {
+      mocks.group.create.mockResolvedValue(groupRow());
+      mocks.device.findMany.mockResolvedValue([{ id: 'dvc_own' }]);
+
+      await controller.create(admin, projectId, dto);
+
+      expect(mocks.device.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: admin.id, status: 'ACTIVE' },
+        }),
+      );
+      expect(mocks.group.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            devices: {
+              create: [{ deviceId: 'dvc_own', status: 'PENDING_APPROVAL' }],
+            },
+          }) as object,
+        }),
       );
     });
 
@@ -345,7 +376,10 @@ describe('GroupsController', () => {
       controller.rotate(admin, projectId, groupId, { passphrase: PASSPHRASE });
 
     it('overwrites the pair, bumps the version and keeps no key material on the version row', async () => {
-      await expect(rotate()).resolves.toEqual(groupResponse(2));
+      await expect(rotate()).resolves.toEqual({
+        ...groupResponse(2),
+        envelopesToCreate: 3,
+      });
 
       expect(mocks.kmsCall).toHaveBeenCalledWith(
         'createAndWrapNewGroupRootKeyAndGroupDataEncryptionKey',
@@ -369,6 +403,47 @@ describe('GroupsController', () => {
       expect(mocks.clearPassphraseAttempts).toHaveBeenCalledWith(projectId);
     });
 
+    it('starts the envelope job after the keys commit', async () => {
+      await rotate();
+
+      expect(mocks.startEnvelopeJob).toHaveBeenCalledWith(
+        admin.id,
+        projectId,
+        [groupId],
+        PASSPHRASE,
+        'ROTATION',
+      );
+      expect(mocks.$transaction.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.startEnvelopeJob.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('refuses a rotation within 48 hours and uses no attempt', async () => {
+      const lastRotation = new Date(Date.now() - 47 * 60 * 60 * 1000);
+      mocks.groupKeyVersion.findFirst.mockResolvedValue({
+        createdAt: lastRotation,
+      });
+
+      await expect(rotate()).rejects.toBeInstanceOf(ConflictException);
+
+      expect(mocks.groupKeyVersion.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { groupId, gdekVersion: { gt: 1 } },
+        }),
+      );
+      expect(mocks.reservePassphraseAttempt).not.toHaveBeenCalled();
+      expect(mocks.kmsCall).not.toHaveBeenCalled();
+      expect(mocks.startEnvelopeJob).not.toHaveBeenCalled();
+    });
+
+    it('allows a rotation after 48 hours', async () => {
+      mocks.groupKeyVersion.findFirst.mockResolvedValue({
+        createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000 - 1000),
+      });
+
+      await expect(rotate()).resolves.toMatchObject({ gdekVersion: 2 });
+    });
+
     it('keeps a wrong passphrase counted and writes nothing', async () => {
       mocks.kmsCall.mockRejectedValue(new IncorrectPassphraseException());
 
@@ -379,6 +454,7 @@ describe('GroupsController', () => {
       expect(mocks.releasePassphraseAttempt).not.toHaveBeenCalled();
       expect(mocks.clearPassphraseAttempts).not.toHaveBeenCalled();
       expect(mocks.$transaction).not.toHaveBeenCalled();
+      expect(mocks.startEnvelopeJob).not.toHaveBeenCalled();
     });
 
     it('gives the attempt back when the KMS is down', async () => {
@@ -410,11 +486,11 @@ describe('GroupsController', () => {
   describe('updateMember', () => {
     const update = (userId = target) =>
       controller.updateMember(admin, projectId, groupId, userId, {
-        role: 'ADMIN',
+        role: 'ACTING_ADMIN',
       });
 
     it('changes the role and records it', async () => {
-      const row = { userId: target, role: 'ADMIN', createdAt: date };
+      const row = { userId: target, role: 'ACTING_ADMIN', createdAt: date };
       mocks.groupMember.update.mockResolvedValue(row);
 
       await expect(update()).resolves.toEqual(row);
@@ -422,7 +498,7 @@ describe('GroupsController', () => {
       expect(mocks.groupMember.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { groupId_userId: { groupId, userId: target } },
-          data: { role: 'ADMIN' },
+          data: { role: 'ACTING_ADMIN' },
         }),
       );
       expect(mocks.auditEvent.create).toHaveBeenCalledWith({
@@ -430,9 +506,15 @@ describe('GroupsController', () => {
           userId: admin.id,
           action: 'group.member_role_changed',
           projectId,
-          metadata: { groupId, targetUserId: target, role: 'ADMIN' },
+          metadata: { groupId, targetUserId: target, role: 'ACTING_ADMIN' },
         },
       });
+    });
+
+    it('answers 409 when the group already has an acting admin', async () => {
+      mocks.$transaction.mockRejectedValue(prismaError('P2002'));
+
+      await expect(update()).rejects.toBeInstanceOf(ConflictException);
     });
 
     it('protects the project admin', async () => {
@@ -450,88 +532,94 @@ describe('GroupsController', () => {
   });
 
   describe('revoke', () => {
-    const revoke = (userId = target) =>
-      controller.revoke(admin, projectId, groupId, userId, {
-        passphrase: PASSPHRASE,
-      });
+    const revoke = (user: AuthUser = admin, userId = target) =>
+      controller.revoke(user, projectId, groupId, userId);
+    const acting = { id: 'acting-1' } as AuthUser;
 
-    it('removes the member and rotates in one transaction', async () => {
-      await expect(revoke()).resolves.toEqual(groupResponse(2));
+    const expectNothingChanged = () => {
+      expect(mocks.$transaction).not.toHaveBeenCalled();
+      expect(mocks.groupMember.delete).not.toHaveBeenCalled();
+    };
+
+    it('removes the member and soft deletes their envelopes without rotating', async () => {
+      await expect(revoke()).resolves.toEqual(groupResponse(1));
 
       expect(mocks.$transaction).toHaveBeenCalledTimes(1);
       expect(mocks.groupMember.delete).toHaveBeenCalledWith({
         where: { groupId_userId: { groupId, userId: target } },
       });
-      expect(mocks.groupKeyVersion.create).toHaveBeenCalledWith({
-        data: { groupId, gdekVersion: 2 },
+      expect(mocks.groupDevice.updateMany).toHaveBeenCalledWith({
+        where: {
+          device: { userId: target },
+          groupId,
+          status: { in: ['PENDING_APPROVAL', 'APPROVED'] },
+        },
+        data: {
+          status: 'REVOKED',
+          revokedByUserId: admin.id,
+          revokedAt: expect.any(Date),
+        },
       });
-      expect(mocks.groupKeys.update).toHaveBeenCalledWith({
-        where: { groupId },
-        data: { ...storedKeys, currentGdekVersion: 2 },
+      expect(mocks.deviceEnvelope.updateMany).toHaveBeenCalledWith({
+        where: { device: { userId: target }, groupId, deletedAt: null },
+        data: { deletedAt: expect.any(Date) },
       });
       expect(mocks.auditEvent.create).toHaveBeenCalledWith({
         data: {
           userId: admin.id,
           action: 'group.member_revoked',
           projectId,
-          metadata: {
-            groupId,
-            targetUserId: target,
-            fromVersion: 1,
-            toVersion: 2,
-          },
+          metadata: { groupId, targetUserId: target },
         },
       });
-      expect(JSON.stringify(mocks.auditEvent.create.mock.calls)).not.toContain(
-        PASSPHRASE,
-      );
+      expect(mocks.kmsCall).not.toHaveBeenCalled();
+      expect(mocks.groupKeys.update).not.toHaveBeenCalled();
+      expect(mocks.groupKeyVersion.create).not.toHaveBeenCalled();
+      expect(mocks.reservePassphraseAttempt).not.toHaveBeenCalled();
     });
 
-    it('cancels any pending removal request for the member', async () => {
-      await revoke();
+    it("lets the group's acting admin revoke without approval", async () => {
+      mocks.group.findFirst.mockResolvedValue(
+        groupRow(1, [{ role: 'ACTING_ADMIN' }]),
+      );
 
-      expect(mocks.groupMemberRemovalRequest.updateMany).toHaveBeenCalledWith({
-        where: { groupId, targetUserId: target, status: 'PENDING_APPROVAL' },
-        data: {
-          status: 'CANCELLED',
-          reviewedByUserId: admin.id,
-          reviewedAt: expect.any(Date),
-        },
+      await expect(revoke(acting)).resolves.toEqual({
+        ...groupResponse(1),
+        role: 'ACTING_ADMIN',
       });
+      expect(mocks.groupMember.delete).toHaveBeenCalled();
+    });
+
+    it('refuses an acting admin targeting themselves', async () => {
+      mocks.group.findFirst.mockResolvedValue(
+        groupRow(1, [{ role: 'ACTING_ADMIN' }]),
+      );
+
+      await expect(revoke(acting, acting.id)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expectNothingChanged();
     });
 
     it('protects the project admin', async () => {
-      await expect(revoke(admin.id)).rejects.toBeInstanceOf(
+      await expect(revoke(admin, admin.id)).rejects.toBeInstanceOf(
         BadRequestException,
       );
-      expect(mocks.reservePassphraseAttempt).not.toHaveBeenCalled();
+      expectNothingChanged();
     });
 
-    it('uses no attempt for someone who is not in the group', async () => {
-      mocks.groupMember.findUnique.mockResolvedValue(null);
-
-      await expect(revoke()).rejects.toBeInstanceOf(NotFoundException);
-      expect(mocks.reservePassphraseAttempt).not.toHaveBeenCalled();
-      expect(mocks.kmsCall).not.toHaveBeenCalled();
-    });
-
-    it('leaves the member in place when the KMS is down', async () => {
-      mocks.kmsCall.mockRejectedValue(new ServiceUnavailableException());
-
-      await expect(revoke()).rejects.toBeInstanceOf(
-        ServiceUnavailableException,
+    it('gives a plain member 403 and someone outside the group 404', async () => {
+      mocks.group.findFirst.mockResolvedValue(
+        groupRow(1, [{ role: 'MEMBER' }]),
       );
-      expect(mocks.$transaction).not.toHaveBeenCalled();
-      expect(mocks.releasePassphraseAttempt).toHaveBeenCalledWith(projectId);
+      await expect(revoke(member)).rejects.toBeInstanceOf(ForbiddenException);
+
+      mocks.group.findFirst.mockResolvedValue(groupRow());
+      await expect(revoke(member)).rejects.toBeInstanceOf(NotFoundException);
+      expectNothingChanged();
     });
 
-    it('answers 409 when it loses a race, so it can be retried', async () => {
-      mocks.$transaction.mockRejectedValue(prismaError('P2002'));
-
-      await expect(revoke()).rejects.toBeInstanceOf(ConflictException);
-    });
-
-    it('answers 404 when the member was removed meanwhile', async () => {
+    it('answers 404 when the member is not in the group', async () => {
       mocks.$transaction.mockRejectedValue(prismaError('P2025'));
 
       await expect(revoke()).rejects.toBeInstanceOf(NotFoundException);

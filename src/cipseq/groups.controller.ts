@@ -33,10 +33,12 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { cipseqPrisma } from '../lib/cipseq-prisma.js';
 import { auditEvent } from './audit.js';
 import { isRecordNotFound, isUniqueViolation } from './cipseq-errors.js';
-import { createGroupKeys, revokeGroupMember } from './group-keys.js';
+import { countMissingEnvelopes, startEnvelopeJob } from './device-envelopes.js';
+import { createGroupKeys } from './group-keys.js';
 import {
   currentGdekVersion,
   findGroupForAdmin,
+  findGroupForGroupAdmin,
   GROUP_FIELDS,
   toGroupResponse,
 } from './group-access.js';
@@ -45,13 +47,16 @@ import {
   GroupMemberResponse,
   GroupPassphraseDto,
   GroupResponse,
+  RotatedGroupResponse,
   UpdateGroupDto,
   UpdateGroupMemberDto,
 } from './groups.dto.js';
 import { findProjectForAdmin } from './project-access.js';
+import { assertMayRevokeMember, memberFromGroupWrites } from './revocations.js';
 import { withPassphraseAttempt } from './with-passphrase-attempt.js';
 
 const FIRST_GDEK_VERSION = 1;
+const ROTATION_INTERVAL_MS = 48 * 60 * 60 * 1000;
 const MEMBER_FIELDS = { userId: true, role: true, createdAt: true } as const;
 
 @ApiTags('cipseq')
@@ -83,6 +88,11 @@ export class GroupsController {
       throw new ConflictException('The project is not initialised');
     }
 
+    const devices = await cipseqPrisma.device.findMany({
+      where: { userId: user.id, status: 'ACTIVE' },
+      select: { id: true },
+    });
+
     const id = randomUUID();
     const group = await withPassphraseAttempt(projectId, async () => {
       const keys = await createGroupKeys(projectId, id, passphrase);
@@ -98,6 +108,12 @@ export class GroupsController {
             },
             keyVersions: { create: { gdekVersion: FIRST_GDEK_VERSION } },
             members: { create: { userId: user.id, role: 'ADMIN' } },
+            devices: {
+              create: devices.map(({ id: deviceId }) => ({
+                deviceId,
+                status: 'PENDING_APPROVAL' as const,
+              })),
+            },
           },
           select: GROUP_FIELDS,
         }),
@@ -168,16 +184,18 @@ export class GroupsController {
   }
 
   // Replaces the wrapped group root key and GDEK, and bumps the version. The old
-  // pair is overwritten, not kept.
+  // pair is overwritten, not kept. A background job then creates envelopes at the
+  // new version for every approved device, and older envelopes stay live.
   @ApiOperation({ summary: "Rotate a group's keys" })
-  @ApiOkResponse({ type: GroupResponse })
+  @ApiOkResponse({ type: RotatedGroupResponse })
   @ApiBadRequestResponse({ description: 'Validation failed' })
   @ApiForbiddenResponse({
     description: 'Not the project admin, or an incorrect passphrase',
   })
   @ApiNotFoundResponse({ description: 'No such project or group' })
   @ApiConflictResponse({
-    description: 'A concurrent rotation or revocation got there first',
+    description:
+      'Rotated within the last 48 hours, or a concurrent rotation got there first',
   })
   @ApiTooManyRequestsResponse({ description: 'Too many incorrect passphrases' })
   @ApiServiceUnavailableResponse({ description: 'A dependency is unavailable' })
@@ -189,10 +207,28 @@ export class GroupsController {
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('groupId', ParseUUIDPipe) groupId: string,
     @Body() { passphrase }: GroupPassphraseDto,
-  ): Promise<GroupResponse> {
+  ): Promise<RotatedGroupResponse> {
     const { group } = await findGroupForAdmin(projectId, groupId, user.id);
     const fromVersion = currentGdekVersion(group);
     const toVersion = fromVersion + 1;
+
+    // Checked before the KMS call, so a rotation that isn't allowed yet doesn't
+    // use up an attempt. Version 1 comes from creating the group, not a rotation.
+    const lastRotation = await cipseqPrisma.groupKeyVersion.findFirst({
+      where: { groupId, gdekVersion: { gt: FIRST_GDEK_VERSION } },
+      orderBy: { gdekVersion: 'desc' },
+      select: { createdAt: true },
+    });
+    if (lastRotation) {
+      const allowedAt = lastRotation.createdAt.getTime() + ROTATION_INTERVAL_MS;
+      if (Date.now() < allowedAt) {
+        throw new ConflictException({
+          statusCode: 409,
+          message: 'This group was rotated in the last 48 hours',
+          rotationAllowedAt: new Date(allowedAt),
+        });
+      }
+    }
 
     await withPassphraseAttempt(projectId, async () => {
       const keys = await createGroupKeys(projectId, groupId, passphrase);
@@ -222,9 +258,21 @@ export class GroupsController {
       }
     });
 
-    return toGroupResponse(
-      { ...group, keys: { currentGdekVersion: toVersion } },
-      'ADMIN',
+    const envelopesToCreate = await countMissingEnvelopes([groupId]);
+    await startEnvelopeJob(
+      user.id,
+      projectId,
+      [groupId],
+      passphrase,
+      'ROTATION',
+    );
+
+    return Object.assign(
+      toGroupResponse(
+        { ...group, keys: { currentGdekVersion: toVersion } },
+        'ADMIN',
+      ),
+      { envelopesToCreate },
     );
   }
 
@@ -235,6 +283,7 @@ export class GroupsController {
   })
   @ApiForbiddenResponse({ description: 'Not the project admin' })
   @ApiNotFoundResponse({ description: 'No such project, group or member' })
+  @ApiConflictResponse({ description: 'The group already has an acting admin' })
   @Patch(':groupId/members/:userId')
   async updateMember(
     @CurrentUser() user: AuthUser,
@@ -268,27 +317,23 @@ export class GroupsController {
       if (isRecordNotFound(error)) {
         throw new NotFoundException();
       }
+      // A partial unique index allows one acting admin per group.
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('The group already has an acting admin');
+      }
       throw error;
     }
   }
 
-  @ApiOperation({
-    summary: 'Revoke a member from a group and rotate its keys',
-  })
+  // Takes effect at once and doesn't rotate the keys, so the GDEK version stays.
+  // The member's devices lose every version of their envelopes for this group.
+  @ApiOperation({ summary: 'Revoke a member from a group' })
   @ApiOkResponse({ type: GroupResponse })
   @ApiBadRequestResponse({
-    description: 'Validation failed, or the member is the project admin',
+    description: 'The member is the project admin or the caller',
   })
-  @ApiForbiddenResponse({
-    description: 'Not the project admin, or an incorrect passphrase',
-  })
+  @ApiForbiddenResponse({ description: 'Not a group admin' })
   @ApiNotFoundResponse({ description: 'No such project, group or member' })
-  @ApiConflictResponse({
-    description: 'A concurrent rotation or revocation got there first',
-  })
-  @ApiTooManyRequestsResponse({ description: 'Too many incorrect passphrases' })
-  @ApiServiceUnavailableResponse({ description: 'A dependency is unavailable' })
-  @ApiBadGatewayResponse({ description: 'The KMS call failed' })
   @HttpCode(200)
   @Post(':groupId/members/:userId/revoke')
   async revoke(
@@ -296,31 +341,33 @@ export class GroupsController {
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('groupId', ParseUUIDPipe) groupId: string,
     @Param('userId') userId: string,
-    @Body() { passphrase }: GroupPassphraseDto,
   ): Promise<GroupResponse> {
-    const { project, group } = await findGroupForAdmin(
+    const { project, group, isProjectAdmin } = await findGroupForGroupAdmin(
       projectId,
       groupId,
       user.id,
     );
-    if (userId === project.adminUserId) {
-      throw new BadRequestException("The project admin can't be revoked");
-    }
-    // Checked before the KMS call, so a mistyped id doesn't use up an attempt.
-    const member = await cipseqPrisma.groupMember.findUnique({
-      where: { groupId_userId: { groupId, userId } },
-      select: { userId: true },
+    assertMayRevokeMember({
+      actorUserId: user.id,
+      adminUserId: project.adminUserId,
+      targetUserId: userId,
     });
-    if (!member) {
-      throw new NotFoundException();
+
+    try {
+      await cipseqPrisma.$transaction([
+        ...memberFromGroupWrites(user.id, groupId, userId),
+        auditEvent(user.id, 'group.member_revoked', projectId, {
+          groupId,
+          targetUserId: userId,
+        }),
+      ]);
+    } catch (error) {
+      if (isRecordNotFound(error)) {
+        throw new NotFoundException();
+      }
+      throw error;
     }
 
-    return revokeGroupMember({
-      actorUserId: user.id,
-      projectId,
-      group,
-      targetUserId: userId,
-      passphrase,
-    });
+    return toGroupResponse(group, isProjectAdmin ? 'ADMIN' : 'ACTING_ADMIN');
   }
 }

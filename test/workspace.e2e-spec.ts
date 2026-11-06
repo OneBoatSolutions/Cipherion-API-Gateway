@@ -96,7 +96,7 @@ describe('Workspace (e2e)', () => {
   const createGroup = (
     id: string,
     deletedAt: Date | null,
-    members: { userId: string; role: 'ADMIN' | 'MEMBER' }[],
+    members: { userId: string; role: 'ADMIN' | 'ACTING_ADMIN' | 'MEMBER' }[],
   ) =>
     cipseqPrisma.group.create({
       data: {
@@ -135,11 +135,6 @@ describe('Workspace (e2e)', () => {
         name: 'Payments',
         description: 'Card and invoice data',
         adminUserId: admin.id,
-        members: {
-          create: [admin, acting, member, outsideGroups].map(({ id }) => ({
-            userId: id,
-          })),
-        },
       },
     });
     await cipseqPrisma.project.create({
@@ -149,12 +144,11 @@ describe('Workspace (e2e)', () => {
         description: 'Deleted',
         adminUserId: admin.id,
         deletedAt: new Date(),
-        members: { create: { userId: admin.id } },
       },
     });
     await createGroup(sharedGroupId, null, [
       adminRow,
-      { userId: acting.id, role: 'ADMIN' },
+      { userId: acting.id, role: 'ACTING_ADMIN' },
       { userId: member.id, role: 'MEMBER' },
     ]);
     await createGroup(hiddenGroupId, null, [adminRow]);
@@ -171,7 +165,6 @@ describe('Workspace (e2e)', () => {
       cipseqPrisma.groupMember.deleteMany({ where: groupWhere }),
       cipseqPrisma.groupKeys.deleteMany({ where: groupWhere }),
       cipseqPrisma.group.deleteMany({ where }),
-      cipseqPrisma.projectMember.deleteMany({ where }),
       cipseqPrisma.project.deleteMany({ where: { id: { in: projectIds } } }),
     ]);
     for (const user of [admin, acting, member, outsideGroups, newUser]) {
@@ -220,7 +213,7 @@ describe('Workspace (e2e)', () => {
 
     expect(result.projects[0].role).toBe('MEMBER');
     expect(groupIds(result)).toEqual([sharedGroupId]);
-    expect(result.projects[0].groups[0].role).toBe('ADMIN');
+    expect(result.projects[0].groups[0].role).toBe('ACTING_ADMIN');
   });
 
   it("shows a member their groups and those groups' members", async () => {
@@ -237,14 +230,13 @@ describe('Workspace (e2e)', () => {
     ).toMatchObject({
       name: 'E2E acting',
       email: acting.email,
-      role: 'ADMIN',
+      role: 'ACTING_ADMIN',
     });
   });
 
-  it('shows a project member outside any group the project but no groups', async () => {
+  it('shows someone in none of the groups nothing of the project', async () => {
     const result = await workspace(outsideGroups);
 
-    expect(result.projects.map(({ id }) => id)).toEqual([projectId]);
-    expect(result.projects[0].groups).toEqual([]);
+    expect(result.projects).toEqual([]);
   });
 });
