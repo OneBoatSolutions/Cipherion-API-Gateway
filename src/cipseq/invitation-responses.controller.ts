@@ -64,8 +64,8 @@ async function findOwnInvitation(id: string, user: AuthUser) {
 @ApiNotFoundResponse({ description: 'No such invitation for this user' })
 @Controller('cipseq/invitations')
 export class InvitationResponsesController {
-  // No KMS call, because no keys change. The new member gets the current GDEK
-  // through device registration.
+  // No KMS call, because no keys change. Their registered devices each get a new
+  // approval request, and approving gives them the latest GDEK version.
   @ApiOperation({ summary: 'Accept an invitation and join the group' })
   @ApiOkResponse({ type: InvitationResponse })
   @ApiConflictResponse({ description: 'Already handled, or already a member' })
@@ -77,6 +77,10 @@ export class InvitationResponsesController {
   ): Promise<InvitationResponse> {
     const { groupId, group } = await findOwnInvitation(id, user);
     const { projectId } = group;
+    const devices = await cipseqPrisma.device.findMany({
+      where: { userId: user.id, status: 'ACTIVE' },
+      select: { id: true },
+    });
 
     try {
       const [updated] = await cipseqPrisma.$transaction([
@@ -85,13 +89,16 @@ export class InvitationResponsesController {
           data: { status: 'ACCEPTED', respondedAt: new Date() },
           select: INVITATION_FIELDS,
         }),
-        cipseqPrisma.projectMember.upsert({
-          where: { projectId_userId: { projectId, userId: user.id } },
-          create: { projectId, userId: user.id },
-          update: {},
-        }),
         cipseqPrisma.groupMember.create({
           data: { groupId, userId: user.id, role: 'MEMBER' },
+        }),
+        cipseqPrisma.groupDevice.createMany({
+          data: devices.map(({ id: deviceId }) => ({
+            groupId,
+            deviceId,
+            status: 'PENDING_APPROVAL' as const,
+          })),
+          skipDuplicates: true,
         }),
         auditEvent(user.id, 'invitation.accepted', projectId, {
           groupId,

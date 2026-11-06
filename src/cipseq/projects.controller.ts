@@ -7,6 +7,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -38,6 +39,7 @@ import {
   findProjectForAdmin,
   findProjectForMember,
   PROJECT_FIELDS,
+  projectsOf,
   toProjectResponse,
 } from './project-access.js';
 import {
@@ -47,6 +49,10 @@ import {
   RotateProjectDto,
   UpdateProjectDto,
 } from './projects.dto.js';
+import {
+  assertMayRevokeMember,
+  memberFromProjectWrites,
+} from './revocations.js';
 import { withPassphraseAttempt } from './with-passphrase-attempt.js';
 
 const FIRST_KEY_VERSION = 1;
@@ -89,7 +95,6 @@ export class ProjectsController {
               wrappedProjectRootKeyTag: wrapped.WrappedProjectRootKeyTag,
             },
           },
-          members: { create: { userId: user.id } },
         },
         select: PROJECT_FIELDS,
       }),
@@ -285,7 +290,7 @@ export class ProjectsController {
   @Get()
   async list(@CurrentUser() user: AuthUser): Promise<ProjectResponse[]> {
     const projects = await cipseqPrisma.project.findMany({
-      where: { deletedAt: null, members: { some: { userId: user.id } } },
+      where: projectsOf(user.id),
       orderBy: { createdAt: 'desc' },
       select: PROJECT_FIELDS,
     });
@@ -359,6 +364,42 @@ export class ProjectsController {
         data: { deletedAt: new Date() },
       }),
       auditEvent(user.id, 'project.deleted', id),
+    ]);
+  }
+
+  @ApiOperation({
+    summary: 'Remove someone from every group in the project',
+  })
+  @ApiNoContentResponse({ description: 'Removed' })
+  @ApiBadRequestResponse({ description: 'The target is the project admin' })
+  @ApiForbiddenResponse({ description: 'Not the project admin' })
+  @ApiNotFoundResponse({ description: 'No such project or member' })
+  @HttpCode(204)
+  @Post(':id/members/:userId/revoke')
+  async revokeMember(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('userId') userId: string,
+  ): Promise<void> {
+    await findProjectForAdmin(id, user.id);
+    assertMayRevokeMember({
+      actorUserId: user.id,
+      adminUserId: user.id,
+      targetUserId: userId,
+    });
+    const member = await cipseqPrisma.groupMember.findFirst({
+      where: { userId, group: { projectId: id, deletedAt: null } },
+      select: { userId: true },
+    });
+    if (!member) {
+      throw new NotFoundException();
+    }
+
+    await cipseqPrisma.$transaction([
+      ...memberFromProjectWrites(user.id, id, userId),
+      auditEvent(user.id, 'project.member_revoked', id, {
+        targetUserId: userId,
+      }),
     ]);
   }
 }

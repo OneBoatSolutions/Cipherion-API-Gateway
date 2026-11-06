@@ -11,8 +11,11 @@ import { isSent, PASSPHRASE_MAX_LENGTH } from './projects.dto.js';
 export const GROUP_NAME_MAX_LENGTH = 100;
 export const GROUP_DESCRIPTION_MAX_LENGTH = 500;
 
-export const GROUP_ROLES = ['ADMIN', 'MEMBER'] as const;
+// ADMIN is the project admin only, so it can't be assigned.
+export const GROUP_ROLES = ['ADMIN', 'ACTING_ADMIN', 'MEMBER'] as const;
 export type GroupRole = (typeof GROUP_ROLES)[number];
+export const ASSIGNABLE_GROUP_ROLES = ['ACTING_ADMIN', 'MEMBER'] as const;
+export type AssignableGroupRole = (typeof ASSIGNABLE_GROUP_ROLES)[number];
 
 // Wrapped keys stay in the database and are never part of a response.
 export class GroupResponse {
@@ -53,6 +56,16 @@ export class GroupResponse {
 
   @ApiProperty({ example: '2026-11-05T06:36:46.000Z' })
   updatedAt!: Date;
+}
+
+export class RotatedGroupResponse extends GroupResponse {
+  @ApiProperty({
+    type: 'integer',
+    description:
+      'Envelopes the background job has to create at the new version. Anything it can not finish shows as ENVELOPES_MISSING',
+    example: 2,
+  })
+  envelopesToCreate!: number;
 }
 
 export class GroupMemberResponse {
@@ -127,7 +140,7 @@ export class UpdateGroupDto {
 }
 
 export class UpdateGroupMemberDto {
-  @ApiProperty({ enum: GROUP_ROLES, example: 'ADMIN' })
-  @IsIn(GROUP_ROLES)
-  role!: GroupRole;
+  @ApiProperty({ enum: ASSIGNABLE_GROUP_ROLES, example: 'ACTING_ADMIN' })
+  @IsIn(ASSIGNABLE_GROUP_ROLES)
+  role!: AssignableGroupRole;
 }

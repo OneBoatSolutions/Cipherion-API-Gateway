@@ -6,6 +6,7 @@ export type AuditAction =
   | 'project.key_rotated'
   | 'project.updated'
   | 'project.deleted'
+  | 'project.member_revoked'
   | 'group.created'
   | 'group.updated'
   | 'group.deleted'
@@ -18,32 +19,33 @@ export type AuditAction =
   | 'invitation.cancelled'
   | 'invitation.accepted'
   | 'invitation.declined'
-  | 'removal_request.created'
-  | 'removal_request.rejected'
-  | 'removal_request.cancelled';
+  | 'device.registered'
+  | 'device.approval_requested'
+  | 'device.approved'
+  | 'device.rejected'
+  | 'device.revoked'
+  | 'device.envelopes_created'
+  | 'device.envelope_job_dismissed';
 
 type AuditMetadata =
   | { groupId: string; invitationId: string }
-  | { groupId: string; requestId: string; targetUserId: string }
   | { changed: string[] }
   | { fromVersion: number; toVersion: number }
   | { groupId: string; changed?: string[] }
   | { groupId: string; fromVersion: number; toVersion: number }
-  | { groupId: string; targetUserId: string; role: string }
-  | {
-      groupId: string;
-      targetUserId: string;
-      fromVersion: number;
-      toVersion: number;
-      requestId?: string;
-    };
+  | { groupId: string; targetUserId: string; role?: string }
+  | { targetUserId: string }
+  | { deviceId: string; groupId?: string }
+  | { deviceId: string; groupIds: string[] }
+  | { groupId: string; gdekVersion: number; count?: number };
 
 // Runs inside the transaction of the change it records, so the two commit
-// together. Metadata must never hold passphrases or key material.
+// together. Metadata must never hold passphrases or key material. A device isn't
+// tied to one project, so its own events have no project id.
 export function auditEvent(
   userId: string,
   action: AuditAction,
-  projectId: string,
+  projectId: string | null,
   metadata?: AuditMetadata,
 ) {
   return cipseqPrisma.auditEvent.create({

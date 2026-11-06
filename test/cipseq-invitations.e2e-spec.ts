@@ -25,8 +25,9 @@ interface Invitation {
 interface Notification {
   type: string;
   id: string;
-  groupId: string;
-  groupName: string;
+  projectId: string;
+  groupId?: string;
+  groupName?: string;
   projectName: string;
   invitedByName?: string | null;
   inviteeEmail?: string;
@@ -44,18 +45,16 @@ interface Workspace {
       gdekVersion: number;
       members: { userId: string; role: string }[];
       pendingInvitations: Invitation[];
-      pendingRemovals: { id: string; targetUserId: string }[];
     }[];
   }[];
   notifications: Notification[];
 }
 
 const PASSPHRASE = 'correct horse battery staple';
-const WRONG_PASSPHRASE = 'not the right passphrase';
 
 // Runs against the .env.dev databases and needs the KMS running. The test users
 // and their CipSeq rows are removed afterwards.
-describe('CipSeq invitations and removal requests (e2e)', () => {
+describe('CipSeq invitations (e2e)', () => {
   let app: NestFastifyApplication;
   let admin: TestUser;
   let acting: TestUser;
@@ -157,7 +156,7 @@ describe('CipSeq invitations and removal requests (e2e)', () => {
       `/cipseq/invitations/${invitation.id}/accept`,
     );
     expect(accepted.statusCode).toBe(200);
-    if (role === 'ADMIN') {
+    if (role === 'ACTING_ADMIN') {
       const promoted = await call(admin, 'PATCH', `${url}/members/${user.id}`, {
         role,
       });
@@ -189,13 +188,11 @@ describe('CipSeq invitations and removal requests (e2e)', () => {
     const groupWhere = { group: where };
     await cipseqPrisma.$transaction([
       cipseqPrisma.groupInvitation.deleteMany({ where: groupWhere }),
-      cipseqPrisma.groupMemberRemovalRequest.deleteMany({ where: groupWhere }),
       cipseqPrisma.groupMember.deleteMany({ where: groupWhere }),
       cipseqPrisma.groupKeyVersion.deleteMany({ where: groupWhere }),
       cipseqPrisma.groupKeys.deleteMany({ where: groupWhere }),
       cipseqPrisma.group.deleteMany({ where }),
       cipseqPrisma.auditEvent.deleteMany({ where }),
-      cipseqPrisma.projectMember.deleteMany({ where }),
       cipseqPrisma.projectKeyVersion.deleteMany({ where }),
       cipseqPrisma.projectKeys.deleteMany({ where }),
       cipseqPrisma.project.deleteMany({ where: { id: { in: projectIds } } }),
@@ -261,7 +258,7 @@ describe('CipSeq invitations and removal requests (e2e)', () => {
 
   it("holds an acting admin's invitation until the project admin approves", async () => {
     const { projectId, url } = await setUp();
-    await join(url, acting, 'ADMIN');
+    await join(url, acting, 'ACTING_ADMIN');
 
     const invitation = await invite(url, acting, invitee);
     expect(invitation.status).toBe('PENDING_APPROVAL');
@@ -320,7 +317,7 @@ describe('CipSeq invitations and removal requests (e2e)', () => {
 
   it('handles reject, cancel and decline, and allows inviting again', async () => {
     const { url } = await setUp();
-    await join(url, acting, 'ADMIN');
+    await join(url, acting, 'ACTING_ADMIN');
 
     const rejected = await invite(url, acting, invitee);
     const reject = await call(
@@ -419,213 +416,31 @@ describe('CipSeq invitations and removal requests (e2e)', () => {
     ).toBe(404);
   });
 
-  it('removes a member through a request, once the admin approves', async () => {
-    const { projectId, groupId, url } = await setUp();
-    await join(url, acting, 'ADMIN');
-    await join(url, member);
-
-    const created = await call(acting, 'POST', `${url}/removal-requests`, {
-      userId: member.id,
-    });
-    expect(created.statusCode).toBe(201);
-    const requestId = created.json<{ id: string }>().id;
-
-    const duplicate = await call(acting, 'POST', `${url}/removal-requests`, {
-      userId: member.id,
-    });
-    expect(duplicate.statusCode).toBe(409);
-
-    // The member stays until it's approved.
-    await expect(
-      cipseqPrisma.groupMember.count({
-        where: { groupId, userId: member.id },
-      }),
-    ).resolves.toBe(1);
-
-    const adminView = await workspace(admin);
-    expect(
-      adminView.notifications.find(({ id }) => id === requestId),
-    ).toMatchObject({
-      type: 'REMOVAL_APPROVAL',
-      targetName: 'E2E member',
-      requestedByName: 'E2E acting',
-    });
-
-    const byActing = await call(
-      acting,
-      'POST',
-      `${url}/removal-requests/${requestId}/approve`,
-      { passphrase: PASSPHRASE },
-    );
-    expect(byActing.statusCode).toBe(403);
-
-    const wrong = await call(
-      admin,
-      'POST',
-      `${url}/removal-requests/${requestId}/approve`,
-      { passphrase: WRONG_PASSPHRASE },
-    );
-    expect(wrong.statusCode).toBe(403);
-    await expect(
-      cipseqPrisma.groupMember.count({
-        where: { groupId, userId: member.id },
-      }),
-    ).resolves.toBe(1);
-
-    const approved = await call(
-      admin,
-      'POST',
-      `${url}/removal-requests/${requestId}/approve`,
-      { passphrase: PASSPHRASE },
-    );
-    expect(approved.statusCode).toBe(200);
-    expect(approved.json<{ gdekVersion: number }>().gdekVersion).toBe(2);
-
-    await expect(
-      cipseqPrisma.groupMember.count({
-        where: { groupId, userId: member.id },
-      }),
-    ).resolves.toBe(0);
-    const request =
-      await cipseqPrisma.groupMemberRemovalRequest.findUniqueOrThrow({
-        where: { id: requestId },
-      });
-    expect(request.status).toBe('APPROVED');
-    expect(request.reviewedByUserId).toBe(admin.id);
-
-    const events = await cipseqPrisma.auditEvent.findMany({
-      where: { projectId },
-    });
-    expect(JSON.stringify(events)).not.toContain(PASSPHRASE);
-    expect(JSON.stringify(events)).not.toContain(WRONG_PASSPHRASE);
-    expect(events.map(({ action }) => action)).toContain(
-      'removal_request.created',
-    );
-
-    const twice = await call(
-      admin,
-      'POST',
-      `${url}/removal-requests/${requestId}/approve`,
-      { passphrase: PASSPHRASE },
-    );
-    expect(twice.statusCode).toBe(409);
-  });
-
-  it('closes a request by reject, cancel or a direct revoke', async () => {
-    const { url } = await setUp();
-    await join(url, acting, 'ADMIN');
-    await join(url, member);
-
-    const request = async () => {
-      const response = await call(acting, 'POST', `${url}/removal-requests`, {
-        userId: member.id,
-      });
-      expect(response.statusCode).toBe(201);
-      return response.json<{ id: string }>().id;
-    };
-
-    const rejected = await call(
-      admin,
-      'POST',
-      `${url}/removal-requests/${await request()}/reject`,
-    );
-    expect(rejected.json<{ status: string }>().status).toBe('REJECTED');
-
-    const cancelled = await call(
-      acting,
-      'POST',
-      `${url}/removal-requests/${await request()}/cancel`,
-    );
-    expect(cancelled.json<{ status: string }>().status).toBe('CANCELLED');
-
-    const pending = await request();
-    const revoked = await call(
-      admin,
-      'POST',
-      `${url}/members/${member.id}/revoke`,
-      { passphrase: PASSPHRASE },
-    );
-    expect(revoked.statusCode).toBe(200);
-    const row = await cipseqPrisma.groupMemberRemovalRequest.findUniqueOrThrow({
-      where: { id: pending },
-    });
-    expect(row.status).toBe('CANCELLED');
-  });
-
-  it('refuses invalid removal requests', async () => {
-    const { url } = await setUp();
-    await join(url, acting, 'ADMIN');
-    await join(url, member);
-    const body = { userId: member.id };
-
-    expect(
-      (await call(admin, 'POST', `${url}/removal-requests`, body)).statusCode,
-    ).toBe(400);
-    expect(
-      (
-        await call(member, 'POST', `${url}/removal-requests`, {
-          userId: acting.id,
-        })
-      ).statusCode,
-    ).toBe(403);
-    expect(
-      (await call(outsider, 'POST', `${url}/removal-requests`, body))
-        .statusCode,
-    ).toBe(404);
-    expect(
-      (
-        await call(acting, 'POST', `${url}/removal-requests`, {
-          userId: acting.id,
-        })
-      ).statusCode,
-    ).toBe(400);
-    expect(
-      (
-        await call(acting, 'POST', `${url}/removal-requests`, {
-          userId: admin.id,
-        })
-      ).statusCode,
-    ).toBe(400);
-    expect(
-      (
-        await call(acting, 'POST', `${url}/removal-requests`, {
-          userId: 'nobody',
-        })
-      ).statusCode,
-    ).toBe(404);
-  });
-
   it('shows pending lists only to the project admin and acting admins', async () => {
     const { projectId, groupId, url } = await setUp();
-    await join(url, acting, 'ADMIN');
+    await join(url, acting, 'ACTING_ADMIN');
     await join(url, member);
     const invitation = await invite(url, acting, invitee);
-    const created = await call(acting, 'POST', `${url}/removal-requests`, {
-      userId: member.id,
-    });
-    expect(created.statusCode).toBe(201);
 
-    const groupFor = async (user: TestUser) =>
-      (await workspace(user)).projects
-        .find(({ id }) => id === projectId)
-        ?.groups.find(({ id }) => id === groupId);
+    const projectFor = async (user: TestUser) =>
+      (await workspace(user)).projects.find(({ id }) => id === projectId);
+    const groupOf = (project: Workspace['projects'][number] | undefined) =>
+      project?.groups.find(({ id }) => id === groupId);
 
     for (const user of [admin, acting]) {
-      const group = await groupFor(user);
-      expect(group?.pendingInvitations.map(({ id }) => id)).toEqual([
+      const project = await projectFor(user);
+      expect(groupOf(project)?.pendingInvitations.map(({ id }) => id)).toEqual([
         invitation.id,
       ]);
-      expect(group?.pendingRemovals).toHaveLength(1);
     }
 
-    const plain = await groupFor(member);
-    expect(plain?.pendingInvitations).toEqual([]);
-    expect(plain?.pendingRemovals).toEqual([]);
+    const plain = await projectFor(member);
+    expect(groupOf(plain)?.pendingInvitations).toEqual([]);
 
     // Only the project admin gets the approvals.
     const actingNotifications = (await workspace(acting)).notifications;
     expect(
-      actingNotifications.filter(({ groupId: id }) => id === groupId),
+      actingNotifications.filter(({ projectId: id }) => id === projectId),
     ).toEqual([]);
   });
 

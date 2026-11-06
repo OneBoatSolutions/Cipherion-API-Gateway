@@ -6,7 +6,9 @@ const mocks = vi.hoisted(() => ({
   project: { findMany: vi.fn() },
   group: { findMany: vi.fn() },
   groupInvitation: { findMany: vi.fn() },
-  groupMemberRemovalRequest: { findMany: vi.fn() },
+  groupDevice: { findMany: vi.fn() },
+  deviceEnvelope: { groupBy: vi.fn() },
+  device: { findMany: vi.fn() },
   userSettings: { findUnique: vi.fn() },
   user: { findMany: vi.fn() },
 }));
@@ -16,7 +18,9 @@ vi.mock('../lib/cipseq-prisma.js', () => ({
     project: mocks.project,
     group: mocks.group,
     groupInvitation: mocks.groupInvitation,
-    groupMemberRemovalRequest: mocks.groupMemberRemovalRequest,
+    groupDevice: mocks.groupDevice,
+    deviceEnvelope: mocks.deviceEnvelope,
+    device: mocks.device,
   },
 }));
 vi.mock('../lib/prisma.js', () => ({
@@ -55,7 +59,7 @@ const groupRow = (
   description: 'Invoices and payroll',
   createdAt: date,
   updatedAt: date,
-  keys: { currentGdekVersion: 3 },
+  keys: { currentGdekVersion: 3, updatedAt: date },
   members,
 });
 
@@ -68,7 +72,9 @@ describe('WorkspaceController', () => {
     mocks.project.findMany.mockResolvedValue([]);
     mocks.group.findMany.mockResolvedValue([]);
     mocks.groupInvitation.findMany.mockResolvedValue([]);
-    mocks.groupMemberRemovalRequest.findMany.mockResolvedValue([]);
+    mocks.groupDevice.findMany.mockResolvedValue([]);
+    mocks.deviceEnvelope.groupBy.mockResolvedValue([]);
+    mocks.device.findMany.mockResolvedValue([]);
     mocks.user.findMany.mockResolvedValue([]);
   });
 
@@ -127,14 +133,6 @@ describe('WorkspaceController', () => {
       invitedByUserId: 'acting',
       createdAt: date,
     });
-    const removal = {
-      id: 'removal-1',
-      groupId: 'group-1',
-      targetUserId: 'target',
-      status: 'PENDING_APPROVAL',
-      requestedByUserId: 'acting',
-      createdAt: date,
-    };
     mocks.project.findMany.mockResolvedValue([
       projectRow('project-1', user.id),
     ]);
@@ -147,25 +145,18 @@ describe('WorkspaceController', () => {
         invitation('waiting', 'PENDING_ACCEPTANCE'),
       ])
       .mockResolvedValueOnce([]);
-    mocks.groupMemberRemovalRequest.findMany.mockResolvedValue([removal]);
     mocks.user.findMany.mockResolvedValue([
       { id: 'acting', name: 'Grace', email: 'grace@cipherion.test' },
-      { id: 'target', name: 'Linus', email: 'linus@cipherion.test' },
     ]);
 
     const { projects, notifications } = await controller.get(user);
 
     expect(notifications.map(({ type, id }) => [type, id])).toEqual([
       ['INVITATION_APPROVAL', 'approve-me'],
-      ['REMOVAL_APPROVAL', 'removal-1'],
     ]);
     expect(notifications[0]).toMatchObject({
       inviteeEmail: 'new@cipherion.test',
       invitedByName: 'Grace',
-    });
-    expect(notifications[1]).toMatchObject({
-      targetName: 'Linus',
-      requestedByName: 'Grace',
     });
     const [group] = projects[0].groups;
     expect(group.pendingInvitations.map(({ id }) => id)).toEqual([
@@ -173,7 +164,262 @@ describe('WorkspaceController', () => {
       'waiting',
     ]);
     expect(group.pendingInvitations[0].projectId).toBe('project-1');
-    expect(group.pendingRemovals[0].projectId).toBe('project-1');
+  });
+
+  it('gives the project admin one device request per project, and missing envelopes', async () => {
+    const row = (groupId: string, status: string, deviceId = 'dvc_1') => ({
+      groupId,
+      status,
+      createdAt: date,
+      device: { id: deviceId, name: 'Laptop', userId: 'owner' },
+    });
+    mocks.project.findMany.mockResolvedValue([
+      projectRow('project-1', user.id),
+    ]);
+    mocks.group.findMany.mockResolvedValue([
+      groupRow('group-1', 'project-1', []),
+      groupRow('group-2', 'project-1', []),
+    ]);
+    mocks.groupDevice.findMany.mockResolvedValue([
+      row('group-1', 'PENDING_APPROVAL'),
+      row('group-2', 'PENDING_APPROVAL'),
+      row('group-1', 'APPROVED', 'dvc_old'),
+      row('group-1', 'APPROVED', 'dvc_current'),
+    ]);
+    mocks.deviceEnvelope.groupBy.mockResolvedValue([
+      {
+        groupId: 'group-1',
+        deviceId: 'dvc_old',
+        _max: { envelopeVersion: 2 },
+      },
+      {
+        groupId: 'group-1',
+        deviceId: 'dvc_current',
+        _max: { envelopeVersion: 3 },
+      },
+    ]);
+    mocks.user.findMany.mockResolvedValue([
+      { id: 'owner', name: 'Linus', email: 'linus@cipherion.test' },
+    ]);
+
+    const { projects, notifications } = await controller.get(user);
+
+    expect(notifications).toHaveLength(2);
+    expect(notifications).toContainEqual({
+      type: 'ENVELOPES_MISSING',
+      id: 'group-1',
+      projectId: 'project-1',
+      projectName: 'Payments',
+      groupId: 'group-1',
+      groupName: 'Finance',
+      failureReason: 'INTERRUPTED',
+      missingCount: 1,
+      createdAt: date,
+    });
+    expect(notifications).toContainEqual({
+      type: 'DEVICE_APPROVAL',
+      id: 'dvc_1',
+      projectId: 'project-1',
+      projectName: 'Payments',
+      deviceId: 'dvc_1',
+      deviceName: 'Laptop',
+      deviceUserName: 'Linus',
+      groups: [
+        { id: 'group-1', name: 'Finance' },
+        { id: 'group-2', name: 'Finance' },
+      ],
+      createdAt: date,
+    });
+    expect(projects[0].groups[0].devices).toContainEqual({
+      deviceId: 'dvc_current',
+      name: 'Laptop',
+      userId: 'owner',
+      status: 'APPROVED',
+      latestEnvelopeVersion: 3,
+    });
+  });
+
+  describe('envelope job notifications', () => {
+    const setUp = (job: Record<string, unknown> | null, missing = true) => {
+      mocks.project.findMany.mockResolvedValue([
+        projectRow('project-1', user.id),
+      ]);
+      mocks.group.findMany.mockResolvedValue([
+        { ...groupRow('group-1', 'project-1', []), envelopeJob: job },
+      ]);
+      mocks.groupDevice.findMany.mockResolvedValue([
+        {
+          groupId: 'group-1',
+          status: 'APPROVED',
+          createdAt: date,
+          reviewedAt: date,
+          device: { id: 'dvc_1', name: 'Laptop', userId: 'owner' },
+        },
+      ]);
+      mocks.deviceEnvelope.groupBy.mockResolvedValue([
+        {
+          groupId: 'group-1',
+          deviceId: 'dvc_1',
+          _max: { envelopeVersion: missing ? 2 : 3 },
+        },
+      ]);
+    };
+    const job = {
+      kind: 'ROTATION',
+      gdekVersion: 3,
+      status: 'RUNNING',
+      failureReason: null,
+      envelopeCount: 1,
+      startedAt: date,
+      lastActiveAt: new Date(),
+      finishedAt: null,
+      dismissedAt: null,
+    };
+    const notificationsOf = async () =>
+      (await controller.get(user)).notifications;
+
+    it('shows a running job as in progress, without asking to resume', async () => {
+      setUp(job);
+
+      await expect(notificationsOf()).resolves.toEqual([
+        expect.objectContaining({
+          type: 'ENVELOPES_IN_PROGRESS',
+          jobKind: 'ROTATION',
+          missingCount: 1,
+          createdAt: date,
+        }),
+      ]);
+    });
+
+    it('asks to resume a job that stopped, with the reason', async () => {
+      setUp({ ...job, status: 'FAILED', failureReason: 'KMS_UNAVAILABLE' });
+
+      await expect(notificationsOf()).resolves.toEqual([
+        expect.objectContaining({
+          type: 'ENVELOPES_MISSING',
+          jobKind: 'ROTATION',
+          failureReason: 'KMS_UNAVAILABLE',
+          missingCount: 1,
+        }),
+      ]);
+    });
+
+    it('treats a running job that stopped updating as interrupted', async () => {
+      setUp({ ...job, lastActiveAt: new Date(Date.now() - 3 * 60 * 1000) });
+
+      await expect(notificationsOf()).resolves.toEqual([
+        expect.objectContaining({
+          type: 'ENVELOPES_MISSING',
+          jobKind: 'ROTATION',
+          failureReason: 'INTERRUPTED',
+        }),
+      ]);
+    });
+
+    it('treats missing envelopes with no job for this version as interrupted', async () => {
+      setUp({ ...job, gdekVersion: 2, status: 'COMPLETED', finishedAt: date });
+
+      const [notification] = await notificationsOf();
+
+      expect(notification).toMatchObject({
+        type: 'ENVELOPES_MISSING',
+        failureReason: 'INTERRUPTED',
+      });
+      expect(notification.jobKind).toBeUndefined();
+    });
+
+    it('keeps a completed job showing until it is dismissed', async () => {
+      const finished = { ...job, status: 'COMPLETED', finishedAt: date };
+
+      setUp(finished, false);
+      await expect(notificationsOf()).resolves.toEqual([
+        expect.objectContaining({
+          type: 'ENVELOPES_COMPLETED',
+          jobKind: 'ROTATION',
+          envelopeCount: 1,
+          createdAt: date,
+        }),
+      ]);
+
+      setUp({ ...finished, dismissedAt: new Date() }, false);
+      await expect(notificationsOf()).resolves.toEqual([]);
+    });
+
+    it('never shows a stopped job once nothing is missing', async () => {
+      setUp({ ...job, status: 'FAILED', failureReason: 'INTERRUPTED' }, false);
+
+      await expect(notificationsOf()).resolves.toEqual([]);
+    });
+  });
+
+  it('dates missing envelopes from the rotation or a later approval, not when the device joined', async () => {
+    const joined = new Date('2026-01-01T00:00:00.000Z');
+    const approvedEarlier = new Date('2026-03-01T00:00:00.000Z');
+    const approvedLater = new Date('2026-11-06T00:00:00.000Z');
+    const approvedLatest = new Date('2026-11-06T01:00:00.000Z');
+    const row = (groupId: string, deviceId: string, reviewedAt: Date) => ({
+      groupId,
+      status: 'APPROVED',
+      createdAt: joined,
+      reviewedAt,
+      device: { id: deviceId, name: 'Laptop', userId: 'owner' },
+    });
+    mocks.project.findMany.mockResolvedValue([
+      projectRow('project-1', user.id),
+    ]);
+    mocks.group.findMany.mockResolvedValue([
+      groupRow('rotated', 'project-1', []),
+      groupRow('approved', 'project-1', []),
+    ]);
+    mocks.groupDevice.findMany.mockResolvedValue([
+      row('rotated', 'dvc_1', approvedEarlier),
+      row('approved', 'dvc_2', approvedLatest),
+      row('approved', 'dvc_3', approvedLater),
+    ]);
+
+    const { notifications } = await controller.get(user);
+
+    const missingSince = (groupId: string) =>
+      notifications.find((found) => found.groupId === groupId)?.createdAt;
+    expect(missingSince('rotated')).toEqual(date);
+    expect(missingSince('approved')).toEqual(approvedLater);
+  });
+
+  it("lists the user's devices with each group's newest status", async () => {
+    mocks.device.findMany.mockResolvedValue([
+      {
+        id: 'dvc_1',
+        name: 'Laptop',
+        status: 'ACTIVE',
+        createdAt: date,
+        groups: [
+          {
+            groupId: 'group-1',
+            status: 'PENDING_APPROVAL',
+            group: { name: 'Finance', projectId: 'project-1' },
+          },
+          {
+            groupId: 'group-1',
+            status: 'REVOKED',
+            group: { name: 'Finance', projectId: 'project-1' },
+          },
+        ],
+      },
+    ]);
+
+    const { devices } = await controller.get(user);
+
+    expect(mocks.device.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: user.id } }),
+    );
+    expect(devices[0].groups).toEqual([
+      {
+        projectId: 'project-1',
+        groupId: 'group-1',
+        groupName: 'Finance',
+        status: 'PENDING_APPROVAL',
+      },
+    ]);
   });
 
   it('gives an acting admin the pending lists but no approvals', async () => {
@@ -182,7 +428,7 @@ describe('WorkspaceController', () => {
     ]);
     mocks.group.findMany.mockResolvedValue([
       groupRow('group-1', 'project-1', [
-        { userId: user.id, role: 'ADMIN', createdAt: date },
+        { userId: user.id, role: 'ACTING_ADMIN', createdAt: date },
       ]),
     ]);
     mocks.groupInvitation.findMany
@@ -216,10 +462,11 @@ describe('WorkspaceController', () => {
 
     const { projects } = await controller.get(user);
 
-    expect(mocks.groupMemberRemovalRequest.findMany).not.toHaveBeenCalled();
+    expect(mocks.groupDevice.findMany).not.toHaveBeenCalled();
+    expect(mocks.deviceEnvelope.groupBy).not.toHaveBeenCalled();
     expect(mocks.groupInvitation.findMany).toHaveBeenCalledTimes(1);
     expect(projects[0].groups[0].pendingInvitations).toEqual([]);
-    expect(projects[0].groups[0].pendingRemovals).toEqual([]);
+    expect(projects[0].groups[0].devices).toEqual([]);
   });
 
   it('gives a new user default settings and nothing else', async () => {
@@ -233,6 +480,7 @@ describe('WorkspaceController', () => {
       },
       settings: { timezone: 'UTC', locale: 'en', securityAlerts: true },
       projects: [],
+      devices: [],
       notifications: [],
     });
     expect(mocks.user.findMany).not.toHaveBeenCalled();
@@ -248,7 +496,20 @@ describe('WorkspaceController', () => {
 
     expect(mocks.project.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { deletedAt: null, members: { some: { userId: user.id } } },
+        where: {
+          deletedAt: null,
+          OR: [
+            { adminUserId: user.id },
+            {
+              groups: {
+                some: {
+                  deletedAt: null,
+                  members: { some: { userId: user.id } },
+                },
+              },
+            },
+          ],
+        },
       }),
     );
     expect(mocks.group.findMany).toHaveBeenCalledWith(
@@ -322,8 +583,10 @@ describe('WorkspaceController', () => {
     const selects = JSON.stringify([
       mocks.project.findMany.mock.calls,
       mocks.group.findMany.mock.calls,
+      mocks.device.findMany.mock.calls,
+      mocks.groupDevice.findMany.mock.calls,
     ]);
-    expect(selects).not.toMatch(/wrapped|salt/i);
+    expect(selects).not.toMatch(/wrapped|salt|envelopeJson|publicKey/i);
   });
 
   it.each(['project', 'userSettings'] as const)(

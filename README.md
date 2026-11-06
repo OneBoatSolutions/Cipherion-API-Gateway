@@ -37,7 +37,7 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 - **Configuration safety**: environment variables are checked with Joi when the app starts, so a misconfigured deployment fails immediately.
 - **Observability**: tracing, metrics, logs and error tracking through [NestJS Observe](https://observe.nestjs.com).
 - **Dashboard** *(in progress)*: profile, settings and account activity for the signed-in user. Billing/subscription is deferred.
-- **CipSeq** *(in progress)*: projects, groups, key rotation and in-app invitations (available), device registration. CipSeq calls the Cipherion KMS over gRPC for every crypto operation and keeps its data, including an audit event for each operation, in a separate PostgreSQL database.
+- **CipSeq** *(in progress)*: projects, groups, key rotation, in-app invitations, device registration and revocation (available), and delivering keys to devices (not yet). CipSeq calls the Cipherion KMS over gRPC for every crypto operation and keeps its data, including an audit event for each operation, in a separate PostgreSQL database.
 - **EnQrypt and Zentriq** *(deferred)*.
 
 ## Tech stack
@@ -76,7 +76,7 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 │   ├── auth.ts              # Better Auth configuration
 │   ├── auth/                # AuthController (/api/v1/auth/*), global AuthGuard, @Public() / @CurrentUser()
 │   ├── dashboard/           # Dashboard routes (/api/v1/dashboard/profile, /settings)
-│   ├── cipseq/              # CipSeq routes (projects, groups, invitations, removal requests), access checks and audit events
+│   ├── cipseq/              # CipSeq routes (projects, groups, invitations, devices), envelope jobs, access checks and audit events
 │   ├── workspace/           # GET /api/v1/workspace: everything the signed-in user is a part of
 │   ├── health/              # Liveness (/api/v1/health) and readiness (/api/v1/ready) endpoints
 │   ├── lib/prisma.ts        # Shared pg pool and PrismaClient for the auth database
@@ -434,8 +434,18 @@ Cipherion has no profile images. Better Auth's user table requires an `image` co
           "pendingInvitations": [
             { "id": "...", "projectId": "...", "groupId": "...", "inviteeEmail": "grace@cipherion.com", "status": "PENDING_APPROVAL", "invitedByUserId": "...", "createdAt": "..." }
           ],
-          "pendingRemovals": []
+          "devices": [
+            { "deviceId": "dvc_...", "name": "Work laptop", "userId": "...", "status": "APPROVED", "latestEnvelopeVersion": 3 }
+          ]
         }
+      ]
+    }
+  ],
+  "devices": [
+    {
+      "id": "dvc_...", "name": "Work laptop", "status": "ACTIVE", "createdAt": "...",
+      "groups": [
+        { "projectId": "...", "groupId": "...", "groupName": "Finance", "status": "APPROVED" }
       ]
     }
   ],
@@ -449,20 +459,23 @@ Cipherion has no profile images. Better Auth's user table requires an `image` co
 }
 ```
 
-- **Who sees what:** a project's admin gets all its groups and their members. Anyone else gets the projects they belong to, the groups they belong to and those groups' members.
-- **Keys:** only the current version numbers. Wrapped keys and salts are never returned.
+- **Who sees what:** a project's admin gets all its groups and their members. Anyone else gets only the projects where they're in a live group, those groups and those groups' members.
+- **Keys:** only the current version numbers. Wrapped keys, salts and envelopes are never returned.
 - **Members:** `name` and `email` come from the auth database, and are `null` if the account no longer exists.
-- **Notifications:** things for the user to act on, newest first. The `id` is the invitation or removal request.
+- **Notifications:** things for the user to act on or know about, newest first. The `id` is the invitation, device or group it's about.
 
-  | `type` | Who gets it | Extra fields |
-  | --- | --- | --- |
-  | `INVITATION_RECEIVED` | The invitee, by signed-in email | `invitedByName` |
-  | `INVITATION_APPROVAL` | Project admin | `inviteeEmail`, `invitedByName` |
-  | `REMOVAL_APPROVAL` | Project admin | `targetUserId`, `targetName`, `requestedByName` |
+  | `type` | Who gets it | Extra fields | Goes away when |
+  | --- | --- | --- | --- |
+  | `INVITATION_RECEIVED` | The invitee, by signed-in email | `invitedByName` | They answer it |
+  | `INVITATION_APPROVAL` | Project admin | `inviteeEmail`, `invitedByName` | It's handled |
+  | `DEVICE_APPROVAL` | Project admin | `deviceId`, `deviceName`, `deviceUserName`, `groups` | It's handled |
+  | `ENVELOPES_IN_PROGRESS` | Project admin | `jobKind`, `missingCount` | The job ends |
+  | `ENVELOPES_MISSING` | Project admin | `jobKind`, `failureReason`, `missingCount` | The admin resumes it and nothing is missing |
+  | `ENVELOPES_COMPLETED` | Project admin | `jobKind`, `envelopeCount` | The admin dismisses it |
 
-- **Pending lists:** `pendingInvitations` and `pendingRemovals` are filled for the project admin and acting admins, and empty for everyone else.
+- **Pending lists:** `pendingInvitations` and a group's `devices` are filled for the project admin and acting admins, and empty for everyone else.
 - **Errors:** `401` without a session, and `503` if any query fails, so a client never shows a partial workspace as complete. The cause goes to the `[Workspace]` log.
-- **Cost:** each call runs several database queries (12 SQL statements when measured), so call it on sign-in and page load, not on a timer. There's no pagination yet.
+- **Cost:** each call runs several database queries (about 20 SQL statements when measured), so call it on sign-in and page load, and only poll it while a job is in progress. There's no pagination yet.
 
 ## CipSeq projects
 
@@ -477,6 +490,7 @@ Routes under `/api/v1/cipseq/projects`. They need the session cookie. The KMS do
 | `GET` | `/:id` | Member | One project. |
 | `PATCH` | `/:id` | Admin | Updates only the fields sent: `name` and `description`. |
 | `DELETE` | `/:id` | Admin | Soft delete, answering `204`: the API stops serving the project, but its rows and wrapped keys stay in the database. |
+| `POST` | `/:id/members/:userId/revoke` | Admin | Removes someone from every group in the project and soft deletes all their envelopes there, answering `204`. No passphrase or key change. |
 
 Every project response has this shape. `role` is the caller's role, and `keyVersion` is `null` until the project is initialised:
 
@@ -492,25 +506,25 @@ Every project response has this shape. `role` is the caller's role, and `keyVers
 }
 ```
 
-- **Access:** someone who isn't a member gets `404`, the same as for a project that doesn't exist. A member who isn't the admin gets `403` on admin routes.
+- **Access:** a project has no direct members, only members of its groups. Someone in none of its live groups gets `404`, the same as for a project that doesn't exist. A group member who isn't the admin gets `403` on admin routes.
 - **Passphrase:** it goes to the KMS and is never stored, logged or audited. The admin can change it, but a lost passphrase can't be recovered.
 - **Rotation:** the KMS re-wraps the project encryption key under the new passphrase and a new salt. The key itself and the root key don't change, so anything wrapped under it stays valid. Old wrapped keys aren't kept: `projectKeyVersion` records only each version and its date.
-- **Attempt limit:** 5 wrong passphrases per project in 15 minutes, then `429`, even for the correct passphrase, until the window ends. Project rotation and the group endpoints that take a passphrase share this limit. Attempts are counted in Redis, so those routes answer `503` while Redis is unreachable. A successful call resets the count, and a KMS failure doesn't use up an attempt.
+- **Attempt limit:** 5 wrong passphrases per project in 15 minutes, then `429`, even for the correct passphrase, until the window ends. Project rotation and the group and device endpoints that take a passphrase share this limit. Attempts are counted in Redis, so those routes answer `503` while Redis is unreachable. A successful call resets the count, and a KMS failure doesn't use up an attempt.
 - **KMS failures:** `503` when the KMS is unreachable or slower than 2 seconds. Other failures follow the `kmsCall()` mapping, usually `502`. Nothing is written, so the client can try again.
 - **Audit:** each successful write records an event in the same transaction: `project.created`, `project.initialized`, `project.key_rotated`, `project.updated` or `project.deleted`.
 
 ## CipSeq groups
 
-Routes under `/api/v1/cipseq/projects/:projectId/groups`. They need the session cookie. Only the project admin can use them: being an admin is per project, so anyone can create their own project, but can't change or approve anything in a project they aren't the admin of. Groups are read through `GET /api/v1/workspace`.
+Routes under `/api/v1/cipseq/projects/:projectId/groups`. They need the session cookie. Only the project admin can use them, except that a group's acting admin can revoke members from it: being an admin is per project, so anyone can create their own project, but can't change or approve anything in a project they aren't the admin of. Groups are read through `GET /api/v1/workspace`.
 
 | Method | Path | Description |
 | --- | --- | --- |
 | `POST` | `/` | Creates a group from `name` (1–100 characters), `description` (1–500 characters) and the project's `passphrase`, at GDEK version 1. The project admin becomes a group admin. Answers `201`, or `409` if the project isn't initialised. |
 | `PATCH` | `/:groupId` | Updates only the fields sent: `name` and `description`. |
 | `DELETE` | `/:groupId` | Soft delete, answering `204`: the API stops serving the group, but its rows and wrapped keys stay in the database. |
-| `POST` | `/:groupId/rotate` | Replaces the group's keys using the `passphrase`, and moves to the next GDEK version. |
-| `PATCH` | `/:groupId/members/:userId` | Sets `role` to `ADMIN` (an acting admin) or `MEMBER`. |
-| `POST` | `/:groupId/members/:userId/revoke` | Removes the member and rotates the keys in one transaction, using the `passphrase`. They stay a member of the project. |
+| `POST` | `/:groupId/rotate` | Replaces the group's keys using the `passphrase`, and moves to the next GDEK version. Answers `200` straight away with `envelopesToCreate` added, and a background job creates the envelopes. A group can rotate once in 48 hours, then `409` with `rotationAllowedAt`. |
+| `PATCH` | `/:groupId/members/:userId` | Sets `role` to `ACTING_ADMIN` or `MEMBER`. A group has at most one acting admin, so a second answers `409` until the first is changed back. |
+| `POST` | `/:groupId/members/:userId/revoke` | The project admin or the group's acting admin removes the member and soft deletes their devices' envelopes for this group. No passphrase, KMS call or key change. |
 
 Create, update, rotate and revoke answer with the group, and the role change answers with `userId`, `role` and `createdAt`:
 
@@ -527,15 +541,16 @@ Create, update, rotate and revoke answer with the group, and the role change ans
 }
 ```
 
-- **Access:** someone outside the project gets `404`. Any other project member, including an acting admin, gets `403`. The project admin can't be demoted or revoked (`400`).
-- **Keys:** each create, rotate and revoke calls `CreateAndWrapNewGroupRootKeyAndGroupDataEncryptionKey`, which makes a new group root key and GDEK. Only the current pair is stored, in `groupKeys`. `groupKeyVersion` records each version number and its date.
+- **Access:** someone outside the project gets `404`. Any other project member gets `403` on project admin routes, including an acting admin. The project admin can't be demoted or revoked (`400`), and an acting admin can't revoke themselves (`400`).
+- **Roles are per group:** someone who is an acting admin of another group is a plain member here, and revoking them here leaves their role there unchanged.
+- **Keys:** each create and rotate calls `CreateAndWrapNewGroupRootKeyAndGroupDataEncryptionKey`, which makes a new group root key and GDEK. Only the current pair is stored, in `groupKeys`. `groupKeyVersion` records each version number and its date.
 - **Old versions are gone for new devices:** because old pairs aren't kept, a device registered after a rotation can't get an envelope for an older version, so it can't read older data.
-- **Revocation protects future data only:** a revoked member's device may keep any GDEK it already received.
-- **Concurrent changes:** `409` if another rotation or revocation got there first. A revoke that loses this race changes nothing, so a member is never removed without a rotation, and it can be retried.
+- **What revoking protects:** the engine asks for the envelope on every operation and clears it straight away, so a normal engine is cut off at its next request. A modified engine could keep a copy, which opens anything encrypted with that GDEK until the project admin next rotates.
+- **Concurrent changes:** `409` if another rotation got there first.
 - **Errors and passphrases:** a wrong passphrase answers `403`, and the attempt limit and KMS failures work as for projects. The passphrase is never stored, logged or audited.
 - **Audit:** `group.created`, `group.updated`, `group.deleted`, `group.key_rotated`, `group.member_role_changed` and `group.member_revoked`, each in the same transaction as the change.
 
-## CipSeq invitations and removal requests
+## CipSeq invitations
 
 Invitations are in-app only: nothing is emailed, and the admin has to tell the person separately. An invitation is stored against an email address and appears in `GET /api/v1/workspace` when someone with that address signs in, including if they sign up later.
 
@@ -552,26 +567,47 @@ The invitee answers under `/api/v1/cipseq/invitations`:
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `POST` | `/:id/accept` | Joins the project if they weren't in it, and the group as `MEMBER`. No keys change: a new member gets the current GDEK through device registration. |
+| `POST` | `/:id/accept` | Joins the group as `MEMBER`, and sends an approval request for each of their devices. No keys change: a new member gets the current GDEK once a device is approved. |
 | `POST` | `/:id/decline` | Declines. They can be invited again. |
 
-Acting admins ask for a removal under `/api/v1/cipseq/projects/:projectId/groups/:groupId/removal-requests`. The project admin revokes directly instead:
+An invitation answers with `{ id, projectId, groupId, inviteeEmail, status, invitedByUserId, createdAt }`.
+
+- **Access:** someone outside the group gets `404`, so they can't confirm it exists. A plain group member gets `403`. An invitation for another email answers `404`.
+- **Conflicts:** `409` if the person is already a member, an invitation is already open, or it has already been handled. Each status change applies only if the row still has the expected status, so two people can't act on one invitation.
+- **No account check:** inviting answers the same whether or not the address has an account, so it can't be used to discover who has signed up.
+- **Emails aren't verified:** anyone can sign up with an invited address and accept. They get no keys, because those need an approved device, but they can see the project and group details and members' names and emails. See the production checklist.
+
+## CipSeq devices
+
+A device registers once, the project admin approves it, and the gateway stores an envelope: the group's GDEK wrapped by the KMS for that device's ML-KEM-1024 key. **Envelopes can't reach devices yet.** That, and proof that a device is genuine, comes with device certificates; until then registering relies on the session alone.
+
+The device's user, under `/api/v1/cipseq/devices`:
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/` | Registers `deviceId` (`dvc_` plus 43 base64url characters), `publicKey` (decodes to 1568 bytes) and an optional `name`, answering `201`. Sends an approval request for each group the user is in; with none, it's just registered. Repeating it with the same user and key changes nothing. |
+| `POST` | `/:deviceId/groups/:groupId/request-approval` | Asks again for one group, after a rejection or revoke, if they're still a member. Never project-wide, because that would give access to every group at once. |
+| `POST` | `/:deviceId/revoke` | Revokes it everywhere, answering `204`. Permanent: the id can't be used again. |
+
+The admins, under `/api/v1/cipseq/projects/:projectId`:
 
 | Method | Path | Who | Description |
 | --- | --- | --- | --- |
-| `POST` | `/` | Acting admin | Requests the removal of `userId`, answering `201`. The member stays until it's approved. |
-| `POST` | `/:id/approve` | Project admin | Revokes the member and rotates the group's keys in one transaction, using the `passphrase`. Answers with the group. The attempt limit and KMS failures work as for revoke. |
-| `POST` | `/:id/reject` | Project admin | Refuses the request. The member stays. |
-| `POST` | `/:id/cancel` | The requester or project admin | Cancels the request. |
+| `POST` | `/devices/:deviceId/approve` | Project admin | Takes the `passphrase` and approves the device for all its waiting groups in the project. Creates the first envelope in the request, then starts the job. Answers with `envelopesToCreate`. |
+| `POST` | `/devices/:deviceId/reject` | Project admin | Rejects it for all its waiting groups, answering `204`. |
+| `POST` | `/devices/:deviceId/revoke` | Project admin | Soft deletes all its envelopes in the project, answering `204`. |
+| `POST` | `/groups/:groupId/devices/:deviceId/revoke` | Project admin or the group's acting admin | Soft deletes its envelopes for this group, answering `204`. |
+| `POST` | `/groups/:groupId/envelopes/renew` | Project admin | Resumes a stopped job with the `passphrase`, answering with `envelopesToCreate`. `409` while a job is running. With nothing missing, it doesn't check the passphrase. |
+| `POST` | `/groups/:groupId/envelopes/completed/dismiss` | Project admin | Dismisses `ENVELOPES_COMPLETED`, answering `204`, also if there's nothing to dismiss. |
 
-An invitation answers with `{ id, projectId, groupId, inviteeEmail, status, invitedByUserId, createdAt }`, and a request with `{ id, projectId, groupId, targetUserId, status, requestedByUserId, createdAt }`.
-
-- **Access:** someone outside the group gets `404`, so they can't confirm it exists. A plain group member gets `403`. An invitation for another email answers `404`.
-- **Refused targets:** `400` if the target of a removal is the project admin or the caller, or if the project admin uses the request route.
-- **Conflicts:** `409` if the person is already a member, an invitation or request is already open, or it has already been handled. Each status change applies only if the row still has the expected status, so two people can't act on one invitation.
-- **Direct revokes:** a revoke cancels any pending removal request for that member.
-- **No account check:** inviting answers the same whether or not the address has an account, so it can't be used to discover who has signed up.
-- **Emails aren't verified:** anyone can sign up with an invited address and accept. They get no keys, because those need an approved device, but they can see the project and group details and members' names and emails. See the production checklist.
+- **Revoking:** no passphrase, KMS call or key change, so it works while the KMS is down. All versions of the envelopes are soft deleted at once. The device stays registered, so it can still be used in other groups and projects, unless its user revoked it everywhere.
+- **Acting admins:** they can only remove members and devices from their own group, and can't target the project admin or themselves (`400`). Only the project admin can remove someone or something from a whole project.
+- **The background job:** after an approval or rotation it creates the missing envelopes at the latest GDEK version, 5 at a time, and older envelopes stay live. It holds the passphrase in gateway memory until it finishes, and never in Redis, the database or logs. A revoke during a job is caught either by the revoke's own update or by the job re-checking after it saves.
+- **When a job stops:** a wrong passphrase, a KMS failure or a restart stops it, with no retry. The passphrase is gone by then, so it can't restart itself: the admin sees `ENVELOPES_MISSING` and enters the passphrase again on the renew route. After a crash it shows as in progress, and renew answers `409`, for up to 2 minutes.
+- **Timing:** a rotation of a 10,000-device group answered in about 200 ms and its job took about 5 minutes locally, with the gateway, KMS and database on one machine. It stored about 26 MB of envelopes and 2,000 audit rows.
+- **Bulk imports:** run `ANALYZE` after inserting thousands of rows into near-empty tables. Until Postgres refreshes its statistics, `/workspace` can take about 15 seconds.
+- **Errors:** `403` for a wrong passphrase or not being allowed, `404` for something hidden or missing, including another user's device, and `409` if the id belongs to someone else, has a different key or was revoked everywhere, or a request is already open. The attempt limit and KMS failures work as for projects.
+- **Audit:** `device.registered`, `.approval_requested`, `.approved`, `.rejected`, `.revoked`, `.envelopes_created` and `.envelope_job_dismissed`, each in the same transaction as the change.
 
 ## Protecting routes
 

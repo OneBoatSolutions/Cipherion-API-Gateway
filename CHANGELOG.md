@@ -78,8 +78,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Audit events: `invitation.created`, `.approved`, `.rejected`, `.cancelled`, `.accepted` and `.declined`, and `removal_request.created`, `.rejected` and `.cancelled`.
 - Unit and e2e tests for invitations and removal requests.
 - Unit and e2e tests for rotation and the attempt limit.
+- CipSeq devices under `/api/v1/cipseq/devices`: `POST /` registers a device (`deviceId`, ML-KEM-1024 `publicKey`, optional `name`) and sends an approval request for each group its user is in, `POST /:deviceId/groups/:groupId/request-approval` asks again for one group, and `POST /:deviceId/revoke` lets its user revoke it everywhere, permanently. Joining a group also sends requests for the user's devices.
+- Project admin routes under `/api/v1/cipseq/projects/:projectId`: `POST /devices/:deviceId/approve` (`passphrase`; covers the device's waiting groups), `POST /devices/:deviceId/reject`, `POST /devices/:deviceId/revoke` (whole project) and `POST /members/:userId/revoke` (every group in the project). The project admin or the group's acting admin can use `POST /groups/:groupId/devices/:deviceId/revoke`.
+- A background job (`src/cipseq/device-envelopes.ts`) calls `CreateDeviceEnvelope` after an approval or rotation, 5 at a time. It holds the passphrase in memory only and stops at the first failure without retrying.
+- Job status in a new `envelopeJob` table, so the project admin sees `ENVELOPES_IN_PROGRESS`, `ENVELOPES_MISSING` (with `failureReason`: `WRONG_PASSPHRASE`, `KMS_UNAVAILABLE` or `INTERRUPTED`) and `ENVELOPES_COMPLETED` in `/workspace`. A running job that hasn't updated for 2 minutes counts as interrupted.
+- `POST /groups/:groupId/envelopes/renew` (`passphrase`) resumes a stopped job, and answers `409` while one is running. `POST /groups/:groupId/envelopes/completed/dismiss` dismisses the completed notice, which otherwise stays.
+- `GET /api/v1/workspace` returns `devices` for the signed-in user and `devices` on each group for the project admin and acting admins, plus `DEVICE_APPROVAL` notifications. No envelope is ever returned.
+- CipSeq device tables and migrations (`cipseq_devices`, `cipseq_envelope_jobs`): `device`, `groupDevice`, `deviceEnvelope` and `envelopeJob`, with partial unique indexes allowing one open approval per group and device, one live envelope per group, device and version, and one acting admin per group.
+- Audit events: `project.member_revoked`, `device.registered`, `.approval_requested`, `.approved`, `.rejected`, `.revoked`, `.envelopes_created` and `.envelope_job_dismissed`.
+- Unit and e2e tests for devices, revocation and envelope jobs.
 
 ### Changed
+
+- **Breaking:** acting admins now have the role `ACTING_ADMIN` instead of `ADMIN`, which means the project admin only. A group has at most one, and assigning a second answers `409`. The migration keeps the earliest assigned in each group and makes the others members.
+- **Breaking:** revoking a member no longer rotates keys or takes a `passphrase`, so it works while the KMS is down. It takes effect at once by soft deleting that member's envelopes for the group. The group's acting admin can do it too, without approval, and someone who is an acting admin elsewhere counts as a plain member of this group.
+- **Breaking:** a project has no direct members. Anyone but the project admin sees a project only while they're in one of its live groups, and gets `404` otherwise.
+- **Breaking:** rotating a group is limited to once in 48 hours per group, answering `409` with `rotationAllowedAt` (creating a group doesn't start the limit). The response adds `envelopesToCreate`.
+- `CreateDeviceEnvelope` is in `PASSPHRASE_CHECKING_METHODS`, so a wrong passphrase answers `403` and counts towards the attempt limit.
 
 - `.env.example` now includes `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`.
 - `prisma7.config.ts` no longer imports `dotenv/config`, so `.env` can't override the `NODE_ENV`-specific env file.
@@ -120,5 +135,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Removed
 
+- **Breaking:** removal requests (`/removal-requests` routes, the `groupMemberRemovalRequest` table, `pendingRemovals` and `REMOVAL_APPROVAL`). Removing someone from a whole project now belongs to the project admin alone.
+- The `projectMember` table, whose rows are dropped by the `cipseq_devices` migration.
 - Empty root `auth.ts` and the unused `prisma/schema.backup.prisma`.
 - Unused `@types/express` and the redundant `@better-auth/prisma-adapter` dependency (already bundled with `better-auth`).

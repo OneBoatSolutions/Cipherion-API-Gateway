@@ -100,7 +100,7 @@ export async function findGroupForMember(
     project,
     group,
     isProjectAdmin,
-    isGroupAdmin: isProjectAdmin || member?.role === 'ADMIN',
+    isGroupAdmin: isProjectAdmin || member?.role === 'ACTING_ADMIN',
   };
 }
 

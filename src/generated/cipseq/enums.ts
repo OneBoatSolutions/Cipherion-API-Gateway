@@ -11,6 +11,7 @@
 
 export const GroupRole = {
   ADMIN: 'ADMIN',
+  ACTING_ADMIN: 'ACTING_ADMIN',
   MEMBER: 'MEMBER'
 } as const
 
@@ -29,11 +30,46 @@ export const InvitationStatus = {
 export type InvitationStatus = (typeof InvitationStatus)[keyof typeof InvitationStatus]
 
 
-export const RemovalRequestStatus = {
+export const DeviceStatus = {
+  ACTIVE: 'ACTIVE',
+  REVOKED: 'REVOKED'
+} as const
+
+export type DeviceStatus = (typeof DeviceStatus)[keyof typeof DeviceStatus]
+
+
+export const GroupDeviceStatus = {
   PENDING_APPROVAL: 'PENDING_APPROVAL',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
-  CANCELLED: 'CANCELLED'
+  REVOKED: 'REVOKED'
 } as const
 
-export type RemovalRequestStatus = (typeof RemovalRequestStatus)[keyof typeof RemovalRequestStatus]
+export type GroupDeviceStatus = (typeof GroupDeviceStatus)[keyof typeof GroupDeviceStatus]
+
+
+export const EnvelopeJobKind = {
+  ROTATION: 'ROTATION',
+  APPROVAL: 'APPROVAL',
+  RENEWAL: 'RENEWAL'
+} as const
+
+export type EnvelopeJobKind = (typeof EnvelopeJobKind)[keyof typeof EnvelopeJobKind]
+
+
+export const EnvelopeJobStatus = {
+  RUNNING: 'RUNNING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED'
+} as const
+
+export type EnvelopeJobStatus = (typeof EnvelopeJobStatus)[keyof typeof EnvelopeJobStatus]
+
+
+export const EnvelopeJobFailure = {
+  WRONG_PASSPHRASE: 'WRONG_PASSPHRASE',
+  KMS_UNAVAILABLE: 'KMS_UNAVAILABLE',
+  INTERRUPTED: 'INTERRUPTED'
+} as const
+
+export type EnvelopeJobFailure = (typeof EnvelopeJobFailure)[keyof typeof EnvelopeJobFailure]

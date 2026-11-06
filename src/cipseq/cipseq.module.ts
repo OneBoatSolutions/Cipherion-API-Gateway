@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
+import { DevicesController } from './devices.controller.js';
 import { GroupsController } from './groups.controller.js';
 import { InvitationResponsesController } from './invitation-responses.controller.js';
 import { InvitationsController } from './invitations.controller.js';
+import { ProjectDevicesController } from './project-devices.controller.js';
 import { ProjectsController } from './projects.controller.js';
-import { RemovalRequestsController } from './removal-requests.controller.js';
 
 @Module({
   controllers: [
@@ -11,7 +12,8 @@ import { RemovalRequestsController } from './removal-requests.controller.js';
     GroupsController,
     InvitationsController,
     InvitationResponsesController,
-    RemovalRequestsController,
+    DevicesController,
+    ProjectDevicesController,
   ],
 })
 export class CipSeqModule {}

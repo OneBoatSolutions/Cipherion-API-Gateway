@@ -33,11 +33,6 @@ export type ProjectKeys = Prisma.ProjectKeysModel
  */
 export type ProjectKeyVersion = Prisma.ProjectKeyVersionModel
 /**
- * Model ProjectMember
- * 
- */
-export type ProjectMember = Prisma.ProjectMemberModel
-/**
  * Model Group
  * 
  */
@@ -63,10 +58,25 @@ export type GroupMember = Prisma.GroupMemberModel
  */
 export type GroupInvitation = Prisma.GroupInvitationModel
 /**
- * Model GroupMemberRemovalRequest
+ * Model Device
  * 
  */
-export type GroupMemberRemovalRequest = Prisma.GroupMemberRemovalRequestModel
+export type Device = Prisma.DeviceModel
+/**
+ * Model GroupDevice
+ * 
+ */
+export type GroupDevice = Prisma.GroupDeviceModel
+/**
+ * Model DeviceEnvelope
+ * 
+ */
+export type DeviceEnvelope = Prisma.DeviceEnvelopeModel
+/**
+ * Model EnvelopeJob
+ * 
+ */
+export type EnvelopeJob = Prisma.EnvelopeJobModel
 /**
  * Model AuditEvent
  * 
