@@ -37,7 +37,7 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 - **Configuration safety**: environment variables are checked with Joi when the app starts, so a misconfigured deployment fails immediately.
 - **Observability**: tracing, metrics, logs and error tracking through [NestJS Observe](https://observe.nestjs.com).
 - **Dashboard** *(in progress)*: profile, settings and account activity for the signed-in user. Billing/subscription is deferred.
-- **CipSeq** *(in progress)*: projects, groups and key rotation (available), invitations and device registration. CipSeq calls the Cipherion KMS over gRPC for every crypto operation and keeps its data, including an audit event for each operation, in a separate PostgreSQL database.
+- **CipSeq** *(in progress)*: projects, groups, key rotation and in-app invitations (available), device registration. CipSeq calls the Cipherion KMS over gRPC for every crypto operation and keeps its data, including an audit event for each operation, in a separate PostgreSQL database.
 - **EnQrypt and Zentriq** *(deferred)*.
 
 ## Tech stack
@@ -76,7 +76,7 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 │   ├── auth.ts              # Better Auth configuration
 │   ├── auth/                # AuthController (/api/v1/auth/*), global AuthGuard, @Public() / @CurrentUser()
 │   ├── dashboard/           # Dashboard routes (/api/v1/dashboard/profile, /settings)
-│   ├── cipseq/              # CipSeq routes (/api/v1/cipseq/projects and their groups), access checks and audit events
+│   ├── cipseq/              # CipSeq routes (projects, groups, invitations, removal requests), access checks and audit events
 │   ├── workspace/           # GET /api/v1/workspace: everything the signed-in user is a part of
 │   ├── health/              # Liveness (/api/v1/health) and readiness (/api/v1/ready) endpoints
 │   ├── lib/prisma.ts        # Shared pg pool and PrismaClient for the auth database
@@ -430,21 +430,39 @@ Cipherion has no profile images. Better Auth's user table requires an `image` co
           "createdAt": "...", "updatedAt": "...",
           "members": [
             { "userId": "...", "name": "Ada Lovelace", "email": "ada@cipherion.com", "role": "ADMIN", "createdAt": "..." }
-          ]
+          ],
+          "pendingInvitations": [
+            { "id": "...", "projectId": "...", "groupId": "...", "inviteeEmail": "grace@cipherion.com", "status": "PENDING_APPROVAL", "invitedByUserId": "...", "createdAt": "..." }
+          ],
+          "pendingRemovals": []
         }
       ]
     }
   ],
-  "notifications": []
+  "notifications": [
+    {
+      "type": "INVITATION_APPROVAL", "id": "...", "projectId": "...", "projectName": "Payments",
+      "groupId": "...", "groupName": "Finance", "inviteeEmail": "grace@cipherion.com",
+      "invitedByName": "Linus Torvalds", "createdAt": "..."
+    }
+  ]
 }
 ```
 
 - **Who sees what:** a project's admin gets all its groups and their members. Anyone else gets the projects they belong to, the groups they belong to and those groups' members.
 - **Keys:** only the current version numbers. Wrapped keys and salts are never returned.
 - **Members:** `name` and `email` come from the auth database, and are `null` if the account no longer exists.
-- **Notifications:** always empty until the invitations and devices work arrives.
+- **Notifications:** things for the user to act on, newest first. The `id` is the invitation or removal request.
+
+  | `type` | Who gets it | Extra fields |
+  | --- | --- | --- |
+  | `INVITATION_RECEIVED` | The invitee, by signed-in email | `invitedByName` |
+  | `INVITATION_APPROVAL` | Project admin | `inviteeEmail`, `invitedByName` |
+  | `REMOVAL_APPROVAL` | Project admin | `targetUserId`, `targetName`, `requestedByName` |
+
+- **Pending lists:** `pendingInvitations` and `pendingRemovals` are filled for the project admin and acting admins, and empty for everyone else.
 - **Errors:** `401` without a session, and `503` if any query fails, so a client never shows a partial workspace as complete. The cause goes to the `[Workspace]` log.
-- **Cost:** each call runs several database queries (7 SQL statements when measured), so call it on sign-in and page load, not on a timer. There's no pagination yet.
+- **Cost:** each call runs several database queries (12 SQL statements when measured), so call it on sign-in and page load, not on a timer. There's no pagination yet.
 
 ## CipSeq projects
 
@@ -516,6 +534,44 @@ Create, update, rotate and revoke answer with the group, and the role change ans
 - **Concurrent changes:** `409` if another rotation or revocation got there first. A revoke that loses this race changes nothing, so a member is never removed without a rotation, and it can be retried.
 - **Errors and passphrases:** a wrong passphrase answers `403`, and the attempt limit and KMS failures work as for projects. The passphrase is never stored, logged or audited.
 - **Audit:** `group.created`, `group.updated`, `group.deleted`, `group.key_rotated`, `group.member_role_changed` and `group.member_revoked`, each in the same transaction as the change.
+
+## CipSeq invitations and removal requests
+
+Invitations are in-app only: nothing is emailed, and the admin has to tell the person separately. An invitation is stored against an email address and appears in `GET /api/v1/workspace` when someone with that address signs in, including if they sign up later.
+
+Routes under `/api/v1/cipseq/projects/:projectId/groups/:groupId/invitations`:
+
+| Method | Path | Who | Description |
+| --- | --- | --- | --- |
+| `POST` | `/` | Project admin or acting admin | Invites `email`, answering `201`. The project admin's invitation goes straight to the invitee (`PENDING_ACCEPTANCE`), and an acting admin's waits for approval (`PENDING_APPROVAL`). |
+| `POST` | `/:id/approve` | Project admin | Sends an acting admin's invitation on to the invitee. |
+| `POST` | `/:id/reject` | Project admin | Refuses an acting admin's invitation. |
+| `POST` | `/:id/cancel` | The inviter or project admin | Cancels an open invitation. |
+
+The invitee answers under `/api/v1/cipseq/invitations`:
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/:id/accept` | Joins the project if they weren't in it, and the group as `MEMBER`. No keys change: a new member gets the current GDEK through device registration. |
+| `POST` | `/:id/decline` | Declines. They can be invited again. |
+
+Acting admins ask for a removal under `/api/v1/cipseq/projects/:projectId/groups/:groupId/removal-requests`. The project admin revokes directly instead:
+
+| Method | Path | Who | Description |
+| --- | --- | --- | --- |
+| `POST` | `/` | Acting admin | Requests the removal of `userId`, answering `201`. The member stays until it's approved. |
+| `POST` | `/:id/approve` | Project admin | Revokes the member and rotates the group's keys in one transaction, using the `passphrase`. Answers with the group. The attempt limit and KMS failures work as for revoke. |
+| `POST` | `/:id/reject` | Project admin | Refuses the request. The member stays. |
+| `POST` | `/:id/cancel` | The requester or project admin | Cancels the request. |
+
+An invitation answers with `{ id, projectId, groupId, inviteeEmail, status, invitedByUserId, createdAt }`, and a request with `{ id, projectId, groupId, targetUserId, status, requestedByUserId, createdAt }`.
+
+- **Access:** someone outside the group gets `404`, so they can't confirm it exists. A plain group member gets `403`. An invitation for another email answers `404`.
+- **Refused targets:** `400` if the target of a removal is the project admin or the caller, or if the project admin uses the request route.
+- **Conflicts:** `409` if the person is already a member, an invitation or request is already open, or it has already been handled. Each status change applies only if the row still has the expected status, so two people can't act on one invitation.
+- **Direct revokes:** a revoke cancels any pending removal request for that member.
+- **No account check:** inviting answers the same whether or not the address has an account, so it can't be used to discover who has signed up.
+- **Emails aren't verified:** anyone can sign up with an invited address and accept. They get no keys, because those need an approved device, but they can see the project and group details and members' names and emails. See the production checklist.
 
 ## Protecting routes
 
@@ -589,6 +645,7 @@ Requests that fail DTO validation return `400 Bad Request` in this format:
 - The KMS is reachable only from the gateway's private network. Each environment has its own gateway client certificate for mTLS; the private key file is readable only by the gateway's user and never committed. Rotate the client certificate before it expires.
 - `CIPSEQ_DATABASE_URL` points to a different database from `DATABASE_URL` (startup is refused otherwise). CipSeq holds key material, so preferably give it its own database user too, with access to that database only.
 - The CipSeq database has backups and point-in-time recovery, with a tested restore. The KMS is stateless, so this database holds the only copy of the wrapped keys: losing it makes the encrypted data unrecoverable.
+- Email addresses are verified before real users are invited. The gateway doesn't do this yet, so today anyone can sign up with an invited address and join the group.
 - CipSeq backups are protected and expire on a schedule. A backup from before a rotation still opens with the old passphrase and holds the old group keys, so after rotating because of a leak, old backups stay a risk until they expire.
 - `NODE_ENV=production` is set, which also turns off the API docs (`/api/v1/docs`) and Better Auth's schema endpoint.
 - The orchestrator restarts the gateway when it exits (it exits with code 1 if a database is unreachable at startup), and starts the databases before the gateway.

@@ -96,10 +96,12 @@ model Group {
   // Soft delete: the wrapped keys stay, because removing them can't be undone.
   deletedAt   DateTime?
 
-  project     Project           @relation(fields: [projectId], references: [id])
-  keys        GroupKeys?
-  keyVersions GroupKeyVersion[]
-  members     GroupMember[]
+  project         Project                     @relation(fields: [projectId], references: [id])
+  keys            GroupKeys?
+  keyVersions     GroupKeyVersion[]
+  members         GroupMember[]
+  invitations     GroupInvitation[]
+  removalRequests GroupMemberRemovalRequest[]
 
   @@index([projectId])
   @@map("group")
@@ -148,6 +150,63 @@ model GroupMember {
   @@id([groupId, userId])
   @@index([userId])
   @@map("groupMember")
+}
+
+enum InvitationStatus {
+  PENDING_APPROVAL
+  REJECTED
+  PENDING_ACCEPTANCE
+  ACCEPTED
+  DECLINED
+  CANCELLED
+}
+
+enum RemovalRequestStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// A partial unique index in the migration allows one open invitation per group
+// and email. An acting admin's invitation waits for the project admin's approval.
+model GroupInvitation {
+  id               String           @id @default(uuid(7)) @db.Uuid
+  groupId          String           @db.Uuid
+  // Lower-cased. Matched against the signed-in user's email.
+  inviteeEmail     String
+  // Better Auth user ids.
+  invitedByUserId  String
+  status           InvitationStatus
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  respondedAt      DateTime?
+  createdAt        DateTime         @default(now())
+
+  group Group @relation(fields: [groupId], references: [id])
+
+  @@index([inviteeEmail, status])
+  @@index([groupId, status])
+  @@map("groupInvitation")
+}
+
+// A partial unique index in the migration allows one pending request per group
+// and member.
+model GroupMemberRemovalRequest {
+  id                String               @id @default(uuid(7)) @db.Uuid
+  groupId           String               @db.Uuid
+  // Better Auth user ids.
+  targetUserId      String
+  requestedByUserId String
+  status            RemovalRequestStatus
+  reviewedByUserId  String?
+  reviewedAt        DateTime?
+  createdAt         DateTime             @default(now())
+
+  group Group @relation(fields: [groupId], references: [id])
+
+  @@index([groupId, status])
+  @@map("groupMemberRemovalRequest")
 }
 
 // No foreign key to Project, so the audit trail outlives the project.

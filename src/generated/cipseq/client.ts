@@ -82,6 +82,16 @@ export type GroupKeyVersion = Prisma.GroupKeyVersionModel
  */
 export type GroupMember = Prisma.GroupMemberModel
 /**
+ * Model GroupInvitation
+ * 
+ */
+export type GroupInvitation = Prisma.GroupInvitationModel
+/**
+ * Model GroupMemberRemovalRequest
+ * 
+ */
+export type GroupMemberRemovalRequest = Prisma.GroupMemberRemovalRequestModel
+/**
  * Model AuditEvent
  * 
  */

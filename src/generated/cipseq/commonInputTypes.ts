@@ -233,6 +233,40 @@ export type EnumGroupRoleWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumGroupRoleFilter<$PrismaModel>
 }
 
+export type EnumInvitationStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.InvitationStatus | Prisma.EnumInvitationStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.InvitationStatus[] | Prisma.ListEnumInvitationStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.InvitationStatus[] | Prisma.ListEnumInvitationStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumInvitationStatusFilter<$PrismaModel> | $Enums.InvitationStatus
+}
+
+export type EnumInvitationStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.InvitationStatus | Prisma.EnumInvitationStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.InvitationStatus[] | Prisma.ListEnumInvitationStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.InvitationStatus[] | Prisma.ListEnumInvitationStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumInvitationStatusWithAggregatesFilter<$PrismaModel> | $Enums.InvitationStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumInvitationStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumInvitationStatusFilter<$PrismaModel>
+}
+
+export type EnumRemovalRequestStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.RemovalRequestStatus | Prisma.EnumRemovalRequestStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.RemovalRequestStatus[] | Prisma.ListEnumRemovalRequestStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.RemovalRequestStatus[] | Prisma.ListEnumRemovalRequestStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumRemovalRequestStatusFilter<$PrismaModel> | $Enums.RemovalRequestStatus
+}
+
+export type EnumRemovalRequestStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.RemovalRequestStatus | Prisma.EnumRemovalRequestStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.RemovalRequestStatus[] | Prisma.ListEnumRemovalRequestStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.RemovalRequestStatus[] | Prisma.ListEnumRemovalRequestStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumRemovalRequestStatusWithAggregatesFilter<$PrismaModel> | $Enums.RemovalRequestStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumRemovalRequestStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumRemovalRequestStatusFilter<$PrismaModel>
+}
+
 export type UuidNullableFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel> | null
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel> | null
@@ -539,6 +573,40 @@ export type NestedEnumGroupRoleWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumGroupRoleFilter<$PrismaModel>
   _max?: Prisma.NestedEnumGroupRoleFilter<$PrismaModel>
+}
+
+export type NestedEnumInvitationStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.InvitationStatus | Prisma.EnumInvitationStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.InvitationStatus[] | Prisma.ListEnumInvitationStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.InvitationStatus[] | Prisma.ListEnumInvitationStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumInvitationStatusFilter<$PrismaModel> | $Enums.InvitationStatus
+}
+
+export type NestedEnumInvitationStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.InvitationStatus | Prisma.EnumInvitationStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.InvitationStatus[] | Prisma.ListEnumInvitationStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.InvitationStatus[] | Prisma.ListEnumInvitationStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumInvitationStatusWithAggregatesFilter<$PrismaModel> | $Enums.InvitationStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumInvitationStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumInvitationStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumRemovalRequestStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.RemovalRequestStatus | Prisma.EnumRemovalRequestStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.RemovalRequestStatus[] | Prisma.ListEnumRemovalRequestStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.RemovalRequestStatus[] | Prisma.ListEnumRemovalRequestStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumRemovalRequestStatusFilter<$PrismaModel> | $Enums.RemovalRequestStatus
+}
+
+export type NestedEnumRemovalRequestStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.RemovalRequestStatus | Prisma.EnumRemovalRequestStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.RemovalRequestStatus[] | Prisma.ListEnumRemovalRequestStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.RemovalRequestStatus[] | Prisma.ListEnumRemovalRequestStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumRemovalRequestStatusWithAggregatesFilter<$PrismaModel> | $Enums.RemovalRequestStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumRemovalRequestStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumRemovalRequestStatusFilter<$PrismaModel>
 }
 
 export type NestedUuidNullableFilter<$PrismaModel = never> = {
