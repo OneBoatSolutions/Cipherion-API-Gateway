@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   groupDevice: { findMany: vi.fn() },
   deviceEnvelope: { groupBy: vi.fn() },
   device: { findMany: vi.fn() },
+  deviceCertificateNotice: { findMany: vi.fn() },
   userSettings: { findUnique: vi.fn() },
   user: { findMany: vi.fn() },
 }));
@@ -20,6 +21,7 @@ vi.mock('../lib/cipseq-prisma.js', () => ({
     groupInvitation: mocks.groupInvitation,
     groupDevice: mocks.groupDevice,
     deviceEnvelope: mocks.deviceEnvelope,
+    deviceCertificateNotice: mocks.deviceCertificateNotice,
     device: mocks.device,
   },
 }));
@@ -74,6 +76,7 @@ describe('WorkspaceController', () => {
     mocks.groupInvitation.findMany.mockResolvedValue([]);
     mocks.groupDevice.findMany.mockResolvedValue([]);
     mocks.deviceEnvelope.groupBy.mockResolvedValue([]);
+    mocks.deviceCertificateNotice.findMany.mockResolvedValue([]);
     mocks.device.findMany.mockResolvedValue([]);
     mocks.user.findMany.mockResolvedValue([]);
   });
@@ -404,6 +407,7 @@ describe('WorkspaceController', () => {
             group: { name: 'Finance', projectId: 'project-1' },
           },
         ],
+        certificates: [],
       },
     ]);
 
@@ -418,6 +422,80 @@ describe('WorkspaceController', () => {
         groupId: 'group-1',
         groupName: 'Finance',
         status: 'PENDING_APPROVAL',
+      },
+    ]);
+    expect(devices[0].certificate).toBeNull();
+  });
+
+  it.each([
+    ['ACTIVE', {}],
+    ['SUPERSEDED', { supersededAt: date }],
+    ['REVOKED', { supersededAt: date, revokedAt: date }],
+    ['EXPIRED', { notAfter: new Date(Date.now() - 1000) }],
+  ])("reports a device's latest certificate as %s", async (state, change) => {
+    const notAfter = new Date(Date.now() + 60_000);
+    mocks.device.findMany.mockResolvedValue([
+      {
+        id: 'dvc_1',
+        name: 'Laptop',
+        status: 'ACTIVE',
+        createdAt: date,
+        groups: [],
+        certificates: [
+          {
+            serialNumber: 'abc',
+            notAfter,
+            supersededAt: null,
+            revokedAt: null,
+            ...change,
+          },
+        ],
+      },
+    ]);
+
+    const { devices } = await controller.get(user);
+
+    expect(devices[0].certificate?.state).toBe(state);
+    expect(JSON.stringify(devices)).not.toMatch(/PRIVATE KEY|certificatePem/);
+  });
+
+  it('shows an issued certificate notice, without reading the settings for it', async () => {
+    mocks.device.findMany.mockResolvedValue([
+      {
+        id: 'dvc_1',
+        name: 'Laptop',
+        status: 'ACTIVE',
+        createdAt: date,
+        groups: [],
+        certificates: [],
+      },
+    ]);
+    mocks.deviceCertificateNotice.findMany.mockResolvedValue([
+      {
+        id: 'notice-1',
+        kind: 'ENROL',
+        deviceId: 'dvc_1',
+        serialNumber: 'abc',
+        createdAt: date,
+      },
+    ]);
+
+    const { notifications } = await controller.get(user);
+
+    expect(mocks.deviceCertificateNotice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: user.id, dismissedAt: null },
+      }),
+    );
+    expect(notifications).toEqual([
+      {
+        type: 'DEVICE_CERTIFICATE_ISSUED',
+        id: 'notice-1',
+        deviceId: 'dvc_1',
+        deviceName: 'Laptop',
+        certificateOperation: 'ENROL',
+        serialNumber: 'abc',
+        createdAt: date,
       },
     ]);
   });

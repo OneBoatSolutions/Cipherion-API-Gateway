@@ -46,6 +46,8 @@
 
 - [x] Separate PostgreSQL database with its own Prisma schema, client and migrations
 - [x] Cipherion KMS client (gRPC + TLS), with a KMS check in `/ready`
+- [x] Treat `PERMISSION_DENIED` as a wrong passphrase only for the KMS's exact `incorrect passphrase` text, so a refused gateway certificate can't lock a project out
+- [ ] Test against the real KMS that a wrong passphrase still answers `403` and is counted (if the KMS's wording changes, wrong guesses would stop counting towards the limit)
 - [ ] Optional concurrency limit on KMS calls, if the KMS needs protection from bursts
 - [x] Projects and initialisation with the user's passphrase
 - [x] Audit events for successful project writes
@@ -61,8 +63,18 @@
 - [x] Device registration and approval, with envelopes created by a background job that holds the passphrase in memory only
 - [x] Device and member revocation (soft delete all versions of the envelopes, with no rotation)
 - [x] Show envelope jobs as in progress, stopped or completed, and resume a stopped one with the passphrase
-- [ ] Certificate branch: port 3443, device certificates, enrol and renew, `POST /cipseq/crypto/encrypt` and `/decrypt`, Better Auth bearer plugin and fixed 1-day sessions. This is what delivers envelopes to devices, and proves a device is genuine
-- [ ] Agree with the team: the updated KMS proto with `IssueDeviceCertificate`, `/api/v1/cipseq` paths, the 1-day session, what encrypt returns while a device's new envelope isn't ready (a 10,000-device job takes about 5 minutes), and who generates and protects pins B and C
+- [x] Certificate branch: port 3443, device certificates, enrol and renew, `POST /cipseq/crypto/encrypt` and `/decrypt`, Better Auth bearer plugin and fixed 1-day sessions. This is what delivers envelopes to devices, and proves a device is genuine
+- [x] TLS pin tooling (`npm run certs:engine`) and docs for generating, delivering and rotating pins
+- [x] Revoke a device's certificates with the device
+- [x] UUID v4 ids for users, sessions and accounts, and `npm run users:migrate-ids` for existing ones
+- [ ] Complete the encrypt and decrypt response to the agreed 11-field contract (only `requestId`, `status` and `envelope` today). Blocks shipping these routes to an engine
+- [ ] Send the certificate-issued notice by email, through a retrying outbox worker on `deviceCertificateNotice`. Blocks production, because a stolen session can enrol a certificate
+- [ ] Derive device ids from the device's key and check them at registration (today only the format is checked, so an id can be squatted)
+- [ ] Decide on F-01 from the KMS audit: wrapped keys aren't bound to their project or group
+- [ ] Deploy port 3443 directly, not through Traefik, prove the served pin on staging, and add a firewall connection limit
+- [ ] Load test envelope delivery (a device lock and an audit row per request), and decide whether to keep the lock and how long to keep `device.envelope_delivered` rows
+- [ ] Test certificates from the old and new device CAs, a real expired `KMS_CLIENT_CERT`, and a KMS outage on the certificate routes
+- [ ] Agree with the team: the updated KMS proto with `IssueDeviceCertificate` (applied here; compare with the KMS's file), `/api/v1/cipseq` paths, the 1-day session, `503` with `Retry-After` while a device's new envelope isn't ready (a 10,000-device job takes about 5 minutes), and who generates and protects pins B and C
 - [ ] Ask the KMS team why `CreateDeviceEnvelope` slows from about 90 ms to 120–146 ms after a few minutes of sustained load, and how many calls at once it can take (a 10,000-device job took 314 s at 5 at a time; the KMS alone stayed at about 50% CPU)
 - [ ] Decide whether to allow one early rotation after a revocation (a modified engine can keep a revoked envelope until the next rotation, and the 48-hour limit can extend that)
 - [ ] Limit repeat `request-approval` calls after a refusal

@@ -2,6 +2,8 @@ syntax = "proto3";
 package prototypeBuffer.v1;
 option go_package = "cipsec/services/core/generated/v1;prototypeBufferV1";
 
+import "google/protobuf/timestamp.proto";
+
 
 
 service grpcCallBackfromNest {
@@ -12,6 +14,22 @@ service grpcCallBackfromNest {
   // UNSIGNED device envelope in the old layout. Use CreateDeviceEnvelope. Do not add it back.
   rpc RotateWrappingKeyforProjectEncryptionKey(RotateWrappingKeyforProjectEncryptionKey_Request) returns (RotateWrappingKeyforProjectEncryptionKey_Response);
   rpc CreateDeviceEnvelope(CreateDeviceEnvelope_Request) returns (CreateDeviceEnvelope_Response);
+  // Gateway-only certificate issuance. Ownership, enrolment/renewal and revocation live in the gateway.
+  rpc IssueDeviceCertificate(IssueDeviceCertificateRequest) returns (IssueDeviceCertificateResponse);
+}
+
+message IssueDeviceCertificateRequest {
+    string device_id = 1; // ^dvc_[A-Za-z0-9_-]{43}$, authenticated/authorized by the gateway
+    bytes csr_der = 2;    // one signed P-256 PKCS#10 request, DER, at most 4096 bytes
+}
+
+message IssueDeviceCertificateResponse {
+    bytes certificate_der = 1;
+    repeated bytes chain_der = 2; // issuing CA first; excludes the self-signed root
+    string serial_number = 3;    // positive, lower-case hexadecimal without leading zeros
+    bytes public_key_sha256 = 4; // SHA-256 of DER SubjectPublicKeyInfo, 32 bytes
+    google.protobuf.Timestamp not_before = 5;
+    google.protobuf.Timestamp not_after = 6;
 }
 
 message createAndWrapNewProjectRootKey_Request {

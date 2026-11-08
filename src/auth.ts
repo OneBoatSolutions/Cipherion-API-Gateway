@@ -2,7 +2,7 @@ import { apiDocsEnabled, trustedOrigins } from './config/env.js';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
-import { openAPI } from 'better-auth/plugins';
+import { bearer, openAPI } from 'better-auth/plugins';
 import { prisma } from './lib/prisma.js';
 import { redis } from './lib/redis.js';
 
@@ -90,8 +90,10 @@ export const auth = betterAuth({
   },
 
   session: {
-    expiresIn: 60 * 60 * 24 * 7,
-    updateAge: 60 * 60 * 24,
+    // Fixed at one day and never extended, because a stolen session can enrol a
+    // device certificate for as long as it lasts.
+    expiresIn: 60 * 60 * 24,
+    disableSessionRefresh: true,
     // Postgres stays the source of truth; a missing Redis entry falls back to it.
     storeSessionInDatabase: true,
   },
@@ -105,14 +107,22 @@ export const auth = betterAuth({
 
   advanced: {
     useSecureCookies: process.env.NODE_ENV === 'production',
+    // User, session and account ids are UUIDs. On Postgres, Better Auth leaves the
+    // id to the database, so prisma/schema.prisma gives each model a uuid() (v4) default.
+    database: { generateId: 'uuid' },
   },
 
   hooks: {
     before: rejectProfileImage,
   },
 
-  // Feeds the auth endpoints into the gateway's Swagger document. Its schema
-  // endpoint is public, so the plugin is left out entirely in production; its
-  // own Scalar page is disabled in favour of Swagger UI.
-  plugins: apiDocsEnabled ? [openAPI({ disableDefaultReference: true })] : [],
+  plugins: [
+    // How the engine sends the owner's session. It takes the signed token from the
+    // set-auth-token header at sign-in, and an unsigned token is refused.
+    bearer({ requireSignature: true }),
+    // Feeds the auth endpoints into the gateway's Swagger document. Its schema
+    // endpoint is public, so the plugin is left out entirely in production; its
+    // own Scalar page is disabled in favour of Swagger UI.
+    ...(apiDocsEnabled ? [openAPI({ disableDefaultReference: true })] : []),
+  ],
 });

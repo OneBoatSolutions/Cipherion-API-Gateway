@@ -80,14 +80,38 @@ describe('toHttpException', () => {
     );
   });
 
-  it.each([
+  const passphraseCheckingMethods = [
     'rotateWrappingKeyforProjectEncryptionKey',
     'createAndWrapNewGroupRootKeyAndGroupDataEncryptionKey',
-  ])('maps PERMISSION_DENIED to an incorrect passphrase on %s', (method) => {
-    expect(
-      toHttpException(method, grpcError(status.PERMISSION_DENIED)),
-    ).toBeInstanceOf(IncorrectPassphraseException);
-  });
+    'createDeviceEnvelope',
+  ];
+
+  it.each(passphraseCheckingMethods)(
+    'maps the KMS wrong passphrase answer to an incorrect passphrase on %s',
+    (method) => {
+      expect(
+        toHttpException(
+          method,
+          grpcError(status.PERMISSION_DENIED, 'incorrect passphrase'),
+        ),
+      ).toBeInstanceOf(IncorrectPassphraseException);
+    },
+  );
+
+  it.each(passphraseCheckingMethods)(
+    'keeps a refused gateway certificate a gateway fault on %s',
+    (method) => {
+      expect(
+        toHttpException(
+          method,
+          grpcError(
+            status.PERMISSION_DENIED,
+            'caller is not allowed to use the KMS',
+          ),
+        ),
+      ).toBeInstanceOf(BadGatewayException);
+    },
+  );
 
   it('keeps PERMISSION_DENIED a gateway fault on RPCs without a passphrase check', () => {
     expect(
@@ -96,6 +120,36 @@ describe('toHttpException', () => {
         grpcError(status.PERMISSION_DENIED),
       ),
     ).toBeInstanceOf(BadGatewayException);
+  });
+
+  describe('issueDeviceCertificate', () => {
+    const secret = 'CA key at /certs/device-ca.key needs renewal';
+
+    it('answers 400 only when the KMS rejects the request', () => {
+      const error = toHttpException(
+        'issueDeviceCertificate',
+        grpcError(status.INVALID_ARGUMENT, secret),
+      );
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect(JSON.stringify(error.getResponse())).not.toContain('device-ca');
+    });
+
+    it.each([
+      status.FAILED_PRECONDITION,
+      status.RESOURCE_EXHAUSTED,
+      status.UNAVAILABLE,
+      status.DEADLINE_EXCEEDED,
+      status.UNAUTHENTICATED,
+      status.PERMISSION_DENIED,
+      status.INTERNAL,
+    ])('answers 503 to gRPC status %i, without the details', (code) => {
+      const error = toHttpException(
+        'issueDeviceCertificate',
+        grpcError(code, secret),
+      );
+      expect(error).toBeInstanceOf(ServiceUnavailableException);
+      expect(JSON.stringify(error.getResponse())).not.toContain('device-ca');
+    });
   });
 
   it('never exposes the KMS error details to the client', () => {

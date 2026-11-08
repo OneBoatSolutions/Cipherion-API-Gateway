@@ -6,6 +6,9 @@
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
+  "engines": {
+    "node": ">=22.23.2"
+  },
   "scripts": {
     "build": "nest build",
     "deploy": "nest deploy",
@@ -24,6 +27,8 @@
     "db:migrate": "prisma migrate dev --config prisma7.config.ts",
     "db:migrate:cipseq": "prisma migrate dev --config prisma7.cipseq.config.ts",
     "proto:generate": "buf generate",
+    "certs:engine": "node scripts/setup-device-tls.mjs",
+    "users:migrate-ids": "node scripts/migrate-user-ids.mjs",
     "db:deploy": "prisma migrate deploy --config prisma7.config.ts && prisma migrate deploy --config prisma7.cipseq.config.ts"
   },
   "dependencies": {

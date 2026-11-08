@@ -1,4 +1,4 @@
-import { generateKeyPairSync, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   FastifyAdapter,
@@ -10,6 +10,7 @@ import { trustedOrigins } from './../src/config/env.js';
 import { cipseqPrisma } from './../src/lib/cipseq-prisma.js';
 import { uniqueClientIp } from './helpers/client-ip.js';
 import { deleteTestUser } from './helpers/delete-test-user.js';
+import { TestPki } from './helpers/test-pki.js';
 
 interface TestUser {
   id: string;
@@ -51,6 +52,7 @@ const WRONG_PASSPHRASE = 'not the right passphrase';
 // Runs against the .env.dev databases and needs the KMS running, with real
 // ML-KEM-1024 keys. The test users and their CipSeq rows are removed afterwards.
 describe('CipSeq devices (e2e)', () => {
+  const pki = new TestPki();
   let app: NestFastifyApplication;
   let admin: TestUser;
   let otherAdmin: TestUser;
@@ -145,15 +147,7 @@ describe('CipSeq devices (e2e)', () => {
   const newDevice = () => {
     const id = `dvc_${randomBytes(32).toString('base64url')}`;
     deviceIds.push(id);
-    // The raw key is the end of the SubjectPublicKeyInfo.
-    const spki = generateKeyPairSync('ml-kem-1024').publicKey.export({
-      type: 'spki',
-      format: 'der',
-    });
-    return {
-      deviceId: id,
-      publicKey: spki.subarray(-1568).toString('base64'),
-    };
+    return { deviceId: id, publicKey: pki.mlKemPublicKey() };
   };
 
   const register = async (user: TestUser) => {

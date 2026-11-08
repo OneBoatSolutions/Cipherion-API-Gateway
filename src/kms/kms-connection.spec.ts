@@ -1,5 +1,34 @@
 import { connectivityState } from '@grpc/grpc-js';
-import { failureReason, watchKmsConnection } from './kms-connection.js';
+import {
+  checkClientCertificateExpiry,
+  failureReason,
+  watchKmsConnection,
+} from './kms-connection.js';
+
+describe('checkClientCertificateExpiry', () => {
+  const now = Date.parse('2026-11-06T00:00:00Z');
+  const inDays = (days: number) => new Date(now + days * 86_400_000);
+
+  it.each([0, -1])('refuses a certificate %i days from expiry', (days) => {
+    expect(() =>
+      checkClientCertificateExpiry(inDays(days), { warn: vi.fn() }, now),
+    ).toThrow('KMS_CLIENT_CERT has expired');
+  });
+
+  it('warns under 30 days', () => {
+    const warn = vi.fn();
+    checkClientCertificateExpiry(inDays(29.5), { warn }, now);
+    expect(warn).toHaveBeenCalledWith(
+      'KMS_CLIENT_CERT expires in 29 days. Run make renew-transport.',
+    );
+  });
+
+  it('stays quiet from 30 days', () => {
+    const warn = vi.fn();
+    checkClientCertificateExpiry(inDays(30), { warn }, now);
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
 
 const { IDLE, CONNECTING, READY, TRANSIENT_FAILURE, SHUTDOWN } =
   connectivityState;

@@ -87,6 +87,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - CipSeq device tables and migrations (`cipseq_devices`, `cipseq_envelope_jobs`): `device`, `groupDevice`, `deviceEnvelope` and `envelopeJob`, with partial unique indexes allowing one open approval per group and device, one live envelope per group, device and version, and one acting admin per group.
 - Audit events: `project.member_revoked`, `device.registered`, `.approval_requested`, `.approved`, `.rejected`, `.revoked`, `.envelopes_created` and `.envelope_job_dismissed`.
 - Unit and e2e tests for devices, revocation and envelope jobs.
+- Engine listener: a second Nest app on `DEVICE_ENGINE_PORT` (default `3443`, off until `DEVICE_ENGINE_ENABLED=true`) with its own TLS 1.3, `SecP256r1MLKEM768` only and a pinned server key. It mounts only `EngineModule`, so sign-in, the dashboard and `/ready` aren't reachable there, and enrol and renew aren't reachable on the console port. Start-up refuses a key that doesn't match its certificate or `DEVICE_TLS_PIN_FILE`, a bad CA bundle, or an OpenSSL build without the group.
+- Device certificates over the engine listener: `POST /api/v1/cipseq/devices/:deviceId/certificate` enrols with a session and a CSR, and `.../certificate/renew` renews with only the certificate and a new key, keeping the old one for 24 hours. Both return exactly `certificate`, `serialNumber`, `notBefore` and `notAfter`: `201` when new and `200` for an exact retry. The KMS signs through the new `IssueDeviceCertificate` RPC and is never called twice for one CSR.
+- Device identity from the TLS socket only, checked against the database on every request (including keep-alive and resumed TLS sessions), through `@CertificateOnly()` and `@SessionAndCertificate()`. `495` means re-enrol, and `403` means enrolling wouldn't help.
+- `POST /api/v1/cipseq/crypto/encrypt` and `/decrypt` on the engine listener, needing a session and a certificate. Encrypt answers `503` with `Retry-After` while a device's new envelope is being created, and never returns an older version.
+- `POST /api/v1/cipseq/devices` on the engine listener, sharing registration with the console route.
+- `deviceCertificate`, `deviceCertificateAttempt` and `deviceCertificateNotice` tables (migration `device_certificates`), with a partial unique index allowing one current certificate per device and a unique CSR hash across history.
+- Limits: 30 enrol or renew requests per device an hour, 5 new enrolments an hour, 5 renewals a day, 60 requests per device and 600 per IP a minute, and a 2-second wait for a busy device before `503` with `Retry-After`.
+- `DEVICE_CERTIFICATE_ISSUED` notification and each device's `certificate` state in `GET /api/v1/workspace`, plus `POST /api/v1/cipseq/devices/certificate-notices/:noticeId/dismiss`. The notice can't be turned off in the settings.
+- Audit events: `device.certificate_enrolled`, `.certificate_renewed`, `.certificate_refused`, `.certificate_issue_failed`, `.certificate_notice_dismissed` and `device.envelope_delivered`.
+- `DEVICE_ENGINE_ENABLED`, `DEVICE_ENGINE_HOST`, `DEVICE_ENGINE_PORT`, `DEVICE_TLS_KEY`, `DEVICE_TLS_CERT`, `DEVICE_TLS_PIN_FILE` and `DEVICE_CA_BUNDLE` settings; the four files are required only when the listener is enabled.
+- The gateway refuses to start with an expired `KMS_CLIENT_CERT`, warns under 30 days, and logs the expiry of every KMS and engine certificate daily.
+- Better Auth `bearer()` plugin with signed tokens only.
+- `npm run certs:engine`, which creates a development server key, certificate and pin, never replaces a key, and keeps the pin on `--renew`.
+- `npm run users:migrate-ids`, a resumable one-off that gives existing users a UUID v4 id in both databases and signs them out.
+- `docs/` pages: device certificates, TLS pins, envelope signing and environment settings.
+- e2e tests with real TLS handshakes and real KMS signing for the listener, enrolment, renewal, certificate checks, races, delivery and the workspace; unit tests for TLS setup, device identity, CSR parsing, issued-certificate checks, limits and expiry.
 
 ### Changed
 
@@ -110,9 +126,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `kmsCall()` maps gRPC `PERMISSION_DENIED` to `403 Incorrect passphrase` for the project rotation and group key RPCs. Other RPCs keep `502`, because there the status means the gateway itself was refused.
 - Reserving, releasing and clearing a passphrase attempt moved into `withPassphraseAttempt()` (`src/cipseq/with-passphrase-attempt.ts`), shared by project rotation and the group endpoints.
 - A direct member revoke now also cancels any pending removal request for that member. Group key creation and revocation moved into `src/cipseq/group-keys.ts`, shared with approving a removal request.
+- **Breaking:** sessions last a fixed 1 day and are never extended, instead of 7 days refreshed daily, on the dashboard too.
+- **Breaking:** new users, sessions and accounts get UUID v4 ids (`generateId: 'uuid'`, with `@default(uuid())` in the schema). Existing ids need `npm run users:migrate-ids`, which signs those users out.
+- Revoking a device everywhere also revokes its certificates, under a per-device lock. Revoking from a group or project leaves them alone.
+- `issueDeviceCertificate` has its own KMS error mapping: `INVALID_ARGUMENT` answers `400` and anything else `503`, so the engine keeps its CSR and retries.
+- `auditEvent()` takes an optional transaction client, for the first interactive transactions.
+- The validation pipe moved into `validationPipe()`, shared by both apps. Device registration moved into `registerDevice()`, shared by both ports.
+- The KMS proto adds `IssueDeviceCertificate`.
+- `package.json` requires Node 22.23.2 or later; the engine listener needs Node's OpenSSL 3.5 or later.
+- `test/cipseq-devices.e2e-spec.ts` makes ML-KEM-1024 keys with OpenSSL, because Node 22 can't.
+- `.env.example` documents every setting and when it's required.
 
 ### Fixed
 
+- A `PERMISSION_DENIED` from the KMS only counts as a wrong passphrase when its text is exactly `incorrect passphrase`. A refused gateway certificate now answers `502` instead of "Incorrect passphrase", no longer uses up the project's passphrase attempts, and no longer stops envelope jobs with `WRONG_PASSPHRASE`.
 - A Postgres restart or a dropped idle connection can no longer crash the gateway: both databases now use a `pg` pool owned by the gateway (`connectionTimeoutMillis: 2000`) with an `error` listener, passed to Prisma with `disposeExternalPool`.
 
 - The e2e test now boots the app on the Fastify adapter instead of Nest's default Express platform.
@@ -132,6 +159,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Project passphrases go to the KMS and are never stored, logged or written to audit events. Only wrapped keys and salts are kept, in their own tables, so a project query can't return them by accident.
 - Old wrapped keys aren't kept after a rotation, so an old passphrase can't open anything in the live database. `projectKeyVersion` now holds only the version and its date (migration `drop_key_version_material`), and the README production checklist warns that older backups still open with the old passphrase.
 - Old wrapped group key pairs aren't kept either: a rotation overwrites `groupKeys`. Wrapped keys stay in their own table, so a group query or `/workspace` can't return them by accident.
+- A certificate counts only if the TLS handshake authorized it **and** its row in the database is current, so a self-made look-alike, a revoked or retired certificate, and a resumed TLS session from before a revocation are all refused. No setting turns these checks off.
+- The engine listener trusts no proxy: forwarded and client-certificate headers are ignored, and identity comes only from the socket.
+- No table stores a private key, a raw CSR or a session token, and the workspace never returns certificate or key material.
+- The engine listener closes idle connections at shutdown and everything else after 8 seconds, so a connected client can't hold up a deploy.
 
 ### Removed
 

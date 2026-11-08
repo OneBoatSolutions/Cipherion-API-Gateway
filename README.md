@@ -26,25 +26,29 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
                        │                  │            │
                      Redis           PostgreSQL    PostgreSQL (CipSeq)
           (session cache,          (users, sessions, (projects, groups, keys,
-           rate limits)             settings)        devices, audit, billing)
+           rate limits)             settings)        devices, certificates, audit)
+
+  Device engine ──► engine listener :3443 (own TLS, pinned key, device certificates) ──► same modules
 ```
+
+The console app sits behind Traefik on `PORT`. The [engine listener](#engine-listener) is a second Nest app in the same process, published directly.
 
 **Responsibilities**
 
-- **Authentication**: email/password sign-in through [Better Auth](https://better-auth.com). Sessions last 7 days and are refreshed every 24 hours. They are cached in Redis and also stored in PostgreSQL, which stays the source of truth: if a Redis entry is missing, the session is read from the database. Signing out removes the Redis entry, so a revoked session stops working immediately. If Redis is unreachable, auth fails closed: auth and protected routes answer `503 Service Unavailable` within about 2 seconds, and work again as soon as Redis is back.
+- **Authentication**: email/password sign-in through [Better Auth](https://better-auth.com). Sessions last a fixed 1 day and are never extended, because a stolen session can enrol a device certificate for as long as it lasts. The engine sends the session as `Authorization: Bearer <token>`, using the signed token from the `set-auth-token` header at sign-in. User, session and account ids are UUID v4. They are cached in Redis and also stored in PostgreSQL, which stays the source of truth: if a Redis entry is missing, the session is read from the database. Signing out removes the Redis entry, so a revoked session stops working immediately. If Redis is unreachable, auth fails closed: auth and protected routes answer `503 Service Unavailable` within about 2 seconds, and work again as soon as Redis is back.
 - **Rate limiting**: 100 requests per 60-second window, counted atomically in Redis so the limit holds across instances.
 - **Request validation**: a global `ValidationPipe` that removes unknown fields, rejects requests containing them, and returns errors in one consistent format.
 - **Configuration safety**: environment variables are checked with Joi when the app starts, so a misconfigured deployment fails immediately.
 - **Observability**: tracing, metrics, logs and error tracking through [NestJS Observe](https://observe.nestjs.com).
 - **Dashboard** *(in progress)*: profile, settings and account activity for the signed-in user. Billing/subscription is deferred.
-- **CipSeq** *(in progress)*: projects, groups, key rotation, in-app invitations, device registration and revocation (available), and delivering keys to devices (not yet). CipSeq calls the Cipherion KMS over gRPC for every crypto operation and keeps its data, including an audit event for each operation, in a separate PostgreSQL database.
+- **CipSeq** *(in progress)*: projects, groups, key rotation, in-app invitations, device registration and revocation, device certificates, and delivering keys to devices over the engine listener (available; the encrypt and decrypt response is not yet the full agreed contract). CipSeq calls the Cipherion KMS over gRPC for every crypto operation and keeps its data, including an audit event for each operation, in a separate PostgreSQL database.
 - **EnQrypt and Zentriq** *(deferred)*.
 
 ## Tech stack
 
 | Area | Technology |
 | --- | --- |
-| Runtime | Node.js 22+, TypeScript (ESM) |
+| Runtime | Node.js 22.23.2+, TypeScript (ESM) |
 | Framework | NestJS 12 with the Fastify adapter |
 | Database | PostgreSQL, Prisma ORM 7 (`@prisma/adapter-pg` driver adapter) |
 | Cache | Redis 7, `ioredis` |
@@ -76,7 +80,8 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 │   ├── auth.ts              # Better Auth configuration
 │   ├── auth/                # AuthController (/api/v1/auth/*), global AuthGuard, @Public() / @CurrentUser()
 │   ├── dashboard/           # Dashboard routes (/api/v1/dashboard/profile, /settings)
-│   ├── cipseq/              # CipSeq routes (projects, groups, invitations, devices), envelope jobs, access checks and audit events
+│   ├── cipseq/              # CipSeq routes (projects, groups, invitations, devices), envelope jobs, access checks, audit events, device certificates and envelope delivery
+│   ├── engine/              # Engine listener on :3443: TLS setup, device identity, guards, enrol/renew and encrypt/decrypt controllers
 │   ├── workspace/           # GET /api/v1/workspace: everything the signed-in user is a part of
 │   ├── health/              # Liveness (/api/v1/health) and readiness (/api/v1/ready) endpoints
 │   ├── lib/prisma.ts        # Shared pg pool and PrismaClient for the auth database
@@ -87,7 +92,9 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 │   ├── lib/kms.ts           # Shared KMS gRPC client (mTLS) and its health client
 │   ├── kms/kms-call.ts      # kmsCall(): one KMS RPC with a 2 s deadline, gRPC status → HTTP error
 │   └── generated/           # Generated clients: prisma/, cipseq/ (Prisma) and kms/ (gRPC). Do not edit by hand
-├── test/                    # End-to-end tests (helpers/ cleans up test users in Postgres and Redis)
+├── scripts/                 # certs:engine (engine key and pin) and users:migrate-ids (one-off UUID migration)
+├── docs/                    # Device certificates, TLS pins, envelope signing and environment settings
+├── test/                    # End-to-end tests (helpers/ cleans up test users and makes throwaway keys)
 ├── .env.example             # Template for environment variables
 └── package.json
 ```
@@ -98,7 +105,8 @@ A unified API gateway for the Cipherion product suite. It gives clients a single
 
 ### Prerequisites
 
-- **Node.js** 22 or later, and npm
+- **Node.js** 22.23.2 or later, and npm. The engine listener needs Node's OpenSSL to be 3.5 or later, and start-up fails if it isn't
+- **OpenSSL** 3.5 or later on the `PATH`, only for `npm run certs:engine` and the e2e tests
 - **PostgreSQL** 14 or later, running locally, in Docker, or hosted
 - **Redis** 6.2 or later (`GETDEL` is required), running locally, in Docker, or hosted
 - **Cipherion KMS** running and reachable over gRPC with mutual TLS (locally on `localhost:50051`), plus a CA certificate for the KMS and a client certificate and key for the gateway
@@ -144,6 +152,8 @@ The application loads its environment file in this order:
 
 The Prisma CLI configs (`prisma7.config.ts`, `prisma7.cipseq.config.ts`) choose `.env.dev`, `.env.prod` or `.env.test` based on `NODE_ENV`.
 
+See [docs/environment.md](docs/environment.md) for when each one is required, local and production values, and the two CA files that are easy to mix up.
+
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `NODE_ENV` | No | `development` | `development`, `test` or `production` |
@@ -158,6 +168,13 @@ The Prisma CLI configs (`prisma7.config.ts`, `prisma7.cipseq.config.ts`) choose 
 | `KMS_CA_CERT` | **Yes** | – | Path to the PEM CA certificate that signed the KMS server certificate |
 | `KMS_CLIENT_CERT` | **Yes** | – | Path to the gateway's PEM client certificate (mutual TLS), signed by a CA the KMS trusts |
 | `KMS_CLIENT_KEY` | **Yes** | – | Path to the gateway's PEM client private key |
+| `DEVICE_ENGINE_ENABLED` | No | `false` | Starts the engine's TLS listener. `false` closes the port, and nothing turns the certificate checks off |
+| `DEVICE_ENGINE_HOST` | No | `0.0.0.0` | Listener address (`127.0.0.1` locally) |
+| `DEVICE_ENGINE_PORT` | No | `3443` | Listener port. Must differ from `PORT` |
+| `DEVICE_TLS_KEY` | When enabled | – | **Secret.** Path to the private key of the active server key |
+| `DEVICE_TLS_CERT` | When enabled | – | Path to its certificate |
+| `DEVICE_TLS_PIN_FILE` | When enabled | – | Path to the active pin. Start-up refuses a key that doesn't match it |
+| `DEVICE_CA_BUNDLE` | When enabled | – | Path to the device CAs (`device-ca-trust.pem`), holding every CA currently in a slot. Not the same file as `KMS_CA_CERT` |
 | `OBSERVE_APP_KEY` | No | – | NestJS Observe app key |
 | `OBSERVE_APP_SECRET` | No | – | NestJS Observe app secret |
 
@@ -325,6 +342,8 @@ The API documentation is at http://localhost:3000/api/v1/docs.
 | `npm run test:cov` | Run unit tests with coverage |
 | `npm run test:e2e` | Run end-to-end tests (needs both databases, Redis and the KMS running locally) |
 | `npm run proto:generate` | Regenerate the typed KMS gRPC client from `proto/kms` into `src/generated/kms` |
+| `npm run users:migrate-ids` | One-off: gives users created before UUID ids a UUID v4, in both databases, and signs them out. Dry run by default; `-- --apply` makes the change. Stop the gateway and back up both databases first. Safe to rerun, and resumes if interrupted |
+| `npm run certs:engine` | Create a development server key, certificate and pin in `certs/engine`. Never replaces a key; `-- --renew` renews the certificate and keeps the pin |
 
 ## API documentation
 
@@ -379,7 +398,7 @@ curl http://localhost:3000/api/v1/auth/get-session -b cookies.txt
 
 The e2e tests (`npm run test:e2e`) exercise these endpoints against the `.env.dev` database and Redis, and delete the test user and its cached sessions afterwards.
 
-> **Always delete users and revoke sessions through Better Auth** (`auth.api.*`), never with raw Prisma. Better Auth also removes the cached copy from Redis. A session deleted only from PostgreSQL stays valid in Redis until its TTL (up to 7 days) runs out.
+> **Always delete users and revoke sessions through Better Auth** (`auth.api.*`), never with raw Prisma. Better Auth also removes the cached copy from Redis. A session deleted only from PostgreSQL stays valid in Redis until its TTL (up to 1 day) runs out.
 
 ## Health checks
 
@@ -579,7 +598,7 @@ An invitation answers with `{ id, projectId, groupId, inviteeEmail, status, invi
 
 ## CipSeq devices
 
-A device registers once, the project admin approves it, and the gateway stores an envelope: the group's GDEK wrapped by the KMS for that device's ML-KEM-1024 key. **Envelopes can't reach devices yet.** That, and proof that a device is genuine, comes with device certificates; until then registering relies on the session alone.
+A device registers once, the project admin approves it, and the gateway stores an envelope: the group's GDEK wrapped by the KMS for that device's ML-KEM-1024 key. The device gets the envelope from the [engine listener](#engine-listener), which also proves the device is genuine.
 
 The device's user, under `/api/v1/cipseq/devices`:
 
@@ -587,7 +606,8 @@ The device's user, under `/api/v1/cipseq/devices`:
 | --- | --- | --- |
 | `POST` | `/` | Registers `deviceId` (`dvc_` plus 43 base64url characters), `publicKey` (decodes to 1568 bytes) and an optional `name`, answering `201`. Sends an approval request for each group the user is in; with none, it's just registered. Repeating it with the same user and key changes nothing. |
 | `POST` | `/:deviceId/groups/:groupId/request-approval` | Asks again for one group, after a rejection or revoke, if they're still a member. Never project-wide, because that would give access to every group at once. |
-| `POST` | `/:deviceId/revoke` | Revokes it everywhere, answering `204`. Permanent: the id can't be used again. |
+| `POST` | `/:deviceId/revoke` | Revokes it and its certificates everywhere, answering `204`. Permanent: the id can't be used again. |
+| `POST` | `/certificate-notices/:noticeId/dismiss` | Dismisses `DEVICE_CERTIFICATE_ISSUED`, answering `204`, also if there's nothing to dismiss. |
 
 The admins, under `/api/v1/cipseq/projects/:projectId`:
 
@@ -608,6 +628,29 @@ The admins, under `/api/v1/cipseq/projects/:projectId`:
 - **Bulk imports:** run `ANALYZE` after inserting thousands of rows into near-empty tables. Until Postgres refreshes its statistics, `/workspace` can take about 15 seconds.
 - **Errors:** `403` for a wrong passphrase or not being allowed, `404` for something hidden or missing, including another user's device, and `409` if the id belongs to someone else, has a different key or was revoked everywhere, or a request is already open. The attempt limit and KMS failures work as for projects.
 - **Audit:** `device.registered`, `.approval_requested`, `.approved`, `.rejected`, `.revoked`, `.envelopes_created` and `.envelope_job_dismissed`, each in the same transaction as the change.
+
+## Engine listener
+
+A second Nest app in the same process, for the engine on each device. It serves its own TLS on `DEVICE_ENGINE_PORT` and **must be published directly, never through Traefik**, because a proxy would break both the [TLS pin](docs/tls-pins.md) and the device certificate. It's off until `DEVICE_ENGINE_ENABLED=true`. Only the routes below are mounted, so sign-in, the dashboard and `/ready` return `404` here, and enrol and renew return `404` on the console port.
+
+Under `/api/v1/cipseq`:
+
+| Method | Path | Session | Certificate | Description |
+| --- | --- | --- | --- | --- |
+| `POST` | `/devices` | Yes | No | Registers a device, as on the console port |
+| `POST` | `/devices/:deviceId/certificate` | Yes | No | Enrols with `{ "csr": "<PEM>" }`. `201` for a new certificate and `200` for an exact retry. Retires the old certificate at once |
+| `POST` | `/devices/:deviceId/certificate/renew` | No | Yes | Renews with a new key. The old certificate keeps working for 24 hours |
+| `POST` | `/crypto/encrypt` | Yes | Yes | Takes `groupId` and returns the current envelope. `503` with `Retry-After` while a new one is being created, and never an older one |
+| `POST` | `/crypto/decrypt` | Yes | Yes | Takes `groupId` and `gdekVersion`, and returns that version |
+
+- **Connection:** TLS 1.3 with `SecP256r1MLKEM768` only, so ordinary `curl` and most monitoring probes fail the handshake. Check the console port's `/ready` instead, and the pin as in [docs/tls-pins.md](docs/tls-pins.md).
+- **Session:** `Authorization: Bearer <token>`, using the signed token from the `set-auth-token` header at sign-in. Sessions last a fixed 1 day and aren't extended, on the dashboard too.
+- **Certificate answers:** enrol and renew return exactly `certificate`, `serialNumber`, `notBefore` and `notAfter`. `495` means the certificate is missing, invalid, expired or retired, so enrol again. `403` means enrolling won't help. `409` means the CSR belongs to a retired certificate, so make a new key. `429` and `503` carry `Retry-After`.
+- **Limits:** 30 enrol or renew requests per device an hour, 5 new enrolments an hour, 5 renewals a day, 60 requests per device and 600 per IP a minute. These need Redis and answer `503` without it. A firewall connection limit is still needed in front of the port, because they can't stop TLS handshakes.
+- **Revoking:** `POST /cipseq/devices/:deviceId/revoke` also revokes its certificates, and the next request gets `495`. Revoking from a group or project leaves the certificate alone, because the device stays in its other groups.
+- **Audit:** `device.certificate_enrolled`, `.certificate_renewed`, `.certificate_refused`, `.certificate_issue_failed`, `.certificate_notice_dismissed` and `.envelope_delivered`.
+
+See [docs/device-certificates.md](docs/device-certificates.md) for what's implemented and tested, [docs/tls-pins.md](docs/tls-pins.md) for keys and rotation, and [docs/envelope-signing.md](docs/envelope-signing.md) for signing.
 
 ## Protecting routes
 

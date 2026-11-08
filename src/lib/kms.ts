@@ -1,9 +1,14 @@
 import '../config/env.js';
 import { credentials, Metadata } from '@grpc/grpc-js';
+import { X509Certificate } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { HealthClient } from '../generated/kms/grpc/health/v1/health.js';
 import { grpcCallBackfromNestClient } from '../generated/kms/v1/prototypeBufferV1.js';
-import { failureReason, watchKmsConnection } from '../kms/kms-connection.js';
+import {
+  checkClientCertificateExpiry,
+  failureReason,
+  watchKmsConnection,
+} from '../kms/kms-connection.js';
 
 // Client for the Cipherion KMS over gRPC with mutual TLS: the gateway checks
 // the KMS certificate against KMS_CA_CERT and presents its own certificate.
@@ -25,12 +30,17 @@ const readPem = (name: string): Buffer => {
   }
 };
 
+const clientCertificate = readPem('KMS_CLIENT_CERT');
+checkClientCertificateExpiry(
+  new Date(new X509Certificate(clientCertificate).validTo),
+);
+
 export const kms = new grpcCallBackfromNestClient(
   address,
   credentials.createSsl(
     readPem('KMS_CA_CERT'),
     readPem('KMS_CLIENT_KEY'),
-    readPem('KMS_CLIENT_CERT'),
+    clientCertificate,
   ),
 );
 
