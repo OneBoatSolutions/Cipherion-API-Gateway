@@ -9,6 +9,8 @@ import { DevicesController } from './devices.controller.js';
 
 const mocks = vi.hoisted(() => ({
   $transaction: vi.fn(),
+  $executeRaw: vi.fn(),
+  deviceCertificate: { updateMany: vi.fn() },
   device: {
     create: vi.fn(),
     findFirst: vi.fn(),
@@ -24,6 +26,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../lib/cipseq-prisma.js', () => ({
   cipseqPrisma: {
     $transaction: mocks.$transaction,
+    $executeRaw: mocks.$executeRaw,
+    deviceCertificate: mocks.deviceCertificate,
     device: mocks.device,
     groupMember: mocks.groupMember,
     groupDevice: mocks.groupDevice,
@@ -246,6 +250,11 @@ describe('DevicesController', () => {
       expect(mocks.device.update).toHaveBeenCalledWith({
         where: { id: deviceId, status: 'ACTIVE' },
         data: { status: 'REVOKED', revokedAt: expect.any(Date) },
+      });
+      expect(mocks.$executeRaw).toHaveBeenCalledTimes(1);
+      expect(mocks.deviceCertificate.updateMany).toHaveBeenCalledWith({
+        where: { deviceId, revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
       });
       expect(mocks.groupDevice.updateMany).toHaveBeenCalledWith({
         where: {

@@ -22,6 +22,15 @@ const separateFromAuthDatabase: Joi.CustomValidator<string> = (
   return value;
 };
 
+// A path to a PEM file the engine listener can't start without.
+const engineFile = Joi.when('DEVICE_ENGINE_ENABLED', {
+  is: true,
+  // `then` is Joi's conditional API here, not a Promise-like object.
+  // oxlint-disable-next-line unicorn/no-thenable
+  then: Joi.string().required(),
+  otherwise: Joi.string().optional(),
+});
+
 // Validated by ConfigModule at startup, so a misconfigured deployment fails immediately.
 export const envSchema = Joi.object({
   NODE_ENV: Joi.string()
@@ -77,6 +86,22 @@ export const envSchema = Joi.object({
   KMS_CA_CERT: Joi.string().required(),
   KMS_CLIENT_CERT: Joi.string().required(),
   KMS_CLIENT_KEY: Joi.string().required(),
+
+  // The engine's own TLS listener, published directly and never through a proxy.
+  // Turning it off closes the port. Nothing turns the certificate checks off.
+  DEVICE_ENGINE_ENABLED: Joi.boolean().default(false),
+  DEVICE_ENGINE_HOST: Joi.string().default('0.0.0.0'),
+  DEVICE_ENGINE_PORT: Joi.number()
+    .port()
+    .default(3443)
+    .invalid(Joi.ref('PORT'))
+    .messages({
+      'any.invalid': '"DEVICE_ENGINE_PORT" must differ from "PORT"',
+    }),
+  DEVICE_TLS_KEY: engineFile,
+  DEVICE_TLS_CERT: engineFile,
+  DEVICE_TLS_PIN_FILE: engineFile,
+  DEVICE_CA_BUNDLE: engineFile,
 
   OBSERVE_APP_KEY: Joi.string().optional(),
   OBSERVE_APP_SECRET: Joi.string().optional(),

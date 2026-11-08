@@ -39,9 +39,27 @@ import {
 } from '../dashboard/settings.dto.js';
 import { cipseqPrisma } from '../lib/cipseq-prisma.js';
 import { prisma } from '../lib/prisma.js';
-import { WorkspaceNotification, WorkspaceResponse } from './workspace.dto.js';
+import {
+  type DeviceCertificateState,
+  WorkspaceNotification,
+  WorkspaceResponse,
+} from './workspace.dto.js';
 
 const logger = new Logger('Workspace');
+
+function certificateState(certificate: {
+  notAfter: Date;
+  supersededAt: Date | null;
+  revokedAt: Date | null;
+}): DeviceCertificateState {
+  if (certificate.revokedAt) {
+    return 'REVOKED';
+  }
+  if (certificate.notAfter.getTime() <= Date.now()) {
+    return 'EXPIRED';
+  }
+  return certificate.supersededAt ? 'SUPERSEDED' : 'ACTIVE';
+}
 
 // Everything the signed-in user is a part of. Scoped in the queries themselves,
 // so rows the user can't see never leave the database.
@@ -106,84 +124,114 @@ async function loadCipSeq(
     )
     .map((group) => group.id);
 
-  const [openInvitations, received, groupDevices, latestEnvelopes, ownDevices] =
-    await Promise.all([
-      managedGroupIds.length === 0
-        ? []
-        : cipseqPrisma.groupInvitation.findMany({
-            where: {
-              groupId: { in: managedGroupIds },
-              status: { in: [...OPEN_INVITATION_STATUSES] },
-            },
-            orderBy: { createdAt: 'desc' },
-            select: INVITATION_FIELDS,
-          }),
-      // By email, because the invitee may not be in the project yet.
-      cipseqPrisma.groupInvitation.findMany({
-        where: {
-          inviteeEmail: user.email.toLowerCase(),
-          status: 'PENDING_ACCEPTANCE',
-          group: { deletedAt: null, project: { deletedAt: null } },
-        },
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          invitedByUserId: true,
-          createdAt: true,
-          group: {
-            select: {
-              id: true,
-              name: true,
-              project: { select: { id: true, name: true } },
-            },
+  const [
+    openInvitations,
+    received,
+    groupDevices,
+    latestEnvelopes,
+    ownDevices,
+    certificateNotices,
+  ] = await Promise.all([
+    managedGroupIds.length === 0
+      ? []
+      : cipseqPrisma.groupInvitation.findMany({
+          where: {
+            groupId: { in: managedGroupIds },
+            status: { in: [...OPEN_INVITATION_STATUSES] },
+          },
+          orderBy: { createdAt: 'desc' },
+          select: INVITATION_FIELDS,
+        }),
+    // By email, because the invitee may not be in the project yet.
+    cipseqPrisma.groupInvitation.findMany({
+      where: {
+        inviteeEmail: user.email.toLowerCase(),
+        status: 'PENDING_ACCEPTANCE',
+        group: { deletedAt: null, project: { deletedAt: null } },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        invitedByUserId: true,
+        createdAt: true,
+        group: {
+          select: {
+            id: true,
+            name: true,
+            project: { select: { id: true, name: true } },
           },
         },
-      }),
-      managedGroupIds.length === 0
-        ? []
-        : cipseqPrisma.groupDevice.findMany({
-            where: {
-              groupId: { in: managedGroupIds },
-              status: { in: [...OPEN_DEVICE_STATUSES] },
-              device: { status: 'ACTIVE' },
-            },
-            orderBy: { createdAt: 'asc' },
-            select: {
-              groupId: true,
-              status: true,
-              createdAt: true,
-              reviewedAt: true,
-              device: { select: { id: true, name: true, userId: true } },
-            },
-          }),
-      managedGroupIds.length === 0
-        ? []
-        : cipseqPrisma.deviceEnvelope.groupBy({
-            by: ['groupId', 'deviceId'],
-            where: { groupId: { in: managedGroupIds }, deletedAt: null },
-            _max: { envelopeVersion: true },
-          }),
-      cipseqPrisma.device.findMany({
-        where: { userId: user.id },
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          name: true,
-          status: true,
-          createdAt: true,
-          groups: {
-            where: { group: { deletedAt: null, project: { deletedAt: null } } },
-            // Newest first: a group's earlier rows are history.
-            orderBy: { createdAt: 'desc' },
-            select: {
-              groupId: true,
-              status: true,
-              group: { select: { name: true, projectId: true } },
-            },
+      },
+    }),
+    managedGroupIds.length === 0
+      ? []
+      : cipseqPrisma.groupDevice.findMany({
+          where: {
+            groupId: { in: managedGroupIds },
+            status: { in: [...OPEN_DEVICE_STATUSES] },
+            device: { status: 'ACTIVE' },
+          },
+          orderBy: { createdAt: 'asc' },
+          select: {
+            groupId: true,
+            status: true,
+            createdAt: true,
+            reviewedAt: true,
+            device: { select: { id: true, name: true, userId: true } },
+          },
+        }),
+    managedGroupIds.length === 0
+      ? []
+      : cipseqPrisma.deviceEnvelope.groupBy({
+          by: ['groupId', 'deviceId'],
+          where: { groupId: { in: managedGroupIds }, deletedAt: null },
+          _max: { envelopeVersion: true },
+        }),
+    cipseqPrisma.device.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        createdAt: true,
+        groups: {
+          where: { group: { deletedAt: null, project: { deletedAt: null } } },
+          // Newest first: a group's earlier rows are history.
+          orderBy: { createdAt: 'desc' },
+          select: {
+            groupId: true,
+            status: true,
+            group: { select: { name: true, projectId: true } },
           },
         },
-      }),
-    ]);
+        // Newest first: the latest certificate is the one that counts.
+        certificates: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            serialNumber: true,
+            notAfter: true,
+            supersededAt: true,
+            revokedAt: true,
+          },
+        },
+      },
+    }),
+    // Not tied to UserSettings.securityAlerts: this is how an owner finds out that
+    // a stolen session enrolled a certificate, so it can't be turned off.
+    cipseqPrisma.deviceCertificateNotice.findMany({
+      where: { userId: user.id, dismissedAt: null },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        kind: true,
+        deviceId: true,
+        serialNumber: true,
+        createdAt: true,
+      },
+    }),
+  ]);
 
   const latestByDevice = new Map(
     latestEnvelopes.map((envelope) => [
@@ -369,14 +417,35 @@ async function loadCipSeq(
     }
   }
 
+  for (const notice of certificateNotices) {
+    notifications.push({
+      type: 'DEVICE_CERTIFICATE_ISSUED',
+      id: notice.id,
+      deviceId: notice.deviceId,
+      deviceName:
+        ownDevices.find(({ id }) => id === notice.deviceId)?.name ?? null,
+      certificateOperation: notice.kind,
+      serialNumber: notice.serialNumber,
+      createdAt: notice.createdAt,
+    });
+  }
+
   // A closed row stays as history, so only each group's newest row counts.
   const devices = ownDevices.map((device) => {
     const seen = new Set<string>();
+    const certificate = device.certificates[0];
     return {
       id: device.id,
       name: device.name,
       status: device.status,
       createdAt: device.createdAt,
+      certificate: certificate
+        ? {
+            serialNumber: certificate.serialNumber,
+            notAfter: certificate.notAfter,
+            state: certificateState(certificate),
+          }
+        : null,
       groups: device.groups.flatMap((row) => {
         if (seen.has(row.groupId)) {
           return [];

@@ -193,11 +193,84 @@ model Device {
   revokedAt DateTime?
   createdAt DateTime     @default(now())
 
-  groups    GroupDevice[]
-  envelopes DeviceEnvelope[]
+  groups              GroupDevice[]
+  envelopes           DeviceEnvelope[]
+  certificates        DeviceCertificate[]
+  certificateAttempts DeviceCertificateAttempt[]
 
   @@index([userId])
   @@map("device")
+}
+
+enum DeviceCertificateOperation {
+  ENROL
+  RENEW
+}
+
+// A device's client certificates, signed by the KMS. Never holds a private key or
+// a raw CSR. A partial unique index in the migration allows one current
+// certificate per device; retired rows stay as history.
+model DeviceCertificate {
+  // Lowercase hex without leading zeros, as the KMS returns it.
+  serialNumber      String                     @id
+  deviceId          String
+  // Hex SHA-256 of the CSR DER. It recognises a retry, and being unique across
+  // history means a retired CSR can't be issued again.
+  csrSha256         String
+  // Hex SHA-256 of the DER SubjectPublicKeyInfo of the device's TLS key.
+  publicKeySha256   String
+  // Leaf first, then any intermediates, without the root. Returned as is on a retry.
+  certificatePem    String
+  notBefore         DateTime
+  notAfter          DateTime
+  issuedVia         DeviceCertificateOperation
+  renewedFromSerial String?
+  // Starts the 24-hour overlap after a renewal. Set once, never reset.
+  supersededAt      DateTime?
+  revokedAt         DateTime?
+  createdAt         DateTime                   @default(now())
+
+  device Device @relation(fields: [deviceId], references: [id])
+
+  @@unique([deviceId, csrSha256])
+  @@index([deviceId, createdAt])
+  @@map("deviceCertificate")
+}
+
+// One row per enrol or renew request, for the rolling limit. Rows past the limit's
+// window are removed when the device next asks.
+model DeviceCertificateAttempt {
+  id        String                     @id @default(uuid(7)) @db.Uuid
+  deviceId  String
+  operation DeviceCertificateOperation
+  createdAt DateTime                   @default(now())
+
+  device Device @relation(fields: [deviceId], references: [id])
+
+  @@index([deviceId, createdAt])
+  @@map("deviceCertificateAttempt")
+}
+
+// Tells the owner a certificate was issued, because a stolen session can enrol
+// one. Shown in GET /workspace until dismissed, and doubles as the email outbox.
+// It can't be turned off with UserSettings.securityAlerts.
+model DeviceCertificateNotice {
+  id               String                     @id @default(uuid(7)) @db.Uuid
+  // Better Auth user id.
+  userId           String
+  kind             DeviceCertificateOperation
+  deviceId         String
+  serialNumber     String
+  createdAt        DateTime                   @default(now())
+  dismissedAt      DateTime?
+  // Email delivery state, for the retrying worker.
+  deliveredAt      DateTime?
+  deliveryAttempts Int                        @default(0)
+  nextDeliveryAt   DateTime                   @default(now())
+
+  @@index([userId, dismissedAt])
+  @@index([deliveredAt, nextDeliveryAt])
+  @@map("deviceCertificateNotice")
 }
 
 enum GroupDeviceStatus {

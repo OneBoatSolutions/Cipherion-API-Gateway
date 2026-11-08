@@ -15,6 +15,51 @@ const baseEnv = {
 const validate = (env: Record<string, string>) =>
   envSchema.validate({ ...baseEnv, ...env });
 
+describe('envSchema engine listener', () => {
+  const redis = { REDIS_URL: 'redis://localhost:6379' };
+  const files = {
+    DEVICE_TLS_KEY: '/certs/engine.key',
+    DEVICE_TLS_CERT: '/certs/engine.crt',
+    DEVICE_TLS_PIN_FILE: '/certs/engine.pin',
+    DEVICE_CA_BUNDLE: '/certs/device-ca-trust.pem',
+  };
+
+  it('is off by default and needs no files then', () => {
+    const { error, value } = validate(redis);
+    expect(error).toBeUndefined();
+    expect(value.DEVICE_ENGINE_ENABLED).toBe(false);
+    expect(value.DEVICE_ENGINE_PORT).toBe(3443);
+  });
+
+  it('accepts all four files when enabled', () => {
+    const { error } = validate({
+      ...redis,
+      ...files,
+      DEVICE_ENGINE_ENABLED: 'true',
+    });
+    expect(error).toBeUndefined();
+  });
+
+  it.each(Object.keys(files))('requires %s when enabled', (missing) => {
+    const { [missing as keyof typeof files]: _, ...rest } = files;
+    const { error } = validate({
+      ...redis,
+      ...rest,
+      DEVICE_ENGINE_ENABLED: 'true',
+    });
+    expect(error?.message).toContain(missing);
+  });
+
+  it('refuses the same port as the console', () => {
+    const { error } = validate({
+      ...redis,
+      PORT: '3000',
+      DEVICE_ENGINE_PORT: '3000',
+    });
+    expect(error?.message).toBe('"DEVICE_ENGINE_PORT" must differ from "PORT"');
+  });
+});
+
 describe('envSchema REDIS_URL', () => {
   it('accepts redis:// outside production', () => {
     for (const NODE_ENV of ['development', 'test']) {

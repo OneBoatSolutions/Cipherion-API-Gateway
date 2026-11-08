@@ -60,6 +60,9 @@ export const ModelName = {
   GroupMember: 'GroupMember',
   GroupInvitation: 'GroupInvitation',
   Device: 'Device',
+  DeviceCertificate: 'DeviceCertificate',
+  DeviceCertificateAttempt: 'DeviceCertificateAttempt',
+  DeviceCertificateNotice: 'DeviceCertificateNotice',
   GroupDevice: 'GroupDevice',
   DeviceEnvelope: 'DeviceEnvelope',
   EnvelopeJob: 'EnvelopeJob',
@@ -195,6 +198,50 @@ export const DeviceScalarFieldEnum = {
 } as const
 
 export type DeviceScalarFieldEnum = (typeof DeviceScalarFieldEnum)[keyof typeof DeviceScalarFieldEnum]
+
+
+export const DeviceCertificateScalarFieldEnum = {
+  serialNumber: 'serialNumber',
+  deviceId: 'deviceId',
+  csrSha256: 'csrSha256',
+  publicKeySha256: 'publicKeySha256',
+  certificatePem: 'certificatePem',
+  notBefore: 'notBefore',
+  notAfter: 'notAfter',
+  issuedVia: 'issuedVia',
+  renewedFromSerial: 'renewedFromSerial',
+  supersededAt: 'supersededAt',
+  revokedAt: 'revokedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type DeviceCertificateScalarFieldEnum = (typeof DeviceCertificateScalarFieldEnum)[keyof typeof DeviceCertificateScalarFieldEnum]
+
+
+export const DeviceCertificateAttemptScalarFieldEnum = {
+  id: 'id',
+  deviceId: 'deviceId',
+  operation: 'operation',
+  createdAt: 'createdAt'
+} as const
+
+export type DeviceCertificateAttemptScalarFieldEnum = (typeof DeviceCertificateAttemptScalarFieldEnum)[keyof typeof DeviceCertificateAttemptScalarFieldEnum]
+
+
+export const DeviceCertificateNoticeScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  kind: 'kind',
+  deviceId: 'deviceId',
+  serialNumber: 'serialNumber',
+  createdAt: 'createdAt',
+  dismissedAt: 'dismissedAt',
+  deliveredAt: 'deliveredAt',
+  deliveryAttempts: 'deliveryAttempts',
+  nextDeliveryAt: 'nextDeliveryAt'
+} as const
+
+export type DeviceCertificateNoticeScalarFieldEnum = (typeof DeviceCertificateNoticeScalarFieldEnum)[keyof typeof DeviceCertificateNoticeScalarFieldEnum]
 
 
 export const GroupDeviceScalarFieldEnum = {

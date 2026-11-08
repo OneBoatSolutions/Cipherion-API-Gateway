@@ -267,6 +267,23 @@ export type EnumDeviceStatusWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumDeviceStatusFilter<$PrismaModel>
 }
 
+export type EnumDeviceCertificateOperationFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeviceCertificateOperation | Prisma.EnumDeviceCertificateOperationFieldRefInput<$PrismaModel>
+  in?: $Enums.DeviceCertificateOperation[] | Prisma.ListEnumDeviceCertificateOperationFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeviceCertificateOperation[] | Prisma.ListEnumDeviceCertificateOperationFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeviceCertificateOperationFilter<$PrismaModel> | $Enums.DeviceCertificateOperation
+}
+
+export type EnumDeviceCertificateOperationWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeviceCertificateOperation | Prisma.EnumDeviceCertificateOperationFieldRefInput<$PrismaModel>
+  in?: $Enums.DeviceCertificateOperation[] | Prisma.ListEnumDeviceCertificateOperationFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeviceCertificateOperation[] | Prisma.ListEnumDeviceCertificateOperationFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeviceCertificateOperationWithAggregatesFilter<$PrismaModel> | $Enums.DeviceCertificateOperation
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDeviceCertificateOperationFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDeviceCertificateOperationFilter<$PrismaModel>
+}
+
 export type EnumGroupDeviceStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.GroupDeviceStatus | Prisma.EnumGroupDeviceStatusFieldRefInput<$PrismaModel>
   in?: $Enums.GroupDeviceStatus[] | Prisma.ListEnumGroupDeviceStatusFieldRefInput<$PrismaModel>
@@ -675,6 +692,23 @@ export type NestedEnumDeviceStatusWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumDeviceStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumDeviceStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumDeviceCertificateOperationFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeviceCertificateOperation | Prisma.EnumDeviceCertificateOperationFieldRefInput<$PrismaModel>
+  in?: $Enums.DeviceCertificateOperation[] | Prisma.ListEnumDeviceCertificateOperationFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeviceCertificateOperation[] | Prisma.ListEnumDeviceCertificateOperationFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeviceCertificateOperationFilter<$PrismaModel> | $Enums.DeviceCertificateOperation
+}
+
+export type NestedEnumDeviceCertificateOperationWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeviceCertificateOperation | Prisma.EnumDeviceCertificateOperationFieldRefInput<$PrismaModel>
+  in?: $Enums.DeviceCertificateOperation[] | Prisma.ListEnumDeviceCertificateOperationFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeviceCertificateOperation[] | Prisma.ListEnumDeviceCertificateOperationFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeviceCertificateOperationWithAggregatesFilter<$PrismaModel> | $Enums.DeviceCertificateOperation
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDeviceCertificateOperationFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDeviceCertificateOperationFilter<$PrismaModel>
 }
 
 export type NestedEnumGroupDeviceStatusFilter<$PrismaModel = never> = {

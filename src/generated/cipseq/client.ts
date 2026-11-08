@@ -87,6 +87,21 @@ export type GroupInvitation = Prisma.GroupInvitationModel
  */
 export type Device = Prisma.DeviceModel
 /**
+ * Model DeviceCertificate
+ * 
+ */
+export type DeviceCertificate = Prisma.DeviceCertificateModel
+/**
+ * Model DeviceCertificateAttempt
+ * 
+ */
+export type DeviceCertificateAttempt = Prisma.DeviceCertificateAttemptModel
+/**
+ * Model DeviceCertificateNotice
+ * 
+ */
+export type DeviceCertificateNotice = Prisma.DeviceCertificateNoticeModel
+/**
  * Model GroupDevice
  * 
  */

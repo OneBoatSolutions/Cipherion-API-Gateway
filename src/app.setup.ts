@@ -20,26 +20,27 @@ export function configureApp(app: NestFastifyApplication): void {
     methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE'],
   });
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      forbidUnknownValues: true,
-      stopAtFirstError: false,
-      exceptionFactory: (validationErrors: ValidationError[] = []) => {
-        const errors = validationErrors.map((error) => ({
-          property: error.property,
-          constraints: error.constraints
-            ? Object.values(error.constraints)
-            : [],
-        }));
+  app.useGlobalPipes(validationPipe());
+}
 
-        return new BadRequestException({
-          message: 'Validation failed',
-          errors,
-        });
-      },
-    }),
-  );
+// Shared with the engine listener, which doesn't use the rest of configureApp().
+export function validationPipe(): ValidationPipe {
+  return new ValidationPipe({
+    transform: true,
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    forbidUnknownValues: true,
+    stopAtFirstError: false,
+    exceptionFactory: (validationErrors: ValidationError[] = []) => {
+      const errors = validationErrors.map((error) => ({
+        property: error.property,
+        constraints: error.constraints ? Object.values(error.constraints) : [],
+      }));
+
+      return new BadRequestException({
+        message: 'Validation failed',
+        errors,
+      });
+    },
+  });
 }

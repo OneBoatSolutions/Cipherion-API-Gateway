@@ -12,8 +12,13 @@ datasource db {
   provider = "postgresql"
 }
 
+// Ids are UUID v4, fully random: user ids are shown to other members, and v7
+// would reveal when an account was created. Better Auth's generateId: 'uuid'
+// (src/auth.ts) leaves the id to the database on Postgres, so each Better Auth
+// model needs this default.
+// The columns stay TEXT, so ids from before the switch keep working.
 model User {
-  id            String    @id
+  id            String    @id @default(uuid())
   name          String
   email         String
   emailVerified Boolean   @default(false)
@@ -45,7 +50,7 @@ model UserSettings {
 }
 
 model Session {
-  id        String   @id
+  id        String   @id @default(uuid())
   expiresAt DateTime
   token     String
   createdAt DateTime @default(now())
@@ -61,7 +66,7 @@ model Session {
 }
 
 model Account {
-  id                    String    @id
+  id                    String    @id @default(uuid())
   accountId             String
   providerId            String
   userId                String
@@ -81,7 +86,7 @@ model Account {
 }
 
 model Verification {
-  id         String   @id
+  id         String   @id @default(uuid())
   identifier String
   value      String
   expiresAt  DateTime
@@ -93,7 +98,7 @@ model Verification {
 }
 
 model RateLimit {
-  id          String @id
+  id          String @id @default(uuid())
   key         String
   count       Int
   lastRequest BigInt

@@ -1,4 +1,8 @@
-import { Module, OnApplicationShutdown } from '@nestjs/common';
+import {
+  BeforeApplicationShutdown,
+  Module,
+  OnApplicationShutdown,
+} from '@nestjs/common';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
@@ -9,6 +13,7 @@ import { DashboardModule } from './dashboard/dashboard.module.js';
 import { HealthModule } from './health/health.module.js';
 import { envFilePath } from './config/env.js';
 import { envSchema } from './config/env.schema.js';
+import { closeEngineApp } from './engine/engine-app.js';
 import { cipseqPrisma } from './lib/cipseq-prisma.js';
 import { stopDatabaseWatches } from './lib/database-watch.js';
 import { closeKms } from './lib/kms.js';
@@ -46,7 +51,15 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule implements OnApplicationShutdown {
+export class AppModule
+  implements BeforeApplicationShutdown, OnApplicationShutdown
+{
+  // Nest runs this first, so engine requests in flight finish before the shared
+  // clients below close.
+  async beforeApplicationShutdown(): Promise<void> {
+    await closeEngineApp();
+  }
+
   // The shared clients live for the whole process, so close them with the app.
   async onApplicationShutdown(): Promise<void> {
     // Stop the heartbeats first, so closing the pools isn't logged as an outage.

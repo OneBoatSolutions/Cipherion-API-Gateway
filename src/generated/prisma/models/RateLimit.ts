@@ -254,14 +254,14 @@ export type RateLimitScalarWhereWithAggregatesInput = {
 }
 
 export type RateLimitCreateInput = {
-  id: string
+  id?: string
   key: string
   count: number
   lastRequest: bigint | number
 }
 
 export type RateLimitUncheckedCreateInput = {
-  id: string
+  id?: string
   key: string
   count: number
   lastRequest: bigint | number
@@ -282,7 +282,7 @@ export type RateLimitUncheckedUpdateInput = {
 }
 
 export type RateLimitCreateManyInput = {
-  id: string
+  id?: string
   key: string
   count: number
   lastRequest: bigint | number

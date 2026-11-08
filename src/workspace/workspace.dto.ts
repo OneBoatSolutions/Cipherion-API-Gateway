@@ -96,15 +96,46 @@ export class WorkspaceDeviceGroup {
   status!: GroupDeviceStatus;
 }
 
+export const DEVICE_CERTIFICATE_STATES = [
+  'ACTIVE',
+  'SUPERSEDED',
+  'REVOKED',
+  'EXPIRED',
+] as const;
+export type DeviceCertificateState = (typeof DEVICE_CERTIFICATE_STATES)[number];
+
+export class WorkspaceDeviceCertificate {
+  @ApiProperty({ example: '1a2b3c4d5e6f708192a3b4c5d6e7f809' })
+  serialNumber!: string;
+
+  @ApiProperty({ example: '2027-02-03T18:30:00.000Z' })
+  notAfter!: Date;
+
+  @ApiProperty({
+    enum: DEVICE_CERTIFICATE_STATES,
+    description: 'SUPERSEDED keeps working for 24 hours after a renewal',
+  })
+  state!: DeviceCertificateState;
+}
+
 export class WorkspaceDevice extends DeviceResponse {
   @ApiProperty({ type: [WorkspaceDeviceGroup] })
   groups!: WorkspaceDeviceGroup[];
+
+  @ApiProperty({
+    type: WorkspaceDeviceCertificate,
+    nullable: true,
+    description:
+      "The device's latest certificate, or null if it never enrolled. Never includes a private key: the gateway holds none",
+  })
+  certificate!: WorkspaceDeviceCertificate | null;
 }
 
 export const NOTIFICATION_TYPES = [
   'INVITATION_RECEIVED',
   'INVITATION_APPROVAL',
   'DEVICE_APPROVAL',
+  'DEVICE_CERTIFICATE_ISSUED',
   'ENVELOPES_IN_PROGRESS',
   'ENVELOPES_COMPLETED',
   'ENVELOPES_MISSING',
@@ -130,11 +161,29 @@ export class WorkspaceNotification {
   @ApiProperty()
   id!: string;
 
-  @ApiProperty({ format: 'uuid' })
-  projectId!: string;
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Not on DEVICE_CERTIFICATE_ISSUED: a device has no one project',
+  })
+  projectId?: string;
 
-  @ApiProperty({ example: 'Payments' })
-  projectName!: string;
+  @ApiPropertyOptional({
+    example: 'Payments',
+    description: 'Not on DEVICE_CERTIFICATE_ISSUED',
+  })
+  projectName?: string;
+
+  @ApiPropertyOptional({
+    enum: ['ENROL', 'RENEW'],
+    description: 'DEVICE_CERTIFICATE_ISSUED only: how it was issued',
+  })
+  certificateOperation?: 'ENROL' | 'RENEW';
+
+  @ApiPropertyOptional({
+    description: 'DEVICE_CERTIFICATE_ISSUED only',
+  })
+  serialNumber?: string;
 
   @ApiPropertyOptional({
     format: 'uuid',
@@ -157,13 +206,15 @@ export class WorkspaceNotification {
   })
   groups?: WorkspaceNotificationGroup[];
 
-  @ApiPropertyOptional({ description: 'DEVICE_APPROVAL only' })
+  @ApiPropertyOptional({
+    description: 'DEVICE_APPROVAL and DEVICE_CERTIFICATE_ISSUED only',
+  })
   deviceId?: string;
 
   @ApiPropertyOptional({
     type: 'string',
     nullable: true,
-    description: 'DEVICE_APPROVAL only',
+    description: 'DEVICE_APPROVAL and DEVICE_CERTIFICATE_ISSUED only',
   })
   deviceName?: string | null;
 

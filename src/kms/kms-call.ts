@@ -27,13 +27,15 @@ export const KMS_UNAVAILABLE = 'Unavailable. Please try again shortly.';
 
 export type KmsMethod = Exclude<keyof grpcCallBackfromNestClient, keyof Client>;
 
-// For these RPCs the KMS answers PERMISSION_DENIED to a wrong passphrase. On any
-// other RPC that status means the gateway itself was refused.
+// For these RPCs the KMS answers PERMISSION_DENIED with this text to a wrong
+// passphrase. Any other PERMISSION_DENIED means the gateway itself was refused,
+// which must not count against the project's passphrase attempts.
 const PASSPHRASE_CHECKING_METHODS: ReadonlySet<string> = new Set<KmsMethod>([
   'rotateWrappingKeyforProjectEncryptionKey',
   'createAndWrapNewGroupRootKeyAndGroupDataEncryptionKey',
   'createDeviceEnvelope',
 ]);
+const INCORRECT_PASSPHRASE_DETAILS = 'incorrect passphrase';
 
 // Parameters<> resolves to the last overload: (request, metadata, options, callback).
 type Signature<M extends KmsMethod> = Parameters<grpcCallBackfromNestClient[M]>;
@@ -77,9 +79,23 @@ export function toHttpException(
 ): HttpException {
   const summary = `${method} failed: ${status[error.code] ?? error.code} ${error.details}`;
 
+  // The engine keeps its CSR and retries on 503, and changes the CSR on 400, so
+  // only a request the KMS itself rejected may answer 400.
+  if (method === 'issueDeviceCertificate') {
+    if (error.code === status.INVALID_ARGUMENT) {
+      logger.warn(summary);
+      return new BadRequestException(
+        'The KMS rejected the device ID or certificate request.',
+      );
+    }
+    logger.error(summary);
+    return new ServiceUnavailableException(KMS_UNAVAILABLE);
+  }
+
   if (
     error.code === status.PERMISSION_DENIED &&
-    PASSPHRASE_CHECKING_METHODS.has(method)
+    PASSPHRASE_CHECKING_METHODS.has(method) &&
+    error.details === INCORRECT_PASSPHRASE_DETAILS
   ) {
     logger.warn(summary);
     return new IncorrectPassphraseException();

@@ -4,6 +4,9 @@ import { Logger } from '@nestjs/common';
 // How long one watch waits for a state change before it is simply re-armed.
 const WATCH_INTERVAL_MS = 60_000;
 
+const DAY_MS = 86_400_000;
+const CLIENT_CERT_WARNING_DAYS = 30;
+
 // Mirrors the Redis client's logging: one error when the KMS connection is
 // lost and one line when it is back, instead of a log per failed attempt.
 // gRPC lets an unused channel go IDLE and only reconnects on the next call,
@@ -47,6 +50,24 @@ export function watchKmsConnection(
   };
 
   onState(channel.getConnectivityState(true));
+}
+
+// An expired certificate only shows up at the first KMS call, as an UNAVAILABLE
+// that looks like an outage, so the gateway refuses to start with one.
+export function checkClientCertificateExpiry(
+  notAfter: Date,
+  logger: Pick<Logger, 'warn'> = new Logger('KMS'),
+  now: number = Date.now(),
+): void {
+  const daysLeft = (notAfter.getTime() - now) / DAY_MS;
+  if (daysLeft <= 0) {
+    throw new Error('KMS_CLIENT_CERT has expired. Run make renew-transport.');
+  }
+  if (daysLeft < CLIENT_CERT_WARNING_DAYS) {
+    logger.warn(
+      `KMS_CLIENT_CERT expires in ${Math.floor(daysLeft)} days. Run make renew-transport.`,
+    );
+  }
 }
 
 // Turns gRPC error details into a short reason like the Redis log's. grpc-js

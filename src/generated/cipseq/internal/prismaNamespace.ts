@@ -406,6 +406,9 @@ export const ModelName = {
   GroupMember: 'GroupMember',
   GroupInvitation: 'GroupInvitation',
   Device: 'Device',
+  DeviceCertificate: 'DeviceCertificate',
+  DeviceCertificateAttempt: 'DeviceCertificateAttempt',
+  DeviceCertificateNotice: 'DeviceCertificateNotice',
   GroupDevice: 'GroupDevice',
   DeviceEnvelope: 'DeviceEnvelope',
   EnvelopeJob: 'EnvelopeJob',
@@ -425,7 +428,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "project" | "projectKeys" | "projectKeyVersion" | "group" | "groupKeys" | "groupKeyVersion" | "groupMember" | "groupInvitation" | "device" | "groupDevice" | "deviceEnvelope" | "envelopeJob" | "auditEvent"
+    modelProps: "project" | "projectKeys" | "projectKeyVersion" | "group" | "groupKeys" | "groupKeyVersion" | "groupMember" | "groupInvitation" | "device" | "deviceCertificate" | "deviceCertificateAttempt" | "deviceCertificateNotice" | "groupDevice" | "deviceEnvelope" | "envelopeJob" | "auditEvent"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1095,6 +1098,228 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    DeviceCertificate: {
+      payload: Prisma.$DeviceCertificatePayload<ExtArgs>
+      fields: Prisma.DeviceCertificateFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DeviceCertificateFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificatePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DeviceCertificateFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificatePayload>
+        }
+        findFirst: {
+          args: Prisma.DeviceCertificateFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificatePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DeviceCertificateFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificatePayload>
+        }
+        findMany: {
+          args: Prisma.DeviceCertificateFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificatePayload>[]
+        }
+        create: {
+          args: Prisma.DeviceCertificateCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificatePayload>
+        }
+        createMany: {
+          args: Prisma.DeviceCertificateCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DeviceCertificateCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificatePayload>[]
+        }
+        delete: {
+          args: Prisma.DeviceCertificateDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificatePayload>
+        }
+        update: {
+          args: Prisma.DeviceCertificateUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificatePayload>
+        }
+        deleteMany: {
+          args: Prisma.DeviceCertificateDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DeviceCertificateUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DeviceCertificateUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificatePayload>[]
+        }
+        upsert: {
+          args: Prisma.DeviceCertificateUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificatePayload>
+        }
+        aggregate: {
+          args: Prisma.DeviceCertificateAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDeviceCertificate>
+        }
+        groupBy: {
+          args: Prisma.DeviceCertificateGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeviceCertificateGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DeviceCertificateCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeviceCertificateCountAggregateOutputType> | number
+        }
+      }
+    }
+    DeviceCertificateAttempt: {
+      payload: Prisma.$DeviceCertificateAttemptPayload<ExtArgs>
+      fields: Prisma.DeviceCertificateAttemptFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DeviceCertificateAttemptFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateAttemptPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DeviceCertificateAttemptFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateAttemptPayload>
+        }
+        findFirst: {
+          args: Prisma.DeviceCertificateAttemptFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateAttemptPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DeviceCertificateAttemptFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateAttemptPayload>
+        }
+        findMany: {
+          args: Prisma.DeviceCertificateAttemptFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateAttemptPayload>[]
+        }
+        create: {
+          args: Prisma.DeviceCertificateAttemptCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateAttemptPayload>
+        }
+        createMany: {
+          args: Prisma.DeviceCertificateAttemptCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DeviceCertificateAttemptCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateAttemptPayload>[]
+        }
+        delete: {
+          args: Prisma.DeviceCertificateAttemptDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateAttemptPayload>
+        }
+        update: {
+          args: Prisma.DeviceCertificateAttemptUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateAttemptPayload>
+        }
+        deleteMany: {
+          args: Prisma.DeviceCertificateAttemptDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DeviceCertificateAttemptUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DeviceCertificateAttemptUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateAttemptPayload>[]
+        }
+        upsert: {
+          args: Prisma.DeviceCertificateAttemptUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateAttemptPayload>
+        }
+        aggregate: {
+          args: Prisma.DeviceCertificateAttemptAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDeviceCertificateAttempt>
+        }
+        groupBy: {
+          args: Prisma.DeviceCertificateAttemptGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeviceCertificateAttemptGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DeviceCertificateAttemptCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeviceCertificateAttemptCountAggregateOutputType> | number
+        }
+      }
+    }
+    DeviceCertificateNotice: {
+      payload: Prisma.$DeviceCertificateNoticePayload<ExtArgs>
+      fields: Prisma.DeviceCertificateNoticeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DeviceCertificateNoticeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateNoticePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DeviceCertificateNoticeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateNoticePayload>
+        }
+        findFirst: {
+          args: Prisma.DeviceCertificateNoticeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateNoticePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DeviceCertificateNoticeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateNoticePayload>
+        }
+        findMany: {
+          args: Prisma.DeviceCertificateNoticeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateNoticePayload>[]
+        }
+        create: {
+          args: Prisma.DeviceCertificateNoticeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateNoticePayload>
+        }
+        createMany: {
+          args: Prisma.DeviceCertificateNoticeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DeviceCertificateNoticeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateNoticePayload>[]
+        }
+        delete: {
+          args: Prisma.DeviceCertificateNoticeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateNoticePayload>
+        }
+        update: {
+          args: Prisma.DeviceCertificateNoticeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateNoticePayload>
+        }
+        deleteMany: {
+          args: Prisma.DeviceCertificateNoticeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DeviceCertificateNoticeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DeviceCertificateNoticeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateNoticePayload>[]
+        }
+        upsert: {
+          args: Prisma.DeviceCertificateNoticeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeviceCertificateNoticePayload>
+        }
+        aggregate: {
+          args: Prisma.DeviceCertificateNoticeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDeviceCertificateNotice>
+        }
+        groupBy: {
+          args: Prisma.DeviceCertificateNoticeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeviceCertificateNoticeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DeviceCertificateNoticeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeviceCertificateNoticeCountAggregateOutputType> | number
+        }
+      }
+    }
     GroupDevice: {
       payload: Prisma.$GroupDevicePayload<ExtArgs>
       fields: Prisma.GroupDeviceFieldRefs
@@ -1545,6 +1770,50 @@ export const DeviceScalarFieldEnum = {
 export type DeviceScalarFieldEnum = (typeof DeviceScalarFieldEnum)[keyof typeof DeviceScalarFieldEnum]
 
 
+export const DeviceCertificateScalarFieldEnum = {
+  serialNumber: 'serialNumber',
+  deviceId: 'deviceId',
+  csrSha256: 'csrSha256',
+  publicKeySha256: 'publicKeySha256',
+  certificatePem: 'certificatePem',
+  notBefore: 'notBefore',
+  notAfter: 'notAfter',
+  issuedVia: 'issuedVia',
+  renewedFromSerial: 'renewedFromSerial',
+  supersededAt: 'supersededAt',
+  revokedAt: 'revokedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type DeviceCertificateScalarFieldEnum = (typeof DeviceCertificateScalarFieldEnum)[keyof typeof DeviceCertificateScalarFieldEnum]
+
+
+export const DeviceCertificateAttemptScalarFieldEnum = {
+  id: 'id',
+  deviceId: 'deviceId',
+  operation: 'operation',
+  createdAt: 'createdAt'
+} as const
+
+export type DeviceCertificateAttemptScalarFieldEnum = (typeof DeviceCertificateAttemptScalarFieldEnum)[keyof typeof DeviceCertificateAttemptScalarFieldEnum]
+
+
+export const DeviceCertificateNoticeScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  kind: 'kind',
+  deviceId: 'deviceId',
+  serialNumber: 'serialNumber',
+  createdAt: 'createdAt',
+  dismissedAt: 'dismissedAt',
+  deliveredAt: 'deliveredAt',
+  deliveryAttempts: 'deliveryAttempts',
+  nextDeliveryAt: 'nextDeliveryAt'
+} as const
+
+export type DeviceCertificateNoticeScalarFieldEnum = (typeof DeviceCertificateNoticeScalarFieldEnum)[keyof typeof DeviceCertificateNoticeScalarFieldEnum]
+
+
 export const GroupDeviceScalarFieldEnum = {
   id: 'id',
   groupId: 'groupId',
@@ -1730,6 +1999,20 @@ export type EnumDeviceStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$Pri
  * Reference to a field of type 'DeviceStatus[]'
  */
 export type ListEnumDeviceStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeviceStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'DeviceCertificateOperation'
+ */
+export type EnumDeviceCertificateOperationFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeviceCertificateOperation'>
+    
+
+
+/**
+ * Reference to a field of type 'DeviceCertificateOperation[]'
+ */
+export type ListEnumDeviceCertificateOperationFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeviceCertificateOperation[]'>
     
 
 
@@ -1976,6 +2259,9 @@ export type GlobalOmitConfig = {
   groupMember?: Prisma.GroupMemberOmit
   groupInvitation?: Prisma.GroupInvitationOmit
   device?: Prisma.DeviceOmit
+  deviceCertificate?: Prisma.DeviceCertificateOmit
+  deviceCertificateAttempt?: Prisma.DeviceCertificateAttemptOmit
+  deviceCertificateNotice?: Prisma.DeviceCertificateNoticeOmit
   groupDevice?: Prisma.GroupDeviceOmit
   deviceEnvelope?: Prisma.DeviceEnvelopeOmit
   envelopeJob?: Prisma.EnvelopeJobOmit

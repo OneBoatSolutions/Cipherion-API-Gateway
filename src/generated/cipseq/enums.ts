@@ -38,6 +38,14 @@ export const DeviceStatus = {
 export type DeviceStatus = (typeof DeviceStatus)[keyof typeof DeviceStatus]
 
 
+export const DeviceCertificateOperation = {
+  ENROL: 'ENROL',
+  RENEW: 'RENEW'
+} as const
+
+export type DeviceCertificateOperation = (typeof DeviceCertificateOperation)[keyof typeof DeviceCertificateOperation]
+
+
 export const GroupDeviceStatus = {
   PENDING_APPROVAL: 'PENDING_APPROVAL',
   APPROVED: 'APPROVED',

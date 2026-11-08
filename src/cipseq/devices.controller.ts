@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -26,59 +25,13 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { cipseqPrisma } from '../lib/cipseq-prisma.js';
 import { auditEvent } from './audit.js';
 import { isUniqueViolation, whileStatusCurrent } from './cipseq-errors.js';
+import { DEVICE_FIELDS, registerDevice } from './device-registration.js';
 import {
   DeviceResponse,
-  ML_KEM_1024_PUBLIC_KEY_BYTES,
   OPEN_DEVICE_STATUSES,
   RegisterDeviceDto,
 } from './devices.dto.js';
 import { deviceEverywhereWrites } from './revocations.js';
-
-const DEVICE_FIELDS = {
-  id: true,
-  name: true,
-  status: true,
-  createdAt: true,
-} as const;
-
-// Node's base64 decoder also reads base64url, and ignores the padding.
-function assertPublicKeySize(publicKey: string): void {
-  if (
-    Buffer.from(publicKey, 'base64').length !== ML_KEM_1024_PUBLIC_KEY_BYTES
-  ) {
-    throw new BadRequestException(
-      'publicKey must be an ML-KEM-1024 public key',
-    );
-  }
-}
-
-async function findRegistered(
-  deviceId: string,
-  userId: string,
-  publicKey: string,
-): Promise<DeviceResponse | null> {
-  const device = await cipseqPrisma.device.findUnique({
-    where: { id: deviceId },
-    select: { ...DEVICE_FIELDS, userId: true, publicKey: true },
-  });
-  if (!device) {
-    return null;
-  }
-  // Another account's id gets the same answer, so it reveals nothing about them.
-  if (
-    device.userId !== userId ||
-    device.publicKey !== publicKey ||
-    device.status !== 'ACTIVE'
-  ) {
-    throw new ConflictException('This device id can not be registered');
-  }
-  return {
-    id: device.id,
-    name: device.name,
-    status: device.status,
-    createdAt: device.createdAt,
-  };
-}
 
 async function findOwnActiveDevice(deviceId: string, userId: string) {
   const device = await cipseqPrisma.device.findFirst({
@@ -113,53 +66,9 @@ export class DevicesController {
   @Post()
   async register(
     @CurrentUser() user: AuthUser,
-    @Body() { deviceId, publicKey, name }: RegisterDeviceDto,
+    @Body() body: RegisterDeviceDto,
   ): Promise<DeviceResponse> {
-    assertPublicKeySize(publicKey);
-
-    const existing = await findRegistered(deviceId, user.id, publicKey);
-    if (existing) {
-      return existing;
-    }
-
-    const memberships = await cipseqPrisma.groupMember.findMany({
-      where: {
-        userId: user.id,
-        group: { deletedAt: null, project: { deletedAt: null } },
-      },
-      select: { groupId: true },
-    });
-
-    try {
-      const [device] = await cipseqPrisma.$transaction([
-        cipseqPrisma.device.create({
-          data: {
-            id: deviceId,
-            userId: user.id,
-            name,
-            publicKey,
-            groups: {
-              create: memberships.map(({ groupId }) => ({
-                groupId,
-                status: 'PENDING_APPROVAL' as const,
-              })),
-            },
-          },
-          select: DEVICE_FIELDS,
-        }),
-        auditEvent(user.id, 'device.registered', null, { deviceId }),
-      ]);
-      return device;
-    } catch (error) {
-      // Two registrations of one device at the same time.
-      if (isUniqueViolation(error)) {
-        const device = await findRegistered(deviceId, user.id, publicKey);
-        if (device) {
-          return device;
-        }
-      }
-      throw error;
-    }
+    return registerDevice(user, body);
   }
 
   // Per group, so that one request can never give access to all of a member's groups.
@@ -228,8 +137,37 @@ export class DevicesController {
     return device;
   }
 
+  // Stays until dismissed, and can't be turned off in the settings: it's how an
+  // owner finds out that a stolen session enrolled a certificate. A repeat click
+  // answers the same, so it isn't an error.
+  @ApiOperation({ summary: 'Dismiss a certificate issued notification' })
+  @ApiNoContentResponse({ description: 'Dismissed' })
+  @ApiBadRequestResponse({ description: 'Invalid id' })
+  @HttpCode(204)
+  @Post('certificate-notices/:noticeId/dismiss')
+  async dismissCertificateNotice(
+    @CurrentUser() user: AuthUser,
+    @Param('noticeId', ParseUUIDPipe) noticeId: string,
+  ): Promise<void> {
+    await cipseqPrisma.$transaction(async (tx) => {
+      const { count } = await tx.deviceCertificateNotice.updateMany({
+        where: { id: noticeId, userId: user.id, dismissedAt: null },
+        data: { dismissedAt: new Date() },
+      });
+      if (count > 0) {
+        await auditEvent(
+          user.id,
+          'device.certificate_notice_dismissed',
+          null,
+          { noticeId },
+          tx,
+        );
+      }
+    });
+  }
+
   // Permanent, because the device's user is the only one with rights in every
-  // project it's used in. Certificates join this in the certificate branch.
+  // project it's used in. Its certificates are revoked with it.
   @ApiOperation({ summary: 'Revoke your own device everywhere, permanently' })
   @ApiNoContentResponse({ description: 'Revoked' })
   @ApiNotFoundResponse({ description: 'Not your device' })

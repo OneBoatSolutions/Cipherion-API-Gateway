@@ -18,10 +18,30 @@ import {
   type ServiceError,
   type UntypedServiceImplementation,
 } from "@grpc/grpc-js";
+import { Timestamp } from "../google/protobuf/timestamp.js";
 
 export const protobufPackage = "prototypeBuffer.v1";
 
 export const protobufFileName = "v1/prototypeBufferV1.proto";
+
+export interface IssueDeviceCertificateRequest {
+  /** ^dvc_[A-Za-z0-9_-]{43}$, authenticated/authorized by the gateway */
+  deviceId: string;
+  /** one signed P-256 PKCS#10 request, DER, at most 4096 bytes */
+  csrDer: Buffer;
+}
+
+export interface IssueDeviceCertificateResponse {
+  certificateDer: Buffer;
+  /** issuing CA first; excludes the self-signed root */
+  chainDer: Buffer[];
+  /** positive, lower-case hexadecimal without leading zeros */
+  serialNumber: string;
+  /** SHA-256 of DER SubjectPublicKeyInfo, 32 bytes */
+  publicKeySha256: Buffer;
+  notBefore: Date | undefined;
+  notAfter: Date | undefined;
+}
 
 export interface createAndWrapNewProjectRootKeyRequest {
   ProjectId: string;
@@ -132,6 +152,283 @@ export interface CreateDeviceEnvelopeResponse {
   /** the signed envelope; store it exactly as returned */
   EnvelopeJson: string;
 }
+
+function createBaseIssueDeviceCertificateRequest(): IssueDeviceCertificateRequest {
+  return { deviceId: "", csrDer: Buffer.alloc(0) };
+}
+
+export const IssueDeviceCertificateRequest: MessageFns<IssueDeviceCertificateRequest> = {
+  encode(message: IssueDeviceCertificateRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.deviceId !== "") {
+      writer.uint32(10).string(message.deviceId);
+    }
+    if (message.csrDer.length !== 0) {
+      writer.uint32(18).bytes(message.csrDer);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): IssueDeviceCertificateRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseIssueDeviceCertificateRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.deviceId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.csrDer = Buffer.from(reader.bytes());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): IssueDeviceCertificateRequest {
+    return {
+      deviceId: isSet(object.deviceId)
+        ? globalThis.String(object.deviceId)
+        : isSet(object.device_id)
+        ? globalThis.String(object.device_id)
+        : "",
+      csrDer: isSet(object.csrDer)
+        ? Buffer.from(bytesFromBase64(object.csrDer))
+        : isSet(object.csr_der)
+        ? Buffer.from(bytesFromBase64(object.csr_der))
+        : Buffer.alloc(0),
+    };
+  },
+
+  toJSON(message: IssueDeviceCertificateRequest): unknown {
+    const obj: any = {};
+    if (message.deviceId !== "") {
+      obj.deviceId = message.deviceId;
+    }
+    if (message.csrDer.length !== 0) {
+      obj.csrDer = base64FromBytes(message.csrDer);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<IssueDeviceCertificateRequest>, I>>(base?: I): IssueDeviceCertificateRequest {
+    return IssueDeviceCertificateRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<IssueDeviceCertificateRequest>, I>>(
+    object: I,
+  ): IssueDeviceCertificateRequest {
+    const message = createBaseIssueDeviceCertificateRequest();
+    message.deviceId = object.deviceId ?? "";
+    message.csrDer = object.csrDer ?? Buffer.alloc(0);
+    return message;
+  },
+};
+
+function createBaseIssueDeviceCertificateResponse(): IssueDeviceCertificateResponse {
+  return {
+    certificateDer: Buffer.alloc(0),
+    chainDer: [],
+    serialNumber: "",
+    publicKeySha256: Buffer.alloc(0),
+    notBefore: undefined,
+    notAfter: undefined,
+  };
+}
+
+export const IssueDeviceCertificateResponse: MessageFns<IssueDeviceCertificateResponse> = {
+  encode(message: IssueDeviceCertificateResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.certificateDer.length !== 0) {
+      writer.uint32(10).bytes(message.certificateDer);
+    }
+    for (const v of message.chainDer) {
+      writer.uint32(18).bytes(v!);
+    }
+    if (message.serialNumber !== "") {
+      writer.uint32(26).string(message.serialNumber);
+    }
+    if (message.publicKeySha256.length !== 0) {
+      writer.uint32(34).bytes(message.publicKeySha256);
+    }
+    if (message.notBefore !== undefined) {
+      Timestamp.encode(toTimestamp(message.notBefore), writer.uint32(42).fork()).join();
+    }
+    if (message.notAfter !== undefined) {
+      Timestamp.encode(toTimestamp(message.notAfter), writer.uint32(50).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): IssueDeviceCertificateResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseIssueDeviceCertificateResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.certificateDer = Buffer.from(reader.bytes());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.chainDer.push(Buffer.from(reader.bytes()));
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.serialNumber = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.publicKeySha256 = Buffer.from(reader.bytes());
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.notBefore = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.notAfter = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): IssueDeviceCertificateResponse {
+    return {
+      certificateDer: isSet(object.certificateDer)
+        ? Buffer.from(bytesFromBase64(object.certificateDer))
+        : isSet(object.certificate_der)
+        ? Buffer.from(bytesFromBase64(object.certificate_der))
+        : Buffer.alloc(0),
+      chainDer: globalThis.Array.isArray(object?.chainDer)
+        ? object.chainDer.map((e: any) => Buffer.from(bytesFromBase64(e)))
+        : globalThis.Array.isArray(object?.chain_der)
+        ? object.chain_der.map((e: any) => Buffer.from(bytesFromBase64(e)))
+        : [],
+      serialNumber: isSet(object.serialNumber)
+        ? globalThis.String(object.serialNumber)
+        : isSet(object.serial_number)
+        ? globalThis.String(object.serial_number)
+        : "",
+      publicKeySha256: isSet(object.publicKeySha256)
+        ? Buffer.from(bytesFromBase64(object.publicKeySha256))
+        : isSet(object.public_key_sha256)
+        ? Buffer.from(bytesFromBase64(object.public_key_sha256))
+        : Buffer.alloc(0),
+      notBefore: isSet(object.notBefore)
+        ? fromJsonTimestamp(object.notBefore)
+        : isSet(object.not_before)
+        ? fromJsonTimestamp(object.not_before)
+        : undefined,
+      notAfter: isSet(object.notAfter)
+        ? fromJsonTimestamp(object.notAfter)
+        : isSet(object.not_after)
+        ? fromJsonTimestamp(object.not_after)
+        : undefined,
+    };
+  },
+
+  toJSON(message: IssueDeviceCertificateResponse): unknown {
+    const obj: any = {};
+    if (message.certificateDer.length !== 0) {
+      obj.certificateDer = base64FromBytes(message.certificateDer);
+    }
+    if (message.chainDer?.length) {
+      obj.chainDer = message.chainDer.map((e) => base64FromBytes(e));
+    }
+    if (message.serialNumber !== "") {
+      obj.serialNumber = message.serialNumber;
+    }
+    if (message.publicKeySha256.length !== 0) {
+      obj.publicKeySha256 = base64FromBytes(message.publicKeySha256);
+    }
+    if (message.notBefore !== undefined) {
+      obj.notBefore = message.notBefore.toISOString();
+    }
+    if (message.notAfter !== undefined) {
+      obj.notAfter = message.notAfter.toISOString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<IssueDeviceCertificateResponse>, I>>(base?: I): IssueDeviceCertificateResponse {
+    return IssueDeviceCertificateResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<IssueDeviceCertificateResponse>, I>>(
+    object: I,
+  ): IssueDeviceCertificateResponse {
+    const message = createBaseIssueDeviceCertificateResponse();
+    message.certificateDer = object.certificateDer ?? Buffer.alloc(0);
+    message.chainDer = object.chainDer?.map((e) => e) || [];
+    message.serialNumber = object.serialNumber ?? "";
+    message.publicKeySha256 = object.publicKeySha256 ?? Buffer.alloc(0);
+    message.notBefore = object.notBefore ?? undefined;
+    message.notAfter = object.notAfter ?? undefined;
+    return message;
+  },
+};
 
 function createBasecreateAndWrapNewProjectRootKeyRequest(): createAndWrapNewProjectRootKeyRequest {
   return { ProjectId: "" };
@@ -2004,6 +2301,19 @@ export const grpcCallBackfromNestService = {
       Buffer.from(CreateDeviceEnvelopeResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): CreateDeviceEnvelopeResponse => CreateDeviceEnvelopeResponse.decode(value),
   },
+  /** Gateway-only certificate issuance. Ownership, enrolment/renewal and revocation live in the gateway. */
+  issueDeviceCertificate: {
+    path: "/prototypeBuffer.v1.grpcCallBackfromNest/IssueDeviceCertificate" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: IssueDeviceCertificateRequest): Buffer =>
+      Buffer.from(IssueDeviceCertificateRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): IssueDeviceCertificateRequest => IssueDeviceCertificateRequest.decode(value),
+    responseSerialize: (value: IssueDeviceCertificateResponse): Buffer =>
+      Buffer.from(IssueDeviceCertificateResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): IssueDeviceCertificateResponse =>
+      IssueDeviceCertificateResponse.decode(value),
+  },
 } as const;
 
 export interface grpcCallBackfromNestServer extends UntypedServiceImplementation {
@@ -2028,6 +2338,8 @@ export interface grpcCallBackfromNestServer extends UntypedServiceImplementation
     RotateWrappingKeyforProjectEncryptionKeyResponse
   >;
   createDeviceEnvelope: handleUnaryCall<CreateDeviceEnvelopeRequest, CreateDeviceEnvelopeResponse>;
+  /** Gateway-only certificate issuance. Ownership, enrolment/renewal and revocation live in the gateway. */
+  issueDeviceCertificate: handleUnaryCall<IssueDeviceCertificateRequest, IssueDeviceCertificateResponse>;
 }
 
 export interface grpcCallBackfromNestClient extends Client {
@@ -2119,6 +2431,22 @@ export interface grpcCallBackfromNestClient extends Client {
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: CreateDeviceEnvelopeResponse) => void,
   ): ClientUnaryCall;
+  /** Gateway-only certificate issuance. Ownership, enrolment/renewal and revocation live in the gateway. */
+  issueDeviceCertificate(
+    request: IssueDeviceCertificateRequest,
+    callback: (error: ServiceError | null, response: IssueDeviceCertificateResponse) => void,
+  ): ClientUnaryCall;
+  issueDeviceCertificate(
+    request: IssueDeviceCertificateRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: IssueDeviceCertificateResponse) => void,
+  ): ClientUnaryCall;
+  issueDeviceCertificate(
+    request: IssueDeviceCertificateRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: IssueDeviceCertificateResponse) => void,
+  ): ClientUnaryCall;
 }
 
 export const grpcCallBackfromNestClient = makeGenericClientConstructor(
@@ -2129,6 +2457,14 @@ export const grpcCallBackfromNestClient = makeGenericClientConstructor(
   service: typeof grpcCallBackfromNestService;
   serviceName: string;
 };
+
+function bytesFromBase64(b64: string): Uint8Array {
+  return Uint8Array.from(globalThis.Buffer.from(b64, "base64"));
+}
+
+function base64FromBytes(arr: Uint8Array): string {
+  return globalThis.Buffer.from(arr).toString("base64");
+}
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
@@ -2144,6 +2480,28 @@ export type Exact<P, I> = P extends Builtin ? P
     & P
     & { [K in keyof P as Extract<K, keyof I>]: Exact<P[K], I[K & keyof I]> }
     & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+
+function toTimestamp(date: Date): Timestamp {
+  const seconds = Math.trunc(date.getTime() / 1_000);
+  const nanos = (date.getTime() % 1_000) * 1_000_000;
+  return { seconds, nanos };
+}
+
+function fromTimestamp(t: Timestamp): Date {
+  let millis = (t.seconds || 0) * 1_000;
+  millis += (t.nanos || 0) / 1_000_000;
+  return new globalThis.Date(millis);
+}
+
+function fromJsonTimestamp(o: any): Date {
+  if (o instanceof globalThis.Date) {
+    return o;
+  } else if (typeof o === "string") {
+    return new globalThis.Date(o);
+  } else {
+    return fromTimestamp(Timestamp.fromJSON(o));
+  }
+}
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;
