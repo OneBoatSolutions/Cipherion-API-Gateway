@@ -78,7 +78,7 @@ The console app sits behind Traefik on `PORT`. The [engine listener](#engine-lis
 │   ├── app.module.ts        # Root module: ConfigModule (Joi validation), ObserveModule, AuthModule, HealthModule
 │   ├── config/env.ts        # Loads the env file before anything reads process.env
 │   ├── auth.ts              # Better Auth configuration
-│   ├── auth/                # AuthController (/api/v1/auth/*), global AuthGuard, @Public() / @CurrentUser()
+│   ├── auth/                # AuthController (/api/v1/auth/*), global AuthGuard, @Public() / @CurrentUser(), email templates, Google/GitHub providers
 │   ├── dashboard/           # Dashboard routes (/api/v1/dashboard/profile, /settings)
 │   ├── cipseq/              # CipSeq routes (projects, groups, invitations, devices), envelope jobs, access checks, audit events, device certificates and envelope delivery
 │   ├── engine/              # Engine listener on :3443: TLS setup, device identity, guards, enrol/renew and encrypt/decrypt controllers
@@ -90,6 +90,7 @@ The console app sits behind Traefik on `PORT`. The [engine listener](#engine-lis
 │   ├── lib/startup-checks.ts# Exits with code 1 if a database is unreachable at startup
 │   ├── lib/redis.ts         # Shared Redis client (sessions, rate limits, caching)
 │   ├── lib/kms.ts           # Shared KMS gRPC client (mTLS) and its health client
+│   ├── lib/mailer.ts        # Shared SMTP sender: queued, pooled, never awaited by a request
 │   ├── kms/kms-call.ts      # kmsCall(): one KMS RPC with a 2 s deadline, gRPC status → HTTP error
 │   └── generated/           # Generated clients: prisma/, cipseq/ (Prisma) and kms/ (gRPC). Do not edit by hand
 ├── scripts/                 # certs:engine (engine key and pin) and users:migrate-ids (one-off UUID migration)
@@ -110,8 +111,9 @@ The console app sits behind Traefik on `PORT`. The [engine listener](#engine-lis
 - **PostgreSQL** 14 or later, running locally, in Docker, or hosted
 - **Redis** 6.2 or later (`GETDEL` is required), running locally, in Docker, or hosted
 - **Cipherion KMS** running and reachable over gRPC with mutual TLS (locally on `localhost:50051`), plus a CA certificate for the KMS and a client certificate and key for the gateway
+- **An SMTP server** for verification and password reset emails. Locally, Mailpit (see [Auth endpoints](#auth-endpoints))
 
-To run both quickly with Docker:
+To run PostgreSQL, Redis and Mailpit quickly with Docker:
 
 ```bash
 docker run -d --name cipherion-postgres \
@@ -120,6 +122,8 @@ docker run -d --name cipherion-postgres \
   -p 5432:5432 postgres:16
 
 docker run -d --name cipherion-redis -p 6379:6379 redis:7
+
+docker run -d --name mailpit -p 1025:1025 -p 8025:8025 axllent/mailpit
 ```
 
 CipSeq has its own database. Locally it can live in the same container:
@@ -164,6 +168,12 @@ See [docs/environment.md](docs/environment.md) for when each one is required, lo
 | `BETTER_AUTH_URL` | **Yes** | – | Public base URL of the gateway, e.g. `http://localhost:3000` |
 | `AUTH_TRUSTED_ORIGINS` | **Yes** | – | Comma-separated list of origins allowed to call auth endpoints (for example, the dashboard URL) |
 | `REDIS_URL` | **Yes** | – | Redis connection string (`redis://` or `rediss://` for TLS; `rediss://` is required when `NODE_ENV=production`), e.g. `redis://localhost:6379` |
+| `EMAIL_HOST` | **Yes**, except `NODE_ENV=test` | – | SMTP server for verification, password reset and password changed emails, e.g. `localhost` (Mailpit) |
+| `EMAIL_PORT` | **Yes**, except `NODE_ENV=test` | – | SMTP port. `465` uses TLS from the start, other ports upgrade with STARTTLS. Production requires TLS |
+| `EMAIL_USER`, `EMAIL_PASS` | No | – | SMTP login, both or neither (Mailpit takes none). `EMAIL_PASS` is **secret** |
+| `EMAIL_FROM` | **Yes**, except `NODE_ENV=test` | – | Sender of those emails, e.g. `Cipherion <no-reply@cipherion.com>`. Most providers only send as the login's own address |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | No | – | Google sign-in, on when both are set. Redirect URI: `<BETTER_AUTH_URL>/api/v1/auth/callback/google` |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | No | – | GitHub sign-in, on when both are set. Redirect URI: `<BETTER_AUTH_URL>/api/v1/auth/callback/github` |
 | `KMS_ADDRESS` | **Yes** | – | Cipherion KMS gRPC address as `host:port`, e.g. `localhost:50051` |
 | `KMS_CA_CERT` | **Yes** | – | Path to the PEM CA certificate that signed the KMS server certificate |
 | `KMS_CLIENT_CERT` | **Yes** | – | Path to the gateway's PEM client certificate (mutual TLS), signed by a CA the KMS trusts |
@@ -200,6 +210,10 @@ BETTER_AUTH_URL=http://localhost:3000
 AUTH_TRUSTED_ORIGINS="http://localhost:3000,http://localhost:5173"
 
 REDIS_URL=redis://localhost:6379
+
+EMAIL_HOST=localhost
+EMAIL_PORT=1025
+EMAIL_FROM="Cipherion <no-reply@cipherion.local>"
 
 KMS_ADDRESS=localhost:50051
 KMS_CA_CERT=/home/you/.cipherion/kms-tls/ca.crt
@@ -377,17 +391,46 @@ Better Auth is mounted at `/api/v1/auth/*`. Sessions are returned as cookies, an
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `POST` | `/api/v1/auth/sign-up/email` | Create an account (`name`, `email`, `password`) |
-| `POST` | `/api/v1/auth/sign-in/email` | Sign in (`email`, `password`) and receive the session cookie |
+| `POST` | `/api/v1/auth/sign-up/email` | Create an account (`name`, `email`, `password`, optional `callbackURL`). Returns no session; emails a verification link |
+| `GET` | `/api/v1/auth/verify-email?token=…&callbackURL=…` | The link in that email. Verifies the address and redirects to `callbackURL` (with `?error=…` if the link is invalid or expired). Creates no session |
+| `POST` | `/api/v1/auth/send-verification-email` | Send a new link (`email`, optional `callbackURL`). 3 per minute per IP |
+| `POST` | `/api/v1/auth/sign-in/email` | Sign in (`email`, `password`) and receive the session cookie. `403` `EMAIL_NOT_VERIFIED` until verified, which also sends a new link |
+| `POST` | `/api/v1/auth/request-password-reset` | Email a reset link (`email`, `redirectTo`). Answers the same whether or not the account exists. 3 per minute per IP |
+| `GET` | `/api/v1/auth/reset-password/:token?callbackURL=…` | The link in that email. Redirects to `redirectTo?token=…`, or `?error=INVALID_TOKEN` |
+| `POST` | `/api/v1/auth/reset-password` | Set the new password (`newPassword`, `token`). Works once; ends every session and marks the email verified |
+| `POST` | `/api/v1/auth/change-password` | Signed in: `currentPassword`, `newPassword`. Always signs out every other session, keeps this one with a fresh cookie, and emails the owner |
+| `POST` | `/api/v1/auth/sign-in/social` | `provider` (`google` or `github`), `callbackURL`, optional `errorCallbackURL`. Returns `{ url }` for the browser; `404` if that provider isn't configured |
+| `GET` | `/api/v1/auth/callback/:provider` | Where Google or GitHub send the user back. Sets the session cookie and redirects to `callbackURL`. `504` after 10 seconds |
 | `GET` | `/api/v1/auth/get-session` | Current user and session, or `null` |
 | `POST` | `/api/v1/auth/sign-out` | End the current session |
 
+`callbackURL`, `redirectTo` and `errorCallbackURL` are the frontend's own pages. Their origin must be in `AUTH_TRUSTED_ORIGINS`, or the request answers `403`.
+
+**Rules worth knowing**
+
+- Links in emails last 1 hour, and never create a session: after verifying, the user signs in with their password.
+- Google or GitHub sign-in joins an existing account only if its email is verified. Otherwise it fails with `account_not_linked`, and the user verifies first (by signing in with the password, or with a reset).
+- Someone who registered with Google or GitHub has no password, so change password answers `400` `CREDENTIAL_ACCOUNT_NOT_FOUND`. A password reset sets one.
+- Signing up with an email that already has an account answers like a new sign-up, creates nothing and changes nothing.
+- Emails are queued and sent in the background, so no request waits on the mail server, and a failure is only logged.
+
+**Email locally:** [Mailpit](https://mailpit.axllent.org) catches every email, with an inbox at http://localhost:8025 and no login:
+
 ```bash
-# sign up, then sign in and store the session cookie
+docker run -d --name mailpit -p 1025:1025 -p 8025:8025 axllent/mailpit
+```
+
+with `EMAIL_HOST=localhost` and `EMAIL_PORT=1025`.
+
+**Google and GitHub:** create an OAuth app with each, with the redirect URI `<BETTER_AUTH_URL>/api/v1/auth/callback/google` (or `/github`), and set both of its variables.
+
+```bash
+# sign up; the verification link arrives by email (Mailpit locally)
 curl -X POST http://localhost:3000/api/v1/auth/sign-up/email \
   -H 'Content-Type: application/json' -H 'Origin: http://localhost:3000' \
-  -d '{"name":"Jane","email":"jane@example.com","password":"a-strong-password"}'
+  -d '{"name":"Jane","email":"jane@example.com","password":"a-strong-password","callbackURL":"http://localhost:3000/"}'
 
+# open the link from the email, then sign in and store the session cookie
 curl -X POST http://localhost:3000/api/v1/auth/sign-in/email -c cookies.txt \
   -H 'Content-Type: application/json' -H 'Origin: http://localhost:3000' \
   -d '{"email":"jane@example.com","password":"a-strong-password"}'
@@ -396,7 +439,7 @@ curl -X POST http://localhost:3000/api/v1/auth/sign-in/email -c cookies.txt \
 curl http://localhost:3000/api/v1/auth/get-session -b cookies.txt
 ```
 
-The e2e tests (`npm run test:e2e`) exercise these endpoints against the `.env.dev` database and Redis, and delete the test user and its cached sessions afterwards.
+The e2e tests (`npm run test:e2e`) exercise these endpoints against the `.env.dev` database and Redis, and delete the test user and its cached sessions afterwards. They never send email: `test/setup-e2e.ts` replaces the mailer, and tests read the links from its calls. Tests that only need a signed-in user use `signUpVerified()` from `test/helpers/users.ts`.
 
 > **Always delete users and revoke sessions through Better Auth** (`auth.api.*`), never with raw Prisma. Better Auth also removes the cached copy from Redis. A session deleted only from PostgreSQL stays valid in Redis until its TTL (up to 1 day) runs out.
 
@@ -427,7 +470,7 @@ Routes for the signed-in user's dashboard. They need the session cookie.
 | `GET` | `/api/v1/dashboard/settings` | The user's settings. A user who has never saved settings gets the defaults: `{"timezone":"UTC","locale":"en","securityAlerts":true}`. |
 | `PATCH` | `/api/v1/dashboard/settings` | Updates only the fields sent: `timezone` (IANA, e.g. `Asia/Kolkata`), `locale` (BCP 47, e.g. `en-IN`) and `securityAlerts` (in-app alerts for security events). Invalid values or unknown fields return `400`. |
 
-Email and password are changed through Better Auth's `/api/v1/auth/change-email` and `/api/v1/auth/change-password`.
+The password is changed through Better Auth's `/api/v1/auth/change-password` (see [Auth endpoints](#auth-endpoints)). Changing the email address isn't available yet.
 
 Cipherion has no profile images. Better Auth's user table requires an `image` column, so the column stays, but `/api/v1/auth/sign-up/email` and `/api/v1/auth/update-user` reject an `image` field with `400` and it is always `null`.
 
@@ -724,7 +767,9 @@ Requests that fail DTO validation return `400 Bad Request` in this format:
 - The KMS is reachable only from the gateway's private network. Each environment has its own gateway client certificate for mTLS; the private key file is readable only by the gateway's user and never committed. Rotate the client certificate before it expires.
 - `CIPSEQ_DATABASE_URL` points to a different database from `DATABASE_URL` (startup is refused otherwise). CipSeq holds key material, so preferably give it its own database user too, with access to that database only.
 - The CipSeq database has backups and point-in-time recovery, with a tested restore. The KMS is stateless, so this database holds the only copy of the wrapped keys: losing it makes the encrypted data unrecoverable.
-- Email addresses are verified before real users are invited. The gateway doesn't do this yet, so today anyone can sign up with an invited address and join the group.
+- `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASS` and `EMAIL_FROM` point to a real SMTP provider, the connection uses TLS (port 465, or STARTTLS on 587; the gateway refuses anything else in production), and `EMAIL_FROM` is an address the provider is allowed to send from (SPF and DKIM set up for its domain), so verification and reset emails don't land in spam.
+- `AUTH_TRUSTED_ORIGINS` includes the frontend pages that verification, reset and Google/GitHub sign-in redirect to.
+- Google and GitHub OAuth apps, if used, have the production redirect URIs (`<BETTER_AUTH_URL>/api/v1/auth/callback/google` and `/github`).
 - CipSeq backups are protected and expire on a schedule. A backup from before a rotation still opens with the old passphrase and holds the old group keys, so after rotating because of a leak, old backups stay a risk until they expire.
 - `NODE_ENV=production` is set, which also turns off the API docs (`/api/v1/docs`) and Better Auth's schema endpoint.
 - The orchestrator restarts the gateway when it exits (it exits with code 1 if a database is unreachable at startup), and starts the databases before the gateway.

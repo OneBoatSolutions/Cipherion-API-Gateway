@@ -3,6 +3,13 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { bearer, openAPI } from 'better-auth/plugins';
+import {
+  passwordChangedEmail,
+  passwordResetEmail,
+  verificationEmail,
+} from './auth/emails.js';
+import { socialProviders } from './auth/social-providers.js';
+import { mailer } from './lib/mailer.js';
 import { prisma } from './lib/prisma.js';
 import { redis } from './lib/redis.js';
 
@@ -46,13 +53,34 @@ const sessionStoreUnavailable = (cause: unknown): never => {
 // image column, so clients are stopped from setting it instead.
 const USER_WRITE_PATHS = new Set(['/sign-up/email', '/update-user']);
 
-const rejectProfileImage = createAuthMiddleware(async (ctx) => {
+const beforeAuth = createAuthMiddleware(async (ctx) => {
   const body = ctx.body as Record<string, unknown> | undefined;
   if (USER_WRITE_PATHS.has(ctx.path) && body?.image !== undefined) {
     throw new APIError('BAD_REQUEST', {
       message: 'Profile images are not supported',
     });
   }
+
+  // A password change always signs out every other session, whatever the
+  // client sends, so a stolen session can't outlive it. Better Auth gives the
+  // current one a new session in the response.
+  if (ctx.path === '/change-password') {
+    return { context: { body: { ...body, revokeOtherSessions: true } } };
+  }
+});
+
+// Tells the owner, so a change made from a stolen session doesn't go unnoticed.
+const afterAuth = createAuthMiddleware(async (ctx) => {
+  if (ctx.path !== '/change-password') {
+    return;
+  }
+  const returned = ctx.context.returned as
+    { user?: { id: string; name: string; email: string } } | undefined;
+  if (returned instanceof APIError || !returned?.user) {
+    return;
+  }
+  const { user } = returned;
+  mailer.send(passwordChangedEmail(user, new Date()), user.id);
 });
 
 export const auth = betterAuth({
@@ -87,6 +115,46 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
+    // Sign-up returns no session, and email sign-in answers 403 until the
+    // address is verified, so nobody can use someone else's email.
+    requireEmailVerification: true,
+    sendResetPassword: async ({ user, url }) => {
+      mailer.send(passwordResetEmail(user, url), user.id);
+    },
+    resetPasswordTokenExpiresIn: 60 * 60,
+    // A stolen session ends when the owner resets their password.
+    revokeSessionsOnPasswordReset: true,
+    // The reset link proves the inbox. This is how someone recovers an address
+    // another person registered: the reset replaces that person's password.
+    onPasswordReset: async ({ user }) => {
+      await prisma.user.updateMany({
+        where: { id: user.id, emailVerified: false },
+        data: { emailVerified: true },
+      });
+    },
+  },
+
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      mailer.send(verificationEmail(user, url), user.id);
+    },
+    sendOnSignUp: true,
+    // An unverified sign-in with the right password sends a new link.
+    sendOnSignIn: true,
+    // A link in an email never creates a session: the user signs in afterwards.
+    autoSignInAfterVerification: false,
+    expiresIn: 60 * 60,
+  },
+
+  // Each provider is on only when both its id and secret are set.
+  socialProviders: socialProviders(),
+
+  account: {
+    accountLinking: {
+      // Better Auth's default, stated so it can't drift: social sign-in only
+      // joins an existing account whose email is verified.
+      requireLocalEmailVerified: true,
+    },
   },
 
   session: {
@@ -103,17 +171,27 @@ export const auth = betterAuth({
     window: 60,
     max: 100,
     storage: 'secondary-storage',
+    // Each of these sends an email, so they're limited harder against flooding
+    // an inbox. Per IP, like the rest.
+    customRules: {
+      '/request-password-reset': { window: 60, max: 3 },
+      '/send-verification-email': { window: 60, max: 3 },
+    },
   },
 
   advanced: {
     useSecureCookies: process.env.NODE_ENV === 'production',
+    // Better Auth skips its origin, callback URL and CSRF checks when
+    // NODE_ENV=test. Stated so they also run in tests, and are never off.
+    disableOriginCheck: false,
     // User, session and account ids are UUIDs. On Postgres, Better Auth leaves the
     // id to the database, so prisma/schema.prisma gives each model a uuid() (v4) default.
     database: { generateId: 'uuid' },
   },
 
   hooks: {
-    before: rejectProfileImage,
+    before: beforeAuth,
+    after: afterAuth,
   },
 
   plugins: [

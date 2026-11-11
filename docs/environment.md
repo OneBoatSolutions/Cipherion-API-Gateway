@@ -22,6 +22,9 @@ if a required one is missing or invalid. [.env.example](../.env.example) has the
 | `BETTER_AUTH_URL` | `http://localhost:3001` | The gateway's public URL |
 | `AUTH_TRUSTED_ORIGINS` | `http://localhost:3000` | Comma-separated origins allowed to call the console port, such as the dashboard |
 | `REDIS_URL` | `redis://localhost:6379` | Sessions, rate limits and request limits. **Production:** must be `rediss://` |
+| `EMAIL_HOST` | `localhost` | SMTP server for verification, password reset and password changed emails. Not required when `NODE_ENV=test` |
+| `EMAIL_PORT` | `1025` | `465` uses TLS from the start, other ports upgrade with STARTTLS. **Production:** the connection must use TLS. Not required when `NODE_ENV=test` |
+| `EMAIL_FROM` | `Cipherion <no-reply@cipherion.com>` | Sender of those emails. Most providers only send as the login's own address. Not required when `NODE_ENV=test` |
 | `KMS_ADDRESS` | `localhost:50051` | KMS as `host:port`. The host must be a name inside the KMS's `server.crt`: `localhost`, `cipherion-kms` or `127.0.0.1` by default |
 | `KMS_CA_CERT` | `certs/deploy/gateway/ca.crt` | Transport CA bundle, which checks the KMS |
 | `KMS_CLIENT_CERT` | `certs/deploy/gateway/gateway.crt` | The gateway's client certificate. Start-up fails if it has expired, and warns under 30 days |
@@ -36,6 +39,9 @@ locally.
 | --- | --- | --- |
 | `NODE_ENV` | `development` | `development`, `test` or `production`. Production also hides the API docs and turns on secure cookies |
 | `PORT` | `3000` | Console port: dashboard, auth and CipSeq routes. Behind Traefik in production |
+| `EMAIL_USER`, `EMAIL_PASS` | – | SMTP login, both or neither. Leave out for Mailpit. `EMAIL_PASS` is **secret** |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | – | Google sign-in, on when both are set. Redirect URI: `<BETTER_AUTH_URL>/api/v1/auth/callback/google` |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | – | GitHub sign-in, on when both are set. Redirect URI: `<BETTER_AUTH_URL>/api/v1/auth/callback/github` |
 | `OBSERVE_APP_KEY`, `OBSERVE_APP_SECRET` | – | NestJS Observe telemetry. Without them, nothing is sent |
 
 ## Engine listener (port 3443)

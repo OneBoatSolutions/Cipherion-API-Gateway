@@ -8,8 +8,8 @@ import { configureApp } from './../src/app.setup.js';
 import { trustedOrigins } from './../src/config/env.js';
 import { cipseqPrisma } from './../src/lib/cipseq-prisma.js';
 import { redis } from './../src/lib/redis.js';
-import { uniqueClientIp } from './helpers/client-ip.js';
 import { deleteTestUser } from './helpers/delete-test-user.js';
+import { signUpVerified } from './helpers/users.js';
 
 interface Project {
   id: string;
@@ -33,25 +33,8 @@ describe('CipSeq projects (e2e)', () => {
   const otherEmail = `e2e-project-other-${Date.now()}@cipherion.test`;
   const url = '/api/v1/cipseq/projects';
 
-  const signUp = async (email: string): Promise<string> => {
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/sign-up/email',
-      headers: {
-        origin: trustedOrigins[0],
-        'x-forwarded-for': uniqueClientIp(),
-      },
-      payload: {
-        name: 'E2E Project User',
-        email,
-        password: 'e2e-password-123',
-      },
-    });
-    expect(response.statusCode).toBe(200);
-    return response.cookies
-      .map(({ name, value }) => `${name}=${value}`)
-      .join('; ');
-  };
+  const signUp = async (email: string): Promise<string> =>
+    (await signUpVerified(app, 'E2E Project User', email)).cookie;
 
   const createProject = async (name = 'Payments'): Promise<Project> => {
     const response = await app.inject({

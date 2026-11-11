@@ -103,6 +103,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `npm run users:migrate-ids`, a resumable one-off that gives existing users a UUID v4 id in both databases and signs them out.
 - `docs/` pages: device certificates, TLS pins, envelope signing and environment settings.
 - e2e tests with real TLS handshakes and real KMS signing for the listener, enrolment, renewal, certificate checks, races, delivery and the workspace; unit tests for TLS setup, device identity, CSR parsing, issued-certificate checks, limits and expiry.
+- Email sending over SMTP (`src/lib/mailer.ts`, `nodemailer`), configured by `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASS` and `EMAIL_FROM`. Emails are queued and never awaited by a request, over 2 pooled connections with 10-second timeouts; at most 200 wait, and the rest are dropped and logged. Port 465 uses TLS from the start, other ports STARTTLS, and production refuses a connection without TLS.
+- Email verification: sign-up sends a link (`callbackURL` sets where it lands), an unverified sign-in sends a new one, and `POST /api/v1/auth/send-verification-email` resends it. Links last 1 hour.
+- Password reset: `POST /api/v1/auth/request-password-reset` (the same answer for unknown emails) emails a one-time link valid for 1 hour, which redirects to `redirectTo?token=…`, then `POST /api/v1/auth/reset-password`.
+- Google and GitHub sign-in through `POST /api/v1/auth/sign-in/social`, each on only when both `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` or `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` are set.
+- A "Your password was changed" email after `POST /api/v1/auth/change-password`.
+- Branded HTML emails with a plain-text part (`src/auth/emails.ts`): verification, password reset and password changed, with no images or tracking.
+- `test/helpers/users.ts` (`signUpVerified()`), shared by the e2e tests, and `test/setup-e2e.ts`, which replaces the mailer in every e2e test.
+- e2e tests for verification, reset, change password, social sign-in, the reset rate limit and a burst of 20 sign-ins (about 460 ms, with the event loop never stalled over 24 ms); unit tests for the mailer, email templates, env schema, social providers and the callback timeout.
 
 ### Changed
 
@@ -136,6 +144,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `package.json` requires Node 22.23.2 or later; the engine listener needs Node's OpenSSL 3.5 or later.
 - `test/cipseq-devices.e2e-spec.ts` makes ML-KEM-1024 keys with OpenSSL, because Node 22 can't.
 - `.env.example` documents every setting and when it's required.
+- **Breaking:** email sign-in requires a verified email and answers `403` `EMAIL_NOT_VERIFIED` until then, and sign-up returns no session. Existing unverified users get a link on their next sign-in; their open sessions last until they expire.
+- **Breaking:** the gateway won't start without `EMAIL_HOST`, `EMAIL_PORT` and `EMAIL_FROM`, except when `NODE_ENV=test`.
+- The Google and GitHub callback answers `504` after 10 seconds, because Better Auth's calls to the providers have no time limit.
 
 ### Fixed
 
@@ -145,6 +156,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The e2e test now boots the app on the Fastify adapter instead of Nest's default Express platform.
 - e2e tests no longer share one Better Auth rate-limit bucket (sign-up/sign-in: 3 per 10 s per IP), which made the fourth sign-up in a run fail with `429`: each test now sends its own `x-forwarded-for` address from the reserved 198.18.0.0/15 range.
 - When Redis is unreachable, auth requests no longer hang for over a minute: the Redis client fails commands within about 2 seconds (`maxRetriesPerRequest: 1`, `commandTimeout: 2000`) and auth routes and protected routes answer `503 Service Unavailable` instead of `500`.
+- `test/migrate-user-ids.e2e-spec.ts` sorts its two audit rows by `action`, not `createdAt`, which they share, so it no longer fails at random.
 - CORS now allows `PATCH` and `DELETE`. Fastify's default (`GET`, `HEAD`, `POST`) made browsers block them, including Dashboard profile and settings saves.
 
 ### Security
@@ -163,6 +175,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The engine listener trusts no proxy: forwarded and client-certificate headers are ignored, and identity comes only from the socket.
 - No table stores a private key, a raw CSR or a session token, and the workspace never returns certificate or key material.
 - The engine listener closes idle connections at shutdown and everything else after 8 seconds, so a connected client can't hold up a deploy.
+- Better Auth's origin, callback URL and CSRF checks are on in every environment (`disableOriginCheck: false`). Better Auth turned them off when `NODE_ENV=test`, so the e2e tests never exercised them.
+- A password reset ends every session and marks the email verified, which is how someone recovers an address another person registered. A password change always signs out every other session, whatever the client sends, and keeps the current one.
+- Verification links never create a session (`autoSignInAfterVerification: false`), and Google or GitHub sign-in only joins an existing account whose email is verified (`requireLocalEmailVerified`).
+- Reset and resend requests are limited to 3 per minute per IP, against inbox flooding.
+- Logs from the mailer carry the user id and error code only, never the address, link or token.
 
 ### Removed
 

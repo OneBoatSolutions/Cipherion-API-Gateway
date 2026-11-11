@@ -9,14 +9,13 @@ import {
 } from '@nestjs/platform-fastify';
 import { AppModule } from './../src/app.module.js';
 import { configureApp } from './../src/app.setup.js';
-import { trustedOrigins } from './../src/config/env.js';
 import { lockDevice } from './../src/cipseq/device-lock.js';
 import { closeEngine, createEngineApp } from './../src/engine/engine-app.js';
 import { engineTlsOptions } from './../src/engine/engine-tls.js';
 import { cipseqPrisma } from './../src/lib/cipseq-prisma.js';
-import { uniqueClientIp } from './helpers/client-ip.js';
 import { deleteTestUser } from './helpers/delete-test-user.js';
 import { pinOf, TestPki } from './helpers/test-pki.js';
+import { signUpVerified } from './helpers/users.js';
 
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 60_000 });
 
@@ -128,29 +127,12 @@ describe('Device certificates (e2e)', () => {
       request.end(payload);
     });
 
-  const signUp = async (name: string): Promise<TestUser> => {
-    const email = `e2e-cert-${name}-${stamp}@cipherion.test`;
-    const response = await console_.inject({
-      method: 'POST',
-      url: '/api/v1/auth/sign-up/email',
-      headers: {
-        origin: trustedOrigins[0],
-        'x-forwarded-for': uniqueClientIp(),
-      },
-      payload: { name: `E2E ${name}`, email, password: 'e2e-password-123' },
-    });
-    expect(response.statusCode).toBe(200);
-    const token = response.headers['set-auth-token'];
-    expect(typeof token).toBe('string');
-    return {
-      id: response.json<{ user: { id: string } }>().user.id,
-      email,
-      cookie: response.cookies
-        .map(({ name: key, value }) => `${key}=${value}`)
-        .join('; '),
-      token: token as string,
-    };
-  };
+  const signUp = (name: string): Promise<TestUser> =>
+    signUpVerified(
+      console_,
+      `E2E ${name}`,
+      `e2e-cert-${name}-${stamp}@cipherion.test`,
+    );
 
   const consoleCall = (
     user: TestUser,
