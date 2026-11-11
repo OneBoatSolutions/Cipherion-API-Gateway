@@ -206,6 +206,7 @@ export type GroupWhereInput = {
   devices?: Prisma.GroupDeviceListRelationFilter
   envelopes?: Prisma.DeviceEnvelopeListRelationFilter
   envelopeJob?: Prisma.XOR<Prisma.EnvelopeJobNullableScalarRelationFilter, Prisma.EnvelopeJobWhereInput> | null
+  deliveries?: Prisma.EnvelopeDeliveryListRelationFilter
 }
 
 export type GroupOrderByWithRelationInput = {
@@ -224,6 +225,7 @@ export type GroupOrderByWithRelationInput = {
   devices?: Prisma.GroupDeviceOrderByRelationAggregateInput
   envelopes?: Prisma.DeviceEnvelopeOrderByRelationAggregateInput
   envelopeJob?: Prisma.EnvelopeJobOrderByWithRelationInput
+  deliveries?: Prisma.EnvelopeDeliveryOrderByRelationAggregateInput
 }
 
 export type GroupWhereUniqueInput = Prisma.AtLeast<{
@@ -245,6 +247,7 @@ export type GroupWhereUniqueInput = Prisma.AtLeast<{
   devices?: Prisma.GroupDeviceListRelationFilter
   envelopes?: Prisma.DeviceEnvelopeListRelationFilter
   envelopeJob?: Prisma.XOR<Prisma.EnvelopeJobNullableScalarRelationFilter, Prisma.EnvelopeJobWhereInput> | null
+  deliveries?: Prisma.EnvelopeDeliveryListRelationFilter
 }, "id">
 
 export type GroupOrderByWithAggregationInput = {
@@ -288,6 +291,7 @@ export type GroupCreateInput = {
   devices?: Prisma.GroupDeviceCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutGroupInput
 }
 
 export type GroupUncheckedCreateInput = {
@@ -305,6 +309,7 @@ export type GroupUncheckedCreateInput = {
   devices?: Prisma.GroupDeviceUncheckedCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutGroupInput
 }
 
 export type GroupUpdateInput = {
@@ -322,6 +327,7 @@ export type GroupUpdateInput = {
   devices?: Prisma.GroupDeviceUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupUncheckedUpdateInput = {
@@ -339,6 +345,7 @@ export type GroupUncheckedUpdateInput = {
   devices?: Prisma.GroupDeviceUncheckedUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupCreateManyInput = {
@@ -555,6 +562,20 @@ export type GroupUpdateOneRequiredWithoutEnvelopeJobNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.GroupUpdateToOneWithWhereWithoutEnvelopeJobInput, Prisma.GroupUpdateWithoutEnvelopeJobInput>, Prisma.GroupUncheckedUpdateWithoutEnvelopeJobInput>
 }
 
+export type GroupCreateNestedOneWithoutDeliveriesInput = {
+  create?: Prisma.XOR<Prisma.GroupCreateWithoutDeliveriesInput, Prisma.GroupUncheckedCreateWithoutDeliveriesInput>
+  connectOrCreate?: Prisma.GroupCreateOrConnectWithoutDeliveriesInput
+  connect?: Prisma.GroupWhereUniqueInput
+}
+
+export type GroupUpdateOneRequiredWithoutDeliveriesNestedInput = {
+  create?: Prisma.XOR<Prisma.GroupCreateWithoutDeliveriesInput, Prisma.GroupUncheckedCreateWithoutDeliveriesInput>
+  connectOrCreate?: Prisma.GroupCreateOrConnectWithoutDeliveriesInput
+  upsert?: Prisma.GroupUpsertWithoutDeliveriesInput
+  connect?: Prisma.GroupWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.GroupUpdateToOneWithWhereWithoutDeliveriesInput, Prisma.GroupUpdateWithoutDeliveriesInput>, Prisma.GroupUncheckedUpdateWithoutDeliveriesInput>
+}
+
 export type GroupCreateWithoutProjectInput = {
   id: string
   name: string
@@ -569,6 +590,7 @@ export type GroupCreateWithoutProjectInput = {
   devices?: Prisma.GroupDeviceCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutGroupInput
 }
 
 export type GroupUncheckedCreateWithoutProjectInput = {
@@ -585,6 +607,7 @@ export type GroupUncheckedCreateWithoutProjectInput = {
   devices?: Prisma.GroupDeviceUncheckedCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutGroupInput
 }
 
 export type GroupCreateOrConnectWithoutProjectInput = {
@@ -640,6 +663,7 @@ export type GroupCreateWithoutKeysInput = {
   devices?: Prisma.GroupDeviceCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutGroupInput
 }
 
 export type GroupUncheckedCreateWithoutKeysInput = {
@@ -656,6 +680,7 @@ export type GroupUncheckedCreateWithoutKeysInput = {
   devices?: Prisma.GroupDeviceUncheckedCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutGroupInput
 }
 
 export type GroupCreateOrConnectWithoutKeysInput = {
@@ -688,6 +713,7 @@ export type GroupUpdateWithoutKeysInput = {
   devices?: Prisma.GroupDeviceUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupUncheckedUpdateWithoutKeysInput = {
@@ -704,6 +730,7 @@ export type GroupUncheckedUpdateWithoutKeysInput = {
   devices?: Prisma.GroupDeviceUncheckedUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupCreateWithoutKeyVersionsInput = {
@@ -720,6 +747,7 @@ export type GroupCreateWithoutKeyVersionsInput = {
   devices?: Prisma.GroupDeviceCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutGroupInput
 }
 
 export type GroupUncheckedCreateWithoutKeyVersionsInput = {
@@ -736,6 +764,7 @@ export type GroupUncheckedCreateWithoutKeyVersionsInput = {
   devices?: Prisma.GroupDeviceUncheckedCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutGroupInput
 }
 
 export type GroupCreateOrConnectWithoutKeyVersionsInput = {
@@ -768,6 +797,7 @@ export type GroupUpdateWithoutKeyVersionsInput = {
   devices?: Prisma.GroupDeviceUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupUncheckedUpdateWithoutKeyVersionsInput = {
@@ -784,6 +814,7 @@ export type GroupUncheckedUpdateWithoutKeyVersionsInput = {
   devices?: Prisma.GroupDeviceUncheckedUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupCreateWithoutMembersInput = {
@@ -800,6 +831,7 @@ export type GroupCreateWithoutMembersInput = {
   devices?: Prisma.GroupDeviceCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutGroupInput
 }
 
 export type GroupUncheckedCreateWithoutMembersInput = {
@@ -816,6 +848,7 @@ export type GroupUncheckedCreateWithoutMembersInput = {
   devices?: Prisma.GroupDeviceUncheckedCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutGroupInput
 }
 
 export type GroupCreateOrConnectWithoutMembersInput = {
@@ -848,6 +881,7 @@ export type GroupUpdateWithoutMembersInput = {
   devices?: Prisma.GroupDeviceUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupUncheckedUpdateWithoutMembersInput = {
@@ -864,6 +898,7 @@ export type GroupUncheckedUpdateWithoutMembersInput = {
   devices?: Prisma.GroupDeviceUncheckedUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupCreateWithoutInvitationsInput = {
@@ -880,6 +915,7 @@ export type GroupCreateWithoutInvitationsInput = {
   devices?: Prisma.GroupDeviceCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutGroupInput
 }
 
 export type GroupUncheckedCreateWithoutInvitationsInput = {
@@ -896,6 +932,7 @@ export type GroupUncheckedCreateWithoutInvitationsInput = {
   devices?: Prisma.GroupDeviceUncheckedCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutGroupInput
 }
 
 export type GroupCreateOrConnectWithoutInvitationsInput = {
@@ -928,6 +965,7 @@ export type GroupUpdateWithoutInvitationsInput = {
   devices?: Prisma.GroupDeviceUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupUncheckedUpdateWithoutInvitationsInput = {
@@ -944,6 +982,7 @@ export type GroupUncheckedUpdateWithoutInvitationsInput = {
   devices?: Prisma.GroupDeviceUncheckedUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupCreateWithoutDevicesInput = {
@@ -960,6 +999,7 @@ export type GroupCreateWithoutDevicesInput = {
   invitations?: Prisma.GroupInvitationCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutGroupInput
 }
 
 export type GroupUncheckedCreateWithoutDevicesInput = {
@@ -976,6 +1016,7 @@ export type GroupUncheckedCreateWithoutDevicesInput = {
   invitations?: Prisma.GroupInvitationUncheckedCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutGroupInput
 }
 
 export type GroupCreateOrConnectWithoutDevicesInput = {
@@ -1008,6 +1049,7 @@ export type GroupUpdateWithoutDevicesInput = {
   invitations?: Prisma.GroupInvitationUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupUncheckedUpdateWithoutDevicesInput = {
@@ -1024,6 +1066,7 @@ export type GroupUncheckedUpdateWithoutDevicesInput = {
   invitations?: Prisma.GroupInvitationUncheckedUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupCreateWithoutEnvelopesInput = {
@@ -1040,6 +1083,7 @@ export type GroupCreateWithoutEnvelopesInput = {
   invitations?: Prisma.GroupInvitationCreateNestedManyWithoutGroupInput
   devices?: Prisma.GroupDeviceCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutGroupInput
 }
 
 export type GroupUncheckedCreateWithoutEnvelopesInput = {
@@ -1056,6 +1100,7 @@ export type GroupUncheckedCreateWithoutEnvelopesInput = {
   invitations?: Prisma.GroupInvitationUncheckedCreateNestedManyWithoutGroupInput
   devices?: Prisma.GroupDeviceUncheckedCreateNestedManyWithoutGroupInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedCreateNestedOneWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutGroupInput
 }
 
 export type GroupCreateOrConnectWithoutEnvelopesInput = {
@@ -1088,6 +1133,7 @@ export type GroupUpdateWithoutEnvelopesInput = {
   invitations?: Prisma.GroupInvitationUpdateManyWithoutGroupNestedInput
   devices?: Prisma.GroupDeviceUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupUncheckedUpdateWithoutEnvelopesInput = {
@@ -1104,6 +1150,7 @@ export type GroupUncheckedUpdateWithoutEnvelopesInput = {
   invitations?: Prisma.GroupInvitationUncheckedUpdateManyWithoutGroupNestedInput
   devices?: Prisma.GroupDeviceUncheckedUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupCreateWithoutEnvelopeJobInput = {
@@ -1120,6 +1167,7 @@ export type GroupCreateWithoutEnvelopeJobInput = {
   invitations?: Prisma.GroupInvitationCreateNestedManyWithoutGroupInput
   devices?: Prisma.GroupDeviceCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeCreateNestedManyWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutGroupInput
 }
 
 export type GroupUncheckedCreateWithoutEnvelopeJobInput = {
@@ -1136,6 +1184,7 @@ export type GroupUncheckedCreateWithoutEnvelopeJobInput = {
   invitations?: Prisma.GroupInvitationUncheckedCreateNestedManyWithoutGroupInput
   devices?: Prisma.GroupDeviceUncheckedCreateNestedManyWithoutGroupInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedCreateNestedManyWithoutGroupInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutGroupInput
 }
 
 export type GroupCreateOrConnectWithoutEnvelopeJobInput = {
@@ -1168,6 +1217,7 @@ export type GroupUpdateWithoutEnvelopeJobInput = {
   invitations?: Prisma.GroupInvitationUpdateManyWithoutGroupNestedInput
   devices?: Prisma.GroupDeviceUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUpdateManyWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupUncheckedUpdateWithoutEnvelopeJobInput = {
@@ -1184,6 +1234,91 @@ export type GroupUncheckedUpdateWithoutEnvelopeJobInput = {
   invitations?: Prisma.GroupInvitationUncheckedUpdateManyWithoutGroupNestedInput
   devices?: Prisma.GroupDeviceUncheckedUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedUpdateManyWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutGroupNestedInput
+}
+
+export type GroupCreateWithoutDeliveriesInput = {
+  id: string
+  name: string
+  description: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  project: Prisma.ProjectCreateNestedOneWithoutGroupsInput
+  keys?: Prisma.GroupKeysCreateNestedOneWithoutGroupInput
+  keyVersions?: Prisma.GroupKeyVersionCreateNestedManyWithoutGroupInput
+  members?: Prisma.GroupMemberCreateNestedManyWithoutGroupInput
+  invitations?: Prisma.GroupInvitationCreateNestedManyWithoutGroupInput
+  devices?: Prisma.GroupDeviceCreateNestedManyWithoutGroupInput
+  envelopes?: Prisma.DeviceEnvelopeCreateNestedManyWithoutGroupInput
+  envelopeJob?: Prisma.EnvelopeJobCreateNestedOneWithoutGroupInput
+}
+
+export type GroupUncheckedCreateWithoutDeliveriesInput = {
+  id: string
+  projectId: string
+  name: string
+  description: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  keys?: Prisma.GroupKeysUncheckedCreateNestedOneWithoutGroupInput
+  keyVersions?: Prisma.GroupKeyVersionUncheckedCreateNestedManyWithoutGroupInput
+  members?: Prisma.GroupMemberUncheckedCreateNestedManyWithoutGroupInput
+  invitations?: Prisma.GroupInvitationUncheckedCreateNestedManyWithoutGroupInput
+  devices?: Prisma.GroupDeviceUncheckedCreateNestedManyWithoutGroupInput
+  envelopes?: Prisma.DeviceEnvelopeUncheckedCreateNestedManyWithoutGroupInput
+  envelopeJob?: Prisma.EnvelopeJobUncheckedCreateNestedOneWithoutGroupInput
+}
+
+export type GroupCreateOrConnectWithoutDeliveriesInput = {
+  where: Prisma.GroupWhereUniqueInput
+  create: Prisma.XOR<Prisma.GroupCreateWithoutDeliveriesInput, Prisma.GroupUncheckedCreateWithoutDeliveriesInput>
+}
+
+export type GroupUpsertWithoutDeliveriesInput = {
+  update: Prisma.XOR<Prisma.GroupUpdateWithoutDeliveriesInput, Prisma.GroupUncheckedUpdateWithoutDeliveriesInput>
+  create: Prisma.XOR<Prisma.GroupCreateWithoutDeliveriesInput, Prisma.GroupUncheckedCreateWithoutDeliveriesInput>
+  where?: Prisma.GroupWhereInput
+}
+
+export type GroupUpdateToOneWithWhereWithoutDeliveriesInput = {
+  where?: Prisma.GroupWhereInput
+  data: Prisma.XOR<Prisma.GroupUpdateWithoutDeliveriesInput, Prisma.GroupUncheckedUpdateWithoutDeliveriesInput>
+}
+
+export type GroupUpdateWithoutDeliveriesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  project?: Prisma.ProjectUpdateOneRequiredWithoutGroupsNestedInput
+  keys?: Prisma.GroupKeysUpdateOneWithoutGroupNestedInput
+  keyVersions?: Prisma.GroupKeyVersionUpdateManyWithoutGroupNestedInput
+  members?: Prisma.GroupMemberUpdateManyWithoutGroupNestedInput
+  invitations?: Prisma.GroupInvitationUpdateManyWithoutGroupNestedInput
+  devices?: Prisma.GroupDeviceUpdateManyWithoutGroupNestedInput
+  envelopes?: Prisma.DeviceEnvelopeUpdateManyWithoutGroupNestedInput
+  envelopeJob?: Prisma.EnvelopeJobUpdateOneWithoutGroupNestedInput
+}
+
+export type GroupUncheckedUpdateWithoutDeliveriesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  projectId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  keys?: Prisma.GroupKeysUncheckedUpdateOneWithoutGroupNestedInput
+  keyVersions?: Prisma.GroupKeyVersionUncheckedUpdateManyWithoutGroupNestedInput
+  members?: Prisma.GroupMemberUncheckedUpdateManyWithoutGroupNestedInput
+  invitations?: Prisma.GroupInvitationUncheckedUpdateManyWithoutGroupNestedInput
+  devices?: Prisma.GroupDeviceUncheckedUpdateManyWithoutGroupNestedInput
+  envelopes?: Prisma.DeviceEnvelopeUncheckedUpdateManyWithoutGroupNestedInput
+  envelopeJob?: Prisma.EnvelopeJobUncheckedUpdateOneWithoutGroupNestedInput
 }
 
 export type GroupCreateManyProjectInput = {
@@ -1209,6 +1344,7 @@ export type GroupUpdateWithoutProjectInput = {
   devices?: Prisma.GroupDeviceUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupUncheckedUpdateWithoutProjectInput = {
@@ -1225,6 +1361,7 @@ export type GroupUncheckedUpdateWithoutProjectInput = {
   devices?: Prisma.GroupDeviceUncheckedUpdateManyWithoutGroupNestedInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedUpdateManyWithoutGroupNestedInput
   envelopeJob?: Prisma.EnvelopeJobUncheckedUpdateOneWithoutGroupNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutGroupNestedInput
 }
 
 export type GroupUncheckedUpdateManyWithoutProjectInput = {
@@ -1247,6 +1384,7 @@ export type GroupCountOutputType = {
   invitations: number
   devices: number
   envelopes: number
+  deliveries: number
 }
 
 export type GroupCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1255,6 +1393,7 @@ export type GroupCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.
   invitations?: boolean | GroupCountOutputTypeCountInvitationsArgs
   devices?: boolean | GroupCountOutputTypeCountDevicesArgs
   envelopes?: boolean | GroupCountOutputTypeCountEnvelopesArgs
+  deliveries?: boolean | GroupCountOutputTypeCountDeliveriesArgs
 }
 
 /**
@@ -1302,6 +1441,13 @@ export type GroupCountOutputTypeCountEnvelopesArgs<ExtArgs extends runtime.Types
   where?: Prisma.DeviceEnvelopeWhereInput
 }
 
+/**
+ * GroupCountOutputType without action
+ */
+export type GroupCountOutputTypeCountDeliveriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.EnvelopeDeliveryWhereInput
+}
+
 
 export type GroupSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1319,6 +1465,7 @@ export type GroupSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   devices?: boolean | Prisma.Group$devicesArgs<ExtArgs>
   envelopes?: boolean | Prisma.Group$envelopesArgs<ExtArgs>
   envelopeJob?: boolean | Prisma.Group$envelopeJobArgs<ExtArgs>
+  deliveries?: boolean | Prisma.Group$deliveriesArgs<ExtArgs>
   _count?: boolean | Prisma.GroupCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["group"]>
 
@@ -1364,6 +1511,7 @@ export type GroupInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   devices?: boolean | Prisma.Group$devicesArgs<ExtArgs>
   envelopes?: boolean | Prisma.Group$envelopesArgs<ExtArgs>
   envelopeJob?: boolean | Prisma.Group$envelopeJobArgs<ExtArgs>
+  deliveries?: boolean | Prisma.Group$deliveriesArgs<ExtArgs>
   _count?: boolean | Prisma.GroupCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type GroupIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1384,6 +1532,7 @@ export type $GroupPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     devices: Prisma.$GroupDevicePayload<ExtArgs>[]
     envelopes: Prisma.$DeviceEnvelopePayload<ExtArgs>[]
     envelopeJob: Prisma.$EnvelopeJobPayload<ExtArgs> | null
+    deliveries: Prisma.$EnvelopeDeliveryPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1795,6 +1944,7 @@ export interface Prisma__GroupClient<T, Null = never, ExtArgs extends runtime.Ty
   devices<T extends Prisma.Group$devicesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Group$devicesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$GroupDevicePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   envelopes<T extends Prisma.Group$envelopesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Group$envelopesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeviceEnvelopePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   envelopeJob<T extends Prisma.Group$envelopeJobArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Group$envelopeJobArgs<ExtArgs>>): Prisma.Prisma__EnvelopeJobClient<runtime.Types.Result.GetResult<Prisma.$EnvelopeJobPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  deliveries<T extends Prisma.Group$deliveriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Group$deliveriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$EnvelopeDeliveryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2387,6 +2537,30 @@ export type Group$envelopeJobArgs<ExtArgs extends runtime.Types.Extensions.Inter
    */
   include?: Prisma.EnvelopeJobInclude<ExtArgs> | null
   where?: Prisma.EnvelopeJobWhereInput
+}
+
+/**
+ * Group.deliveries
+ */
+export type Group$deliveriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the EnvelopeDelivery
+   */
+  select?: Prisma.EnvelopeDeliverySelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the EnvelopeDelivery
+   */
+  omit?: Prisma.EnvelopeDeliveryOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.EnvelopeDeliveryInclude<ExtArgs> | null
+  where?: Prisma.EnvelopeDeliveryWhereInput
+  orderBy?: Prisma.EnvelopeDeliveryOrderByWithRelationInput | Prisma.EnvelopeDeliveryOrderByWithRelationInput[]
+  cursor?: Prisma.EnvelopeDeliveryWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.EnvelopeDeliveryScalarFieldEnum | Prisma.EnvelopeDeliveryScalarFieldEnum[]
 }
 
 /**

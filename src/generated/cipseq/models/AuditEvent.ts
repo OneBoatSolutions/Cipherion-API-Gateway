@@ -186,6 +186,7 @@ export type AuditEventWhereInput = {
   projectId?: Prisma.UuidNullableFilter<"AuditEvent"> | string | null
   metadata?: Prisma.JsonNullableFilter<"AuditEvent">
   createdAt?: Prisma.DateTimeFilter<"AuditEvent"> | Date | string
+  delivery?: Prisma.XOR<Prisma.EnvelopeDeliveryNullableScalarRelationFilter, Prisma.EnvelopeDeliveryWhereInput> | null
 }
 
 export type AuditEventOrderByWithRelationInput = {
@@ -195,6 +196,7 @@ export type AuditEventOrderByWithRelationInput = {
   projectId?: Prisma.SortOrderInput | Prisma.SortOrder
   metadata?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  delivery?: Prisma.EnvelopeDeliveryOrderByWithRelationInput
 }
 
 export type AuditEventWhereUniqueInput = Prisma.AtLeast<{
@@ -207,6 +209,7 @@ export type AuditEventWhereUniqueInput = Prisma.AtLeast<{
   projectId?: Prisma.UuidNullableFilter<"AuditEvent"> | string | null
   metadata?: Prisma.JsonNullableFilter<"AuditEvent">
   createdAt?: Prisma.DateTimeFilter<"AuditEvent"> | Date | string
+  delivery?: Prisma.XOR<Prisma.EnvelopeDeliveryNullableScalarRelationFilter, Prisma.EnvelopeDeliveryWhereInput> | null
 }, "id">
 
 export type AuditEventOrderByWithAggregationInput = {
@@ -240,6 +243,7 @@ export type AuditEventCreateInput = {
   projectId?: string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  delivery?: Prisma.EnvelopeDeliveryCreateNestedOneWithoutAuditEventInput
 }
 
 export type AuditEventUncheckedCreateInput = {
@@ -249,6 +253,7 @@ export type AuditEventUncheckedCreateInput = {
   projectId?: string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  delivery?: Prisma.EnvelopeDeliveryUncheckedCreateNestedOneWithoutAuditEventInput
 }
 
 export type AuditEventUpdateInput = {
@@ -258,6 +263,7 @@ export type AuditEventUpdateInput = {
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  delivery?: Prisma.EnvelopeDeliveryUpdateOneWithoutAuditEventNestedInput
 }
 
 export type AuditEventUncheckedUpdateInput = {
@@ -267,6 +273,7 @@ export type AuditEventUncheckedUpdateInput = {
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  delivery?: Prisma.EnvelopeDeliveryUncheckedUpdateOneWithoutAuditEventNestedInput
 }
 
 export type AuditEventCreateManyInput = {
@@ -321,6 +328,77 @@ export type AuditEventMinOrderByAggregateInput = {
   createdAt?: Prisma.SortOrder
 }
 
+export type AuditEventScalarRelationFilter = {
+  is?: Prisma.AuditEventWhereInput
+  isNot?: Prisma.AuditEventWhereInput
+}
+
+export type AuditEventCreateNestedOneWithoutDeliveryInput = {
+  create?: Prisma.XOR<Prisma.AuditEventCreateWithoutDeliveryInput, Prisma.AuditEventUncheckedCreateWithoutDeliveryInput>
+  connectOrCreate?: Prisma.AuditEventCreateOrConnectWithoutDeliveryInput
+  connect?: Prisma.AuditEventWhereUniqueInput
+}
+
+export type AuditEventUpdateOneRequiredWithoutDeliveryNestedInput = {
+  create?: Prisma.XOR<Prisma.AuditEventCreateWithoutDeliveryInput, Prisma.AuditEventUncheckedCreateWithoutDeliveryInput>
+  connectOrCreate?: Prisma.AuditEventCreateOrConnectWithoutDeliveryInput
+  upsert?: Prisma.AuditEventUpsertWithoutDeliveryInput
+  connect?: Prisma.AuditEventWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AuditEventUpdateToOneWithWhereWithoutDeliveryInput, Prisma.AuditEventUpdateWithoutDeliveryInput>, Prisma.AuditEventUncheckedUpdateWithoutDeliveryInput>
+}
+
+export type AuditEventCreateWithoutDeliveryInput = {
+  id?: string
+  userId: string
+  action: string
+  projectId?: string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+}
+
+export type AuditEventUncheckedCreateWithoutDeliveryInput = {
+  id?: string
+  userId: string
+  action: string
+  projectId?: string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+}
+
+export type AuditEventCreateOrConnectWithoutDeliveryInput = {
+  where: Prisma.AuditEventWhereUniqueInput
+  create: Prisma.XOR<Prisma.AuditEventCreateWithoutDeliveryInput, Prisma.AuditEventUncheckedCreateWithoutDeliveryInput>
+}
+
+export type AuditEventUpsertWithoutDeliveryInput = {
+  update: Prisma.XOR<Prisma.AuditEventUpdateWithoutDeliveryInput, Prisma.AuditEventUncheckedUpdateWithoutDeliveryInput>
+  create: Prisma.XOR<Prisma.AuditEventCreateWithoutDeliveryInput, Prisma.AuditEventUncheckedCreateWithoutDeliveryInput>
+  where?: Prisma.AuditEventWhereInput
+}
+
+export type AuditEventUpdateToOneWithWhereWithoutDeliveryInput = {
+  where?: Prisma.AuditEventWhereInput
+  data: Prisma.XOR<Prisma.AuditEventUpdateWithoutDeliveryInput, Prisma.AuditEventUncheckedUpdateWithoutDeliveryInput>
+}
+
+export type AuditEventUpdateWithoutDeliveryInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  action?: Prisma.StringFieldUpdateOperationsInput | string
+  projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type AuditEventUncheckedUpdateWithoutDeliveryInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  action?: Prisma.StringFieldUpdateOperationsInput | string
+  projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
 
 
 export type AuditEventSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -330,6 +408,7 @@ export type AuditEventSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   projectId?: boolean
   metadata?: boolean
   createdAt?: boolean
+  delivery?: boolean | Prisma.AuditEvent$deliveryArgs<ExtArgs>
 }, ExtArgs["result"]["auditEvent"]>
 
 export type AuditEventSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -360,10 +439,17 @@ export type AuditEventSelectScalar = {
 }
 
 export type AuditEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "action" | "projectId" | "metadata" | "createdAt", ExtArgs["result"]["auditEvent"]>
+export type AuditEventInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  delivery?: boolean | Prisma.AuditEvent$deliveryArgs<ExtArgs>
+}
+export type AuditEventIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
+export type AuditEventIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
 
 export type $AuditEventPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "AuditEvent"
-  objects: {}
+  objects: {
+    delivery: Prisma.$EnvelopeDeliveryPayload<ExtArgs> | null
+  }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     userId: string
@@ -765,6 +851,7 @@ readonly fields: AuditEventFieldRefs;
  */
 export interface Prisma__AuditEventClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
+  delivery<T extends Prisma.AuditEvent$deliveryArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AuditEvent$deliveryArgs<ExtArgs>>): Prisma.Prisma__EnvelopeDeliveryClient<runtime.Types.Result.GetResult<Prisma.$EnvelopeDeliveryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -817,6 +904,10 @@ export type AuditEventFindUniqueArgs<ExtArgs extends runtime.Types.Extensions.In
    */
   omit?: Prisma.AuditEventOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AuditEventInclude<ExtArgs> | null
+  /**
    * Filter, which AuditEvent to fetch.
    */
   where: Prisma.AuditEventWhereUniqueInput
@@ -835,6 +926,10 @@ export type AuditEventFindUniqueOrThrowArgs<ExtArgs extends runtime.Types.Extens
    */
   omit?: Prisma.AuditEventOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AuditEventInclude<ExtArgs> | null
+  /**
    * Filter, which AuditEvent to fetch.
    */
   where: Prisma.AuditEventWhereUniqueInput
@@ -852,6 +947,10 @@ export type AuditEventFindFirstArgs<ExtArgs extends runtime.Types.Extensions.Int
    * Omit specific fields from the AuditEvent
    */
   omit?: Prisma.AuditEventOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AuditEventInclude<ExtArgs> | null
   /**
    * Filter, which AuditEvent to fetch.
    */
@@ -901,6 +1000,10 @@ export type AuditEventFindFirstOrThrowArgs<ExtArgs extends runtime.Types.Extensi
    */
   omit?: Prisma.AuditEventOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AuditEventInclude<ExtArgs> | null
+  /**
    * Filter, which AuditEvent to fetch.
    */
   where?: Prisma.AuditEventWhereInput
@@ -948,6 +1051,10 @@ export type AuditEventFindManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * Omit specific fields from the AuditEvent
    */
   omit?: Prisma.AuditEventOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AuditEventInclude<ExtArgs> | null
   /**
    * Filter, which AuditEvents to fetch.
    */
@@ -997,6 +1104,10 @@ export type AuditEventCreateArgs<ExtArgs extends runtime.Types.Extensions.Intern
    */
   omit?: Prisma.AuditEventOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AuditEventInclude<ExtArgs> | null
+  /**
    * The data needed to create a AuditEvent.
    */
   data: Prisma.XOR<Prisma.AuditEventCreateInput, Prisma.AuditEventUncheckedCreateInput>
@@ -1044,6 +1155,10 @@ export type AuditEventUpdateArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Omit specific fields from the AuditEvent
    */
   omit?: Prisma.AuditEventOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AuditEventInclude<ExtArgs> | null
   /**
    * The data needed to update a AuditEvent.
    */
@@ -1111,6 +1226,10 @@ export type AuditEventUpsertArgs<ExtArgs extends runtime.Types.Extensions.Intern
    */
   omit?: Prisma.AuditEventOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AuditEventInclude<ExtArgs> | null
+  /**
    * The filter to search for the AuditEvent to update in case it exists.
    */
   where: Prisma.AuditEventWhereUniqueInput
@@ -1137,6 +1256,10 @@ export type AuditEventDeleteArgs<ExtArgs extends runtime.Types.Extensions.Intern
    */
   omit?: Prisma.AuditEventOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AuditEventInclude<ExtArgs> | null
+  /**
    * Filter which AuditEvent to delete.
    */
   where: Prisma.AuditEventWhereUniqueInput
@@ -1157,6 +1280,25 @@ export type AuditEventDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.In
 }
 
 /**
+ * AuditEvent.delivery
+ */
+export type AuditEvent$deliveryArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the EnvelopeDelivery
+   */
+  select?: Prisma.EnvelopeDeliverySelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the EnvelopeDelivery
+   */
+  omit?: Prisma.EnvelopeDeliveryOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.EnvelopeDeliveryInclude<ExtArgs> | null
+  where?: Prisma.EnvelopeDeliveryWhereInput
+}
+
+/**
  * AuditEvent without action
  */
 export type AuditEventDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1168,4 +1310,8 @@ export type AuditEventDefaultArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * Omit specific fields from the AuditEvent
    */
   omit?: Prisma.AuditEventOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AuditEventInclude<ExtArgs> | null
 }

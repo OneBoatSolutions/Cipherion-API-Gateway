@@ -81,3 +81,37 @@ export const EnvelopeJobFailure = {
 } as const
 
 export type EnvelopeJobFailure = (typeof EnvelopeJobFailure)[keyof typeof EnvelopeJobFailure]
+
+
+export const CryptoOperation = {
+  ENCRYPT: 'ENCRYPT',
+  DECRYPT: 'DECRYPT'
+} as const
+
+export type CryptoOperation = (typeof CryptoOperation)[keyof typeof CryptoOperation]
+
+
+export const DeliveryStatus = {
+  APPROVED: 'APPROVED',
+  SUPERSEDED: 'SUPERSEDED'
+} as const
+
+export type DeliveryStatus = (typeof DeliveryStatus)[keyof typeof DeliveryStatus]
+
+
+export const CryptoDataKind = {
+  TEXT: 'TEXT',
+  FILE: 'FILE',
+  STREAM: 'STREAM',
+  OTHER: 'OTHER'
+} as const
+
+export type CryptoDataKind = (typeof CryptoDataKind)[keyof typeof CryptoDataKind]
+
+
+export const CryptoOutcome = {
+  SUCCESS: 'SUCCESS',
+  FAILED: 'FAILED'
+} as const
+
+export type CryptoOutcome = (typeof CryptoOutcome)[keyof typeof CryptoOutcome]

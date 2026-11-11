@@ -201,6 +201,7 @@ export type ProjectWhereInput = {
   keys?: Prisma.XOR<Prisma.ProjectKeysNullableScalarRelationFilter, Prisma.ProjectKeysWhereInput> | null
   keyVersions?: Prisma.ProjectKeyVersionListRelationFilter
   groups?: Prisma.GroupListRelationFilter
+  deliveries?: Prisma.EnvelopeDeliveryListRelationFilter
 }
 
 export type ProjectOrderByWithRelationInput = {
@@ -214,6 +215,7 @@ export type ProjectOrderByWithRelationInput = {
   keys?: Prisma.ProjectKeysOrderByWithRelationInput
   keyVersions?: Prisma.ProjectKeyVersionOrderByRelationAggregateInput
   groups?: Prisma.GroupOrderByRelationAggregateInput
+  deliveries?: Prisma.EnvelopeDeliveryOrderByRelationAggregateInput
 }
 
 export type ProjectWhereUniqueInput = Prisma.AtLeast<{
@@ -230,6 +232,7 @@ export type ProjectWhereUniqueInput = Prisma.AtLeast<{
   keys?: Prisma.XOR<Prisma.ProjectKeysNullableScalarRelationFilter, Prisma.ProjectKeysWhereInput> | null
   keyVersions?: Prisma.ProjectKeyVersionListRelationFilter
   groups?: Prisma.GroupListRelationFilter
+  deliveries?: Prisma.EnvelopeDeliveryListRelationFilter
 }, "id">
 
 export type ProjectOrderByWithAggregationInput = {
@@ -269,6 +272,7 @@ export type ProjectCreateInput = {
   keys?: Prisma.ProjectKeysCreateNestedOneWithoutProjectInput
   keyVersions?: Prisma.ProjectKeyVersionCreateNestedManyWithoutProjectInput
   groups?: Prisma.GroupCreateNestedManyWithoutProjectInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutProjectInput
 }
 
 export type ProjectUncheckedCreateInput = {
@@ -282,6 +286,7 @@ export type ProjectUncheckedCreateInput = {
   keys?: Prisma.ProjectKeysUncheckedCreateNestedOneWithoutProjectInput
   keyVersions?: Prisma.ProjectKeyVersionUncheckedCreateNestedManyWithoutProjectInput
   groups?: Prisma.GroupUncheckedCreateNestedManyWithoutProjectInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutProjectInput
 }
 
 export type ProjectUpdateInput = {
@@ -295,6 +300,7 @@ export type ProjectUpdateInput = {
   keys?: Prisma.ProjectKeysUpdateOneWithoutProjectNestedInput
   keyVersions?: Prisma.ProjectKeyVersionUpdateManyWithoutProjectNestedInput
   groups?: Prisma.GroupUpdateManyWithoutProjectNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutProjectNestedInput
 }
 
 export type ProjectUncheckedUpdateInput = {
@@ -308,6 +314,7 @@ export type ProjectUncheckedUpdateInput = {
   keys?: Prisma.ProjectKeysUncheckedUpdateOneWithoutProjectNestedInput
   keyVersions?: Prisma.ProjectKeyVersionUncheckedUpdateManyWithoutProjectNestedInput
   groups?: Prisma.GroupUncheckedUpdateManyWithoutProjectNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutProjectNestedInput
 }
 
 export type ProjectCreateManyInput = {
@@ -429,6 +436,20 @@ export type ProjectUpdateOneRequiredWithoutGroupsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.ProjectUpdateToOneWithWhereWithoutGroupsInput, Prisma.ProjectUpdateWithoutGroupsInput>, Prisma.ProjectUncheckedUpdateWithoutGroupsInput>
 }
 
+export type ProjectCreateNestedOneWithoutDeliveriesInput = {
+  create?: Prisma.XOR<Prisma.ProjectCreateWithoutDeliveriesInput, Prisma.ProjectUncheckedCreateWithoutDeliveriesInput>
+  connectOrCreate?: Prisma.ProjectCreateOrConnectWithoutDeliveriesInput
+  connect?: Prisma.ProjectWhereUniqueInput
+}
+
+export type ProjectUpdateOneRequiredWithoutDeliveriesNestedInput = {
+  create?: Prisma.XOR<Prisma.ProjectCreateWithoutDeliveriesInput, Prisma.ProjectUncheckedCreateWithoutDeliveriesInput>
+  connectOrCreate?: Prisma.ProjectCreateOrConnectWithoutDeliveriesInput
+  upsert?: Prisma.ProjectUpsertWithoutDeliveriesInput
+  connect?: Prisma.ProjectWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ProjectUpdateToOneWithWhereWithoutDeliveriesInput, Prisma.ProjectUpdateWithoutDeliveriesInput>, Prisma.ProjectUncheckedUpdateWithoutDeliveriesInput>
+}
+
 export type ProjectCreateWithoutKeysInput = {
   id: string
   name: string
@@ -439,6 +460,7 @@ export type ProjectCreateWithoutKeysInput = {
   deletedAt?: Date | string | null
   keyVersions?: Prisma.ProjectKeyVersionCreateNestedManyWithoutProjectInput
   groups?: Prisma.GroupCreateNestedManyWithoutProjectInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutProjectInput
 }
 
 export type ProjectUncheckedCreateWithoutKeysInput = {
@@ -451,6 +473,7 @@ export type ProjectUncheckedCreateWithoutKeysInput = {
   deletedAt?: Date | string | null
   keyVersions?: Prisma.ProjectKeyVersionUncheckedCreateNestedManyWithoutProjectInput
   groups?: Prisma.GroupUncheckedCreateNestedManyWithoutProjectInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutProjectInput
 }
 
 export type ProjectCreateOrConnectWithoutKeysInput = {
@@ -479,6 +502,7 @@ export type ProjectUpdateWithoutKeysInput = {
   deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   keyVersions?: Prisma.ProjectKeyVersionUpdateManyWithoutProjectNestedInput
   groups?: Prisma.GroupUpdateManyWithoutProjectNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutProjectNestedInput
 }
 
 export type ProjectUncheckedUpdateWithoutKeysInput = {
@@ -491,6 +515,7 @@ export type ProjectUncheckedUpdateWithoutKeysInput = {
   deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   keyVersions?: Prisma.ProjectKeyVersionUncheckedUpdateManyWithoutProjectNestedInput
   groups?: Prisma.GroupUncheckedUpdateManyWithoutProjectNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutProjectNestedInput
 }
 
 export type ProjectCreateWithoutKeyVersionsInput = {
@@ -503,6 +528,7 @@ export type ProjectCreateWithoutKeyVersionsInput = {
   deletedAt?: Date | string | null
   keys?: Prisma.ProjectKeysCreateNestedOneWithoutProjectInput
   groups?: Prisma.GroupCreateNestedManyWithoutProjectInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutProjectInput
 }
 
 export type ProjectUncheckedCreateWithoutKeyVersionsInput = {
@@ -515,6 +541,7 @@ export type ProjectUncheckedCreateWithoutKeyVersionsInput = {
   deletedAt?: Date | string | null
   keys?: Prisma.ProjectKeysUncheckedCreateNestedOneWithoutProjectInput
   groups?: Prisma.GroupUncheckedCreateNestedManyWithoutProjectInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutProjectInput
 }
 
 export type ProjectCreateOrConnectWithoutKeyVersionsInput = {
@@ -543,6 +570,7 @@ export type ProjectUpdateWithoutKeyVersionsInput = {
   deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   keys?: Prisma.ProjectKeysUpdateOneWithoutProjectNestedInput
   groups?: Prisma.GroupUpdateManyWithoutProjectNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutProjectNestedInput
 }
 
 export type ProjectUncheckedUpdateWithoutKeyVersionsInput = {
@@ -555,6 +583,7 @@ export type ProjectUncheckedUpdateWithoutKeyVersionsInput = {
   deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   keys?: Prisma.ProjectKeysUncheckedUpdateOneWithoutProjectNestedInput
   groups?: Prisma.GroupUncheckedUpdateManyWithoutProjectNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutProjectNestedInput
 }
 
 export type ProjectCreateWithoutGroupsInput = {
@@ -567,6 +596,7 @@ export type ProjectCreateWithoutGroupsInput = {
   deletedAt?: Date | string | null
   keys?: Prisma.ProjectKeysCreateNestedOneWithoutProjectInput
   keyVersions?: Prisma.ProjectKeyVersionCreateNestedManyWithoutProjectInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutProjectInput
 }
 
 export type ProjectUncheckedCreateWithoutGroupsInput = {
@@ -579,6 +609,7 @@ export type ProjectUncheckedCreateWithoutGroupsInput = {
   deletedAt?: Date | string | null
   keys?: Prisma.ProjectKeysUncheckedCreateNestedOneWithoutProjectInput
   keyVersions?: Prisma.ProjectKeyVersionUncheckedCreateNestedManyWithoutProjectInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutProjectInput
 }
 
 export type ProjectCreateOrConnectWithoutGroupsInput = {
@@ -607,6 +638,7 @@ export type ProjectUpdateWithoutGroupsInput = {
   deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   keys?: Prisma.ProjectKeysUpdateOneWithoutProjectNestedInput
   keyVersions?: Prisma.ProjectKeyVersionUpdateManyWithoutProjectNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutProjectNestedInput
 }
 
 export type ProjectUncheckedUpdateWithoutGroupsInput = {
@@ -619,6 +651,75 @@ export type ProjectUncheckedUpdateWithoutGroupsInput = {
   deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   keys?: Prisma.ProjectKeysUncheckedUpdateOneWithoutProjectNestedInput
   keyVersions?: Prisma.ProjectKeyVersionUncheckedUpdateManyWithoutProjectNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutProjectNestedInput
+}
+
+export type ProjectCreateWithoutDeliveriesInput = {
+  id: string
+  name: string
+  description: string
+  adminUserId: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  keys?: Prisma.ProjectKeysCreateNestedOneWithoutProjectInput
+  keyVersions?: Prisma.ProjectKeyVersionCreateNestedManyWithoutProjectInput
+  groups?: Prisma.GroupCreateNestedManyWithoutProjectInput
+}
+
+export type ProjectUncheckedCreateWithoutDeliveriesInput = {
+  id: string
+  name: string
+  description: string
+  adminUserId: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  keys?: Prisma.ProjectKeysUncheckedCreateNestedOneWithoutProjectInput
+  keyVersions?: Prisma.ProjectKeyVersionUncheckedCreateNestedManyWithoutProjectInput
+  groups?: Prisma.GroupUncheckedCreateNestedManyWithoutProjectInput
+}
+
+export type ProjectCreateOrConnectWithoutDeliveriesInput = {
+  where: Prisma.ProjectWhereUniqueInput
+  create: Prisma.XOR<Prisma.ProjectCreateWithoutDeliveriesInput, Prisma.ProjectUncheckedCreateWithoutDeliveriesInput>
+}
+
+export type ProjectUpsertWithoutDeliveriesInput = {
+  update: Prisma.XOR<Prisma.ProjectUpdateWithoutDeliveriesInput, Prisma.ProjectUncheckedUpdateWithoutDeliveriesInput>
+  create: Prisma.XOR<Prisma.ProjectCreateWithoutDeliveriesInput, Prisma.ProjectUncheckedCreateWithoutDeliveriesInput>
+  where?: Prisma.ProjectWhereInput
+}
+
+export type ProjectUpdateToOneWithWhereWithoutDeliveriesInput = {
+  where?: Prisma.ProjectWhereInput
+  data: Prisma.XOR<Prisma.ProjectUpdateWithoutDeliveriesInput, Prisma.ProjectUncheckedUpdateWithoutDeliveriesInput>
+}
+
+export type ProjectUpdateWithoutDeliveriesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  adminUserId?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  keys?: Prisma.ProjectKeysUpdateOneWithoutProjectNestedInput
+  keyVersions?: Prisma.ProjectKeyVersionUpdateManyWithoutProjectNestedInput
+  groups?: Prisma.GroupUpdateManyWithoutProjectNestedInput
+}
+
+export type ProjectUncheckedUpdateWithoutDeliveriesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  adminUserId?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  keys?: Prisma.ProjectKeysUncheckedUpdateOneWithoutProjectNestedInput
+  keyVersions?: Prisma.ProjectKeyVersionUncheckedUpdateManyWithoutProjectNestedInput
+  groups?: Prisma.GroupUncheckedUpdateManyWithoutProjectNestedInput
 }
 
 
@@ -629,11 +730,13 @@ export type ProjectUncheckedUpdateWithoutGroupsInput = {
 export type ProjectCountOutputType = {
   keyVersions: number
   groups: number
+  deliveries: number
 }
 
 export type ProjectCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   keyVersions?: boolean | ProjectCountOutputTypeCountKeyVersionsArgs
   groups?: boolean | ProjectCountOutputTypeCountGroupsArgs
+  deliveries?: boolean | ProjectCountOutputTypeCountDeliveriesArgs
 }
 
 /**
@@ -660,6 +763,13 @@ export type ProjectCountOutputTypeCountGroupsArgs<ExtArgs extends runtime.Types.
   where?: Prisma.GroupWhereInput
 }
 
+/**
+ * ProjectCountOutputType without action
+ */
+export type ProjectCountOutputTypeCountDeliveriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.EnvelopeDeliveryWhereInput
+}
+
 
 export type ProjectSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -672,6 +782,7 @@ export type ProjectSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   keys?: boolean | Prisma.Project$keysArgs<ExtArgs>
   keyVersions?: boolean | Prisma.Project$keyVersionsArgs<ExtArgs>
   groups?: boolean | Prisma.Project$groupsArgs<ExtArgs>
+  deliveries?: boolean | Prisma.Project$deliveriesArgs<ExtArgs>
   _count?: boolean | Prisma.ProjectCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["project"]>
 
@@ -710,6 +821,7 @@ export type ProjectInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs
   keys?: boolean | Prisma.Project$keysArgs<ExtArgs>
   keyVersions?: boolean | Prisma.Project$keyVersionsArgs<ExtArgs>
   groups?: boolean | Prisma.Project$groupsArgs<ExtArgs>
+  deliveries?: boolean | Prisma.Project$deliveriesArgs<ExtArgs>
   _count?: boolean | Prisma.ProjectCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type ProjectIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -721,6 +833,7 @@ export type $ProjectPayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     keys: Prisma.$ProjectKeysPayload<ExtArgs> | null
     keyVersions: Prisma.$ProjectKeyVersionPayload<ExtArgs>[]
     groups: Prisma.$GroupPayload<ExtArgs>[]
+    deliveries: Prisma.$EnvelopeDeliveryPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1127,6 +1240,7 @@ export interface Prisma__ProjectClient<T, Null = never, ExtArgs extends runtime.
   keys<T extends Prisma.Project$keysArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Project$keysArgs<ExtArgs>>): Prisma.Prisma__ProjectKeysClient<runtime.Types.Result.GetResult<Prisma.$ProjectKeysPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   keyVersions<T extends Prisma.Project$keyVersionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Project$keyVersionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectKeyVersionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   groups<T extends Prisma.Project$groupsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Project$groupsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$GroupPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  deliveries<T extends Prisma.Project$deliveriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Project$deliveriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$EnvelopeDeliveryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1620,6 +1734,30 @@ export type Project$groupsArgs<ExtArgs extends runtime.Types.Extensions.Internal
   take?: number
   skip?: number
   distinct?: Prisma.GroupScalarFieldEnum | Prisma.GroupScalarFieldEnum[]
+}
+
+/**
+ * Project.deliveries
+ */
+export type Project$deliveriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the EnvelopeDelivery
+   */
+  select?: Prisma.EnvelopeDeliverySelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the EnvelopeDelivery
+   */
+  omit?: Prisma.EnvelopeDeliveryOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.EnvelopeDeliveryInclude<ExtArgs> | null
+  where?: Prisma.EnvelopeDeliveryWhereInput
+  orderBy?: Prisma.EnvelopeDeliveryOrderByWithRelationInput | Prisma.EnvelopeDeliveryOrderByWithRelationInput[]
+  cursor?: Prisma.EnvelopeDeliveryWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.EnvelopeDeliveryScalarFieldEnum | Prisma.EnvelopeDeliveryScalarFieldEnum[]
 }
 
 /**

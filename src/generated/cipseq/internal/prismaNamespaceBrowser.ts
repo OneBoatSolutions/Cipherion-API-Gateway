@@ -66,7 +66,8 @@ export const ModelName = {
   GroupDevice: 'GroupDevice',
   DeviceEnvelope: 'DeviceEnvelope',
   EnvelopeJob: 'EnvelopeJob',
-  AuditEvent: 'AuditEvent'
+  AuditEvent: 'AuditEvent',
+  EnvelopeDelivery: 'EnvelopeDelivery'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -299,6 +300,34 @@ export const AuditEventScalarFieldEnum = {
 } as const
 
 export type AuditEventScalarFieldEnum = (typeof AuditEventScalarFieldEnum)[keyof typeof AuditEventScalarFieldEnum]
+
+
+export const EnvelopeDeliveryScalarFieldEnum = {
+  id: 'id',
+  requestId: 'requestId',
+  auditEventId: 'auditEventId',
+  operation: 'operation',
+  status: 'status',
+  userId: 'userId',
+  deviceId: 'deviceId',
+  groupId: 'groupId',
+  projectId: 'projectId',
+  gdekVersion: 'gdekVersion',
+  certificateSerial: 'certificateSerial',
+  createdAt: 'createdAt',
+  dataKind: 'dataKind',
+  mimeType: 'mimeType',
+  sizeBytes: 'sizeBytes',
+  fileNameHash: 'fileNameHash',
+  outcome: 'outcome',
+  errorCode: 'errorCode',
+  errorReason: 'errorReason',
+  durationMs: 'durationMs',
+  engineVersion: 'engineVersion',
+  occurredAt: 'occurredAt'
+} as const
+
+export type EnvelopeDeliveryScalarFieldEnum = (typeof EnvelopeDeliveryScalarFieldEnum)[keyof typeof EnvelopeDeliveryScalarFieldEnum]
 
 
 export const SortOrder = {

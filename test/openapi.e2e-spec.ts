@@ -61,6 +61,77 @@ describe('OpenAPI docs (e2e)', () => {
     expect(document.components?.schemas).toHaveProperty('UpdateSettingsDto');
   });
 
+  it('documents the metrics endpoints fully for the frontend', () => {
+    const parameters = (path: string) =>
+      Object.fromEntries(
+        (document.paths[path].get?.parameters ?? []).map((parameter) => {
+          const { name, required, schema } = parameter as {
+            name: string;
+            required?: boolean;
+            schema?: { enum?: string[] };
+          };
+          return [name, { required: Boolean(required), enum: schema?.enum }];
+        }),
+      );
+
+    const leaderboard =
+      document.paths['/api/v1/cipseq/metrics/leaderboard'].get;
+    expect(leaderboard?.tags).toEqual(['cipseq']);
+    expect(leaderboard?.description).toContain('| `today` |');
+    expect(parameters('/api/v1/cipseq/metrics/leaderboard')).toEqual({
+      period: {
+        required: false,
+        enum: ['today', 'week', 'month', 'year', 'all'],
+      },
+    });
+    expect(Object.keys(leaderboard?.responses ?? {}).sort()).toEqual([
+      '200',
+      '400',
+      '401',
+    ]);
+
+    const usage = document.paths['/api/v1/cipseq/metrics/usage'].get;
+    expect(parameters('/api/v1/cipseq/metrics/usage')).toEqual({
+      scope: {
+        required: true,
+        enum: ['project', 'group', 'user', 'device'],
+      },
+      id: { required: true, enum: undefined },
+      period: { required: true, enum: ['today', 'week', 'month', 'year'] },
+    });
+    expect(Object.keys(usage?.responses ?? {}).sort()).toEqual([
+      '200',
+      '400',
+      '401',
+      '404',
+    ]);
+    const examples = (
+      (usage?.responses ?? {})['200'] as unknown as {
+        content: { 'application/json': { examples: Record<string, unknown> } };
+      }
+    ).content['application/json'].examples;
+    expect(Object.keys(examples)).toEqual(['today', 'week', 'year']);
+
+    const schemas = document.components?.schemas ?? {};
+    for (const name of [
+      'MetricsTotals',
+      'MetricsBucket',
+      'LeaderboardProject',
+      'LeaderboardUser',
+      'LeaderboardDevice',
+      'LeaderboardResponse',
+      'UsageResponse',
+    ]) {
+      expect(schemas, name).toHaveProperty(name);
+    }
+    expect(schemas.MetricsBucket).toMatchObject({
+      properties: {
+        start: { type: 'string', format: 'date-time' },
+        encryptions: { type: 'integer' },
+      },
+    });
+  });
+
   it('lists the Better Auth endpoints instead of the wildcard route', () => {
     const signIn = document.paths['/api/v1/auth/sign-in/email'].post;
 

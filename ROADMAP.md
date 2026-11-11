@@ -83,6 +83,10 @@
 - [ ] Derive device ids from the device's key and check them at registration (today only the format is checked, so an id can be squatted)
 - [ ] Decide on F-01 from the KMS audit: wrapped keys aren't bound to their project or group
 - [ ] Deploy port 3443 directly, not through Traefik, prove the served pin on staging, and add a firewall connection limit
+- [x] Metrics: an `envelopeDelivery` row per delivery (encrypt or decrypt, linked to its audit row), a leaderboard of the top 10 projects, users and devices in the admin's projects, and usage for a project, group, user or device, as UTC time series (`GET /api/v1/cipseq/metrics/leaderboard` and `/usage`)
+- [ ] Daily totals for the metrics once raw counts get slow (100,000 deliveries took about 100 ms for the leaderboard's `all`, and the cost grows with the rows in the period)
+- [ ] Engine usage report: an endpoint the engine calls after each operation, matched by `requestId`, that fills the 10 nullable columns on `envelopeDelivery` (decide its limits, a cap on `errorReason`'s length, the salt for `fileNameHash` and whether sizes are rounded; then make the columns required and add metrics by data kind, size and failures)
+- [ ] Remaining `pending.md` items: more audit fields and audit refusals (A1, A2), last delivery per device (A3), an audit read API (A4), and the engine-side items (A5–A7)
 - [ ] Load test envelope delivery (a device lock and an audit row per request), and decide whether to keep the lock and how long to keep `device.envelope_delivered` rows
 - [ ] Test certificates from the old and new device CAs, a real expired `KMS_CLIENT_CERT`, and a KMS outage on the certificate routes
 - [ ] Agree with the team: the updated KMS proto with `IssueDeviceCertificate` (applied here; compare with the KMS's file), `/api/v1/cipseq` paths, the 1-day session, `503` with `Retry-After` while a device's new envelope isn't ready (a 10,000-device job takes about 5 minutes), and who generates and protects pins B and C
@@ -116,7 +120,8 @@
 - [ ] Require SSL (`sslmode=require` or stricter) on `DATABASE_URL` and `CIPSEQ_DATABASE_URL` in production, like `rediss://` for Redis
 - [ ] Return `503` instead of `500` from Dashboard routes while a database is unreachable
 - [ ] Backups and point-in-time recovery for the CipSeq database, with a tested restore (it holds the only copy of the wrapped keys)
-- [ ] Refuse to start, in its own branch, unless both databases, Redis, the KMS and the SMTP server can all be reached (only the databases are checked today)- [ ] Compress responses before production (`/workspace` was 2.26 MB for 10,000 members and devices, 102 KB gzipped)
+- [ ] Refuse to start, in its own branch, unless both databases, Redis, the KMS and the SMTP server can all be reached (only the databases are checked today)
+- [ ] Compress responses before production (`/workspace` was 2.26 MB for 10,000 members and devices, 102 KB gzipped)
 - [ ] Decide whether the public `/ready` response should name its dependencies (`database`, `cipseq`, `redis`, `kms`)
 - [x] OpenAPI / Swagger documentation (`/api/v1/docs`, not served in production)
 - [ ] Drop the accepted `glob`/`minimatch` advisories (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249) once `@fastify/static` moves to glob 14; they only affect a startup glob over Swagger UI's own files
