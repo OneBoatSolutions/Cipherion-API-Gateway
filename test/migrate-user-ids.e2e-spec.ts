@@ -103,7 +103,8 @@ describe('migrate-user-ids (e2e)', () => {
     ).toBe(1);
     const audit = await cipseqPrisma.auditEvent.findMany({
       where: { projectId },
-      orderBy: { createdAt: 'asc' },
+      // Both rows come from one createMany, so they share a createdAt.
+      orderBy: { action: 'asc' },
     });
     expect(audit[0].userId).toBe(newId);
     expect(audit[1].userId).toBe(other);

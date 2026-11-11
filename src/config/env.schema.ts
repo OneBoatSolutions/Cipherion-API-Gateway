@@ -31,6 +31,16 @@ const engineFile = Joi.when('DEVICE_ENGINE_ENABLED', {
   otherwise: Joi.string().optional(),
 });
 
+// Required everywhere except NODE_ENV=test.
+const outsideTests = (schema: Joi.Schema) =>
+  Joi.when('NODE_ENV', {
+    is: 'test',
+    // `then` is Joi's conditional API here, not a Promise-like object.
+    // oxlint-disable-next-line unicorn/no-thenable
+    then: schema.optional(),
+    otherwise: schema.required(),
+  });
+
 // Validated by ConfigModule at startup, so a misconfigured deployment fails immediately.
 export const envSchema = Joi.object({
   NODE_ENV: Joi.string()
@@ -103,6 +113,25 @@ export const envSchema = Joi.object({
   DEVICE_TLS_PIN_FILE: engineFile,
   DEVICE_CA_BUNDLE: engineFile,
 
+  // Verification, password reset and password changed emails, over SMTP.
+  // Tests replace the sender instead. Port 465 uses TLS from the start; other
+  // ports upgrade with STARTTLS, which production requires.
+  EMAIL_HOST: outsideTests(Joi.string().hostname()),
+  EMAIL_PORT: outsideTests(Joi.number().port()),
+  // Both or neither: a local catcher such as Mailpit takes no login.
+  EMAIL_USER: Joi.string().optional(),
+  EMAIL_PASS: Joi.string().optional(),
+  EMAIL_FROM: outsideTests(Joi.string()),
+
+  // Google and GitHub sign-in, each on only when both of its values are set.
+  GOOGLE_CLIENT_ID: Joi.string().optional(),
+  GOOGLE_CLIENT_SECRET: Joi.string().optional(),
+  GITHUB_CLIENT_ID: Joi.string().optional(),
+  GITHUB_CLIENT_SECRET: Joi.string().optional(),
+
   OBSERVE_APP_KEY: Joi.string().optional(),
   OBSERVE_APP_SECRET: Joi.string().optional(),
-});
+})
+  .and('EMAIL_USER', 'EMAIL_PASS')
+  .and('GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET')
+  .and('GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET');

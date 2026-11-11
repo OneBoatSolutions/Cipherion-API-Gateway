@@ -5,10 +5,9 @@ import {
 } from '@nestjs/platform-fastify';
 import { AppModule } from './../src/app.module.js';
 import { configureApp } from './../src/app.setup.js';
-import { trustedOrigins } from './../src/config/env.js';
 import { DEFAULT_SETTINGS } from './../src/dashboard/settings.dto.js';
-import { uniqueClientIp } from './helpers/client-ip.js';
 import { deleteTestUser } from './helpers/delete-test-user.js';
+import { signUpVerified } from './helpers/users.js';
 
 // Runs against the .env.dev database; the test user (and, by cascade, its
 // settings row) is removed afterwards.
@@ -30,23 +29,7 @@ describe('Dashboard settings (e2e)', () => {
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
 
-    const signUp = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/sign-up/email',
-      headers: {
-        origin: trustedOrigins[0],
-        'x-forwarded-for': uniqueClientIp(),
-      },
-      payload: {
-        name: 'E2E Settings User',
-        email,
-        password: 'e2e-password-123',
-      },
-    });
-    expect(signUp.statusCode).toBe(200);
-    cookie = signUp.cookies
-      .map(({ name, value }) => `${name}=${value}`)
-      .join('; ');
+    ({ cookie } = await signUpVerified(app, 'E2E Settings User', email));
   });
 
   afterAll(async () => {

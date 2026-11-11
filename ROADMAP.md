@@ -30,6 +30,16 @@
 - [x] Mount the Better Auth handler on the gateway (`/api/v1/auth/*`)
 - [x] CORS for trusted origins
 - [x] Auth guard for protected routes (`@Public()`, `@CurrentUser()`)
+- [x] Email sending over SMTP, with Mailpit locally
+- [x] Email verification, required before email sign-in
+- [x] Password reset by email (ends every session and marks the email verified)
+- [x] Change password signs out every other session and emails the owner
+- [x] Google and GitHub sign-in (optional; only joins verified accounts)
+- [x] Branded verification, reset and password changed emails
+- [ ] Change email address, verifying the new one first (Better Auth's `/change-email` is off; the README no longer claims it works)
+- [ ] Delete account: password and an email link, end every session; in CipSeq remove group memberships, revoke devices and certificates, cancel invitations and approvals, stop jobs; keep audit events under the old id; decide what happens to projects the user is admin of (refuse until handed over, or delete them), which probably needs project admin handover first
+- [ ] Add the hosted frontend's origin to `AUTH_TRUSTED_ORIGINS` once it's deployed
+- [ ] Rate limiting against floods from many IPs needs a proxy or WAF in front of the gateway (Better Auth's limits are per IP)
 - [ ] Forward the client IP to Better Auth so rate limits are per client, not one shared bucket (decide which proxy headers to trust)
 - [ ] API keys for service-to-service and programmatic clients
 - [ ] Separate `.env.test` database for e2e tests (they currently use the `.env.dev` database)
@@ -57,7 +67,8 @@
 - [x] `GET /workspace`: one read for everything the signed-in user is a part of
 - [x] In-app invitations (send, accept and decline; an acting admin's invitations need the project admin's approval; shown in `/workspace` notifications)
 - [x] Project-wide removal by the project admin only; acting admins remove members and devices from their own group
-- [ ] Require verified emails before production (anyone can sign up with an invited address and accept; this needs email sending, so it also means delivering invitations by email)
+- [x] Require verified emails before production (email sign-in now needs a verified address)
+- [ ] Activity emails, in their own branch: first invitations (the only way someone without an account learns of one), certificate issued and envelope job stopped; then members and devices approved, rejected, revoked or removed, role changes, deleted projects and groups, and new sign-ins; with a setting for which emails each person gets
 - [ ] Expire invitations that stay open
 - [x] Add device requests to `/workspace` notifications
 - [x] Device registration and approval, with envelopes created by a background job that holds the passphrase in memory only
@@ -105,8 +116,7 @@
 - [ ] Require SSL (`sslmode=require` or stricter) on `DATABASE_URL` and `CIPSEQ_DATABASE_URL` in production, like `rediss://` for Redis
 - [ ] Return `503` instead of `500` from Dashboard routes while a database is unreachable
 - [ ] Backups and point-in-time recovery for the CipSeq database, with a tested restore (it holds the only copy of the wrapped keys)
-- [ ] Optionally require Redis and the KMS at startup too
-- [ ] Compress responses before production (`/workspace` was 2.26 MB for 10,000 members and devices, 102 KB gzipped)
+- [ ] Refuse to start, in its own branch, unless both databases, Redis, the KMS and the SMTP server can all be reached (only the databases are checked today)- [ ] Compress responses before production (`/workspace` was 2.26 MB for 10,000 members and devices, 102 KB gzipped)
 - [ ] Decide whether the public `/ready` response should name its dependencies (`database`, `cipseq`, `redis`, `kms`)
 - [x] OpenAPI / Swagger documentation (`/api/v1/docs`, not served in production)
 - [ ] Drop the accepted `glob`/`minimatch` advisories (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249) once `@fastify/static` moves to glob 14; they only affect a startup glob over Swagger UI's own files

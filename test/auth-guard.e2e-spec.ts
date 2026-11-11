@@ -8,9 +8,8 @@ import { AppModule } from './../src/app.module.js';
 import { configureApp } from './../src/app.setup.js';
 import type { AuthUser } from './../src/auth/auth.types.js';
 import { CurrentUser } from './../src/auth/decorators/current-user.decorator.js';
-import { trustedOrigins } from './../src/config/env.js';
-import { uniqueClientIp } from './helpers/client-ip.js';
 import { deleteTestUser } from './helpers/delete-test-user.js';
+import { signUpVerified } from './helpers/users.js';
 
 // Test-only route, so the guard can be exercised without a production endpoint.
 @Controller('guard-test')
@@ -25,8 +24,6 @@ class ProtectedTestController {
 describe('AuthGuard (e2e)', () => {
   let app: NestFastifyApplication;
   const email = `e2e-guard-${Date.now()}@cipherion.test`;
-  const password = 'e2e-password-123';
-  const origin = trustedOrigins[0];
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -68,28 +65,15 @@ describe('AuthGuard (e2e)', () => {
   });
 
   it('passes the signed-in user to @CurrentUser()', async () => {
-    const signUp = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/sign-up/email',
-      headers: { origin, 'x-forwarded-for': uniqueClientIp() },
-      payload: { name: 'E2E Guard User', email, password },
-    });
-    expect(signUp.statusCode).toBe(200);
-
-    const cookie = signUp.cookies
-      .map(({ name, value }) => `${name}=${value}`)
-      .join('; ');
+    const user = await signUpVerified(app, 'E2E Guard User', email);
 
     const response = await app.inject({
       method: 'GET',
       url: '/api/v1/guard-test',
-      headers: { cookie },
+      headers: { cookie: user.cookie },
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({
-      id: signUp.json().user.id,
-      email,
-    });
+    expect(response.json()).toEqual({ id: user.id, email });
   });
 });

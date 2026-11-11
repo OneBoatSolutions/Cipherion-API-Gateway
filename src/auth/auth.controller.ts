@@ -5,6 +5,10 @@ import { APIError } from 'better-auth/api';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../auth.js';
 import { Public } from './decorators/public.decorator.js';
+import { PROVIDER_TIMEOUT_MS, withTimeout } from './with-timeout.js';
+
+// Where Google and GitHub send the user back.
+const CALLBACK_PATH = '/api/v1/auth/callback/';
 
 // Forwards every /api/v1/auth/* request to the Better Auth handler. Swagger
 // lists Better Auth's own endpoints instead of this wildcard (see openapi.ts).
@@ -21,7 +25,7 @@ export class AuthController {
     const hasBody =
       req.method !== 'GET' && req.method !== 'HEAD' && req.body != null;
 
-    const response = await auth
+    const handled = auth
       .handler(
         new Request(url, {
           method: req.method,
@@ -37,6 +41,10 @@ export class AuthController {
         }
         throw error;
       });
+
+    const response = url.pathname.startsWith(CALLBACK_PATH)
+      ? await withTimeout(handled, PROVIDER_TIMEOUT_MS)
+      : await handled;
 
     reply.status(response.status);
     response.headers.forEach((value, key) => {

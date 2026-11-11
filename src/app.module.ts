@@ -17,6 +17,7 @@ import { closeEngineApp } from './engine/engine-app.js';
 import { cipseqPrisma } from './lib/cipseq-prisma.js';
 import { stopDatabaseWatches } from './lib/database-watch.js';
 import { closeKms } from './lib/kms.js';
+import { mailer } from './lib/mailer.js';
 import { prisma } from './lib/prisma.js';
 import { redis } from './lib/redis.js';
 import { WorkspaceModule } from './workspace/workspace.module.js';
@@ -69,6 +70,7 @@ export class AppModule
       prisma.$disconnect(),
       cipseqPrisma.$disconnect(),
       Promise.resolve().then(closeKms),
+      Promise.resolve().then(mailer.close),
     ]);
   }
 }

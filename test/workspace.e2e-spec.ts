@@ -6,10 +6,9 @@ import {
 } from '@nestjs/platform-fastify';
 import { AppModule } from './../src/app.module.js';
 import { configureApp } from './../src/app.setup.js';
-import { trustedOrigins } from './../src/config/env.js';
 import { cipseqPrisma } from './../src/lib/cipseq-prisma.js';
-import { uniqueClientIp } from './helpers/client-ip.js';
 import { deleteTestUser } from './helpers/delete-test-user.js';
+import { signUpVerified } from './helpers/users.js';
 
 interface TestUser {
   id: string;
@@ -60,26 +59,12 @@ describe('Workspace (e2e)', () => {
   const deletedGroupId = randomUUID();
   const projectIds = [projectId, deletedProjectId];
 
-  const signUp = async (name: string): Promise<TestUser> => {
-    const email = `e2e-workspace-${name}-${stamp}@cipherion.test`;
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/sign-up/email',
-      headers: {
-        origin: trustedOrigins[0],
-        'x-forwarded-for': uniqueClientIp(),
-      },
-      payload: { name: `E2E ${name}`, email, password: 'e2e-password-123' },
-    });
-    expect(response.statusCode).toBe(200);
-    return {
-      id: response.json<{ user: { id: string } }>().user.id,
-      email,
-      cookie: response.cookies
-        .map(({ name: key, value }) => `${key}=${value}`)
-        .join('; '),
-    };
-  };
+  const signUp = (name: string): Promise<TestUser> =>
+    signUpVerified(
+      app,
+      `E2E ${name}`,
+      `e2e-workspace-${name}-${stamp}@cipherion.test`,
+    );
 
   const workspace = async (user: TestUser): Promise<Workspace> => {
     const response = await app.inject({
