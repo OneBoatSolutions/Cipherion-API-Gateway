@@ -58,6 +58,7 @@ type AuditMetadata =
       groupId: string;
       gdekVersion: number;
       requestId: string;
+      operation: 'ENCRYPT' | 'DECRYPT';
     };
 
 // Runs inside the transaction of the change it records, so the two commit

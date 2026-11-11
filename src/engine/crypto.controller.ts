@@ -51,6 +51,7 @@ export class CryptoController {
     return deliverEnvelope({
       peer: peerOf(request),
       userId: user.id,
+      operation: 'ENCRYPT',
       groupId,
     });
   }
@@ -66,6 +67,7 @@ export class CryptoController {
     return deliverEnvelope({
       peer: peerOf(request),
       userId: user.id,
+      operation: 'DECRYPT',
       groupId,
       gdekVersion,
     });

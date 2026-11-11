@@ -430,6 +430,101 @@ export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
   _max?: Prisma.NestedJsonNullableFilter<$PrismaModel>
 }
 
+export type EnumCryptoOperationFilter<$PrismaModel = never> = {
+  equals?: $Enums.CryptoOperation | Prisma.EnumCryptoOperationFieldRefInput<$PrismaModel>
+  in?: $Enums.CryptoOperation[] | Prisma.ListEnumCryptoOperationFieldRefInput<$PrismaModel>
+  notIn?: $Enums.CryptoOperation[] | Prisma.ListEnumCryptoOperationFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumCryptoOperationFilter<$PrismaModel> | $Enums.CryptoOperation
+}
+
+export type EnumDeliveryStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryStatus | Prisma.EnumDeliveryStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.DeliveryStatus[] | Prisma.ListEnumDeliveryStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeliveryStatus[] | Prisma.ListEnumDeliveryStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeliveryStatusFilter<$PrismaModel> | $Enums.DeliveryStatus
+}
+
+export type EnumCryptoDataKindNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.CryptoDataKind | Prisma.EnumCryptoDataKindFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CryptoDataKind[] | Prisma.ListEnumCryptoDataKindFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CryptoDataKind[] | Prisma.ListEnumCryptoDataKindFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCryptoDataKindNullableFilter<$PrismaModel> | $Enums.CryptoDataKind | null
+}
+
+export type BigIntNullableFilter<$PrismaModel = never> = {
+  equals?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel> | null
+  in?: bigint[] | number[] | Prisma.ListBigIntFieldRefInput<$PrismaModel> | null
+  notIn?: bigint[] | number[] | Prisma.ListBigIntFieldRefInput<$PrismaModel> | null
+  lt?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  lte?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  gt?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  gte?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedBigIntNullableFilter<$PrismaModel> | bigint | number | null
+}
+
+export type EnumCryptoOutcomeNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.CryptoOutcome | Prisma.EnumCryptoOutcomeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CryptoOutcome[] | Prisma.ListEnumCryptoOutcomeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CryptoOutcome[] | Prisma.ListEnumCryptoOutcomeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCryptoOutcomeNullableFilter<$PrismaModel> | $Enums.CryptoOutcome | null
+}
+
+export type EnumCryptoOperationWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CryptoOperation | Prisma.EnumCryptoOperationFieldRefInput<$PrismaModel>
+  in?: $Enums.CryptoOperation[] | Prisma.ListEnumCryptoOperationFieldRefInput<$PrismaModel>
+  notIn?: $Enums.CryptoOperation[] | Prisma.ListEnumCryptoOperationFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumCryptoOperationWithAggregatesFilter<$PrismaModel> | $Enums.CryptoOperation
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCryptoOperationFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCryptoOperationFilter<$PrismaModel>
+}
+
+export type EnumDeliveryStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryStatus | Prisma.EnumDeliveryStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.DeliveryStatus[] | Prisma.ListEnumDeliveryStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeliveryStatus[] | Prisma.ListEnumDeliveryStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeliveryStatusWithAggregatesFilter<$PrismaModel> | $Enums.DeliveryStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDeliveryStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDeliveryStatusFilter<$PrismaModel>
+}
+
+export type EnumCryptoDataKindNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CryptoDataKind | Prisma.EnumCryptoDataKindFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CryptoDataKind[] | Prisma.ListEnumCryptoDataKindFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CryptoDataKind[] | Prisma.ListEnumCryptoDataKindFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCryptoDataKindNullableWithAggregatesFilter<$PrismaModel> | $Enums.CryptoDataKind | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCryptoDataKindNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCryptoDataKindNullableFilter<$PrismaModel>
+}
+
+export type BigIntNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel> | null
+  in?: bigint[] | number[] | Prisma.ListBigIntFieldRefInput<$PrismaModel> | null
+  notIn?: bigint[] | number[] | Prisma.ListBigIntFieldRefInput<$PrismaModel> | null
+  lt?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  lte?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  gt?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  gte?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedBigIntNullableWithAggregatesFilter<$PrismaModel> | bigint | number | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _avg?: Prisma.NestedFloatNullableFilter<$PrismaModel>
+  _sum?: Prisma.NestedBigIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedBigIntNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedBigIntNullableFilter<$PrismaModel>
+}
+
+export type EnumCryptoOutcomeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CryptoOutcome | Prisma.EnumCryptoOutcomeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CryptoOutcome[] | Prisma.ListEnumCryptoOutcomeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CryptoOutcome[] | Prisma.ListEnumCryptoOutcomeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCryptoOutcomeNullableWithAggregatesFilter<$PrismaModel> | $Enums.CryptoOutcome | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCryptoOutcomeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCryptoOutcomeNullableFilter<$PrismaModel>
+}
+
 export type NestedUuidFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
@@ -826,6 +921,101 @@ export type NestedJsonNullableFilterBase<$PrismaModel = never> = {
   gt?: runtime.InputJsonValue | Prisma.JsonFieldRefInput<$PrismaModel>
   gte?: runtime.InputJsonValue | Prisma.JsonFieldRefInput<$PrismaModel>
   not?: runtime.InputJsonValue | Prisma.JsonFieldRefInput<$PrismaModel> | Prisma.JsonNullValueFilter
+}
+
+export type NestedEnumCryptoOperationFilter<$PrismaModel = never> = {
+  equals?: $Enums.CryptoOperation | Prisma.EnumCryptoOperationFieldRefInput<$PrismaModel>
+  in?: $Enums.CryptoOperation[] | Prisma.ListEnumCryptoOperationFieldRefInput<$PrismaModel>
+  notIn?: $Enums.CryptoOperation[] | Prisma.ListEnumCryptoOperationFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumCryptoOperationFilter<$PrismaModel> | $Enums.CryptoOperation
+}
+
+export type NestedEnumDeliveryStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryStatus | Prisma.EnumDeliveryStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.DeliveryStatus[] | Prisma.ListEnumDeliveryStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeliveryStatus[] | Prisma.ListEnumDeliveryStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeliveryStatusFilter<$PrismaModel> | $Enums.DeliveryStatus
+}
+
+export type NestedEnumCryptoDataKindNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.CryptoDataKind | Prisma.EnumCryptoDataKindFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CryptoDataKind[] | Prisma.ListEnumCryptoDataKindFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CryptoDataKind[] | Prisma.ListEnumCryptoDataKindFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCryptoDataKindNullableFilter<$PrismaModel> | $Enums.CryptoDataKind | null
+}
+
+export type NestedBigIntNullableFilter<$PrismaModel = never> = {
+  equals?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel> | null
+  in?: bigint[] | number[] | Prisma.ListBigIntFieldRefInput<$PrismaModel> | null
+  notIn?: bigint[] | number[] | Prisma.ListBigIntFieldRefInput<$PrismaModel> | null
+  lt?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  lte?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  gt?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  gte?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedBigIntNullableFilter<$PrismaModel> | bigint | number | null
+}
+
+export type NestedEnumCryptoOutcomeNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.CryptoOutcome | Prisma.EnumCryptoOutcomeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CryptoOutcome[] | Prisma.ListEnumCryptoOutcomeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CryptoOutcome[] | Prisma.ListEnumCryptoOutcomeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCryptoOutcomeNullableFilter<$PrismaModel> | $Enums.CryptoOutcome | null
+}
+
+export type NestedEnumCryptoOperationWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CryptoOperation | Prisma.EnumCryptoOperationFieldRefInput<$PrismaModel>
+  in?: $Enums.CryptoOperation[] | Prisma.ListEnumCryptoOperationFieldRefInput<$PrismaModel>
+  notIn?: $Enums.CryptoOperation[] | Prisma.ListEnumCryptoOperationFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumCryptoOperationWithAggregatesFilter<$PrismaModel> | $Enums.CryptoOperation
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCryptoOperationFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCryptoOperationFilter<$PrismaModel>
+}
+
+export type NestedEnumDeliveryStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryStatus | Prisma.EnumDeliveryStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.DeliveryStatus[] | Prisma.ListEnumDeliveryStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeliveryStatus[] | Prisma.ListEnumDeliveryStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeliveryStatusWithAggregatesFilter<$PrismaModel> | $Enums.DeliveryStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDeliveryStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDeliveryStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumCryptoDataKindNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CryptoDataKind | Prisma.EnumCryptoDataKindFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CryptoDataKind[] | Prisma.ListEnumCryptoDataKindFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CryptoDataKind[] | Prisma.ListEnumCryptoDataKindFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCryptoDataKindNullableWithAggregatesFilter<$PrismaModel> | $Enums.CryptoDataKind | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCryptoDataKindNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCryptoDataKindNullableFilter<$PrismaModel>
+}
+
+export type NestedBigIntNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel> | null
+  in?: bigint[] | number[] | Prisma.ListBigIntFieldRefInput<$PrismaModel> | null
+  notIn?: bigint[] | number[] | Prisma.ListBigIntFieldRefInput<$PrismaModel> | null
+  lt?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  lte?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  gt?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  gte?: bigint | number | Prisma.BigIntFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedBigIntNullableWithAggregatesFilter<$PrismaModel> | bigint | number | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _avg?: Prisma.NestedFloatNullableFilter<$PrismaModel>
+  _sum?: Prisma.NestedBigIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedBigIntNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedBigIntNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumCryptoOutcomeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CryptoOutcome | Prisma.EnumCryptoOutcomeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CryptoOutcome[] | Prisma.ListEnumCryptoOutcomeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CryptoOutcome[] | Prisma.ListEnumCryptoOutcomeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCryptoOutcomeNullableWithAggregatesFilter<$PrismaModel> | $Enums.CryptoOutcome | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCryptoOutcomeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCryptoOutcomeNullableFilter<$PrismaModel>
 }
 
 

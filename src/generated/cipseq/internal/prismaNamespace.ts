@@ -412,7 +412,8 @@ export const ModelName = {
   GroupDevice: 'GroupDevice',
   DeviceEnvelope: 'DeviceEnvelope',
   EnvelopeJob: 'EnvelopeJob',
-  AuditEvent: 'AuditEvent'
+  AuditEvent: 'AuditEvent',
+  EnvelopeDelivery: 'EnvelopeDelivery'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -428,7 +429,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "project" | "projectKeys" | "projectKeyVersion" | "group" | "groupKeys" | "groupKeyVersion" | "groupMember" | "groupInvitation" | "device" | "deviceCertificate" | "deviceCertificateAttempt" | "deviceCertificateNotice" | "groupDevice" | "deviceEnvelope" | "envelopeJob" | "auditEvent"
+    modelProps: "project" | "projectKeys" | "projectKeyVersion" | "group" | "groupKeys" | "groupKeyVersion" | "groupMember" | "groupInvitation" | "device" | "deviceCertificate" | "deviceCertificateAttempt" | "deviceCertificateNotice" | "groupDevice" | "deviceEnvelope" | "envelopeJob" | "auditEvent" | "envelopeDelivery"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1616,6 +1617,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    EnvelopeDelivery: {
+      payload: Prisma.$EnvelopeDeliveryPayload<ExtArgs>
+      fields: Prisma.EnvelopeDeliveryFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.EnvelopeDeliveryFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeDeliveryPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.EnvelopeDeliveryFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeDeliveryPayload>
+        }
+        findFirst: {
+          args: Prisma.EnvelopeDeliveryFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeDeliveryPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.EnvelopeDeliveryFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeDeliveryPayload>
+        }
+        findMany: {
+          args: Prisma.EnvelopeDeliveryFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeDeliveryPayload>[]
+        }
+        create: {
+          args: Prisma.EnvelopeDeliveryCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeDeliveryPayload>
+        }
+        createMany: {
+          args: Prisma.EnvelopeDeliveryCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.EnvelopeDeliveryCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeDeliveryPayload>[]
+        }
+        delete: {
+          args: Prisma.EnvelopeDeliveryDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeDeliveryPayload>
+        }
+        update: {
+          args: Prisma.EnvelopeDeliveryUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeDeliveryPayload>
+        }
+        deleteMany: {
+          args: Prisma.EnvelopeDeliveryDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.EnvelopeDeliveryUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.EnvelopeDeliveryUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeDeliveryPayload>[]
+        }
+        upsert: {
+          args: Prisma.EnvelopeDeliveryUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EnvelopeDeliveryPayload>
+        }
+        aggregate: {
+          args: Prisma.EnvelopeDeliveryAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateEnvelopeDelivery>
+        }
+        groupBy: {
+          args: Prisma.EnvelopeDeliveryGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.EnvelopeDeliveryGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.EnvelopeDeliveryCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.EnvelopeDeliveryCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1871,6 +1946,34 @@ export const AuditEventScalarFieldEnum = {
 export type AuditEventScalarFieldEnum = (typeof AuditEventScalarFieldEnum)[keyof typeof AuditEventScalarFieldEnum]
 
 
+export const EnvelopeDeliveryScalarFieldEnum = {
+  id: 'id',
+  requestId: 'requestId',
+  auditEventId: 'auditEventId',
+  operation: 'operation',
+  status: 'status',
+  userId: 'userId',
+  deviceId: 'deviceId',
+  groupId: 'groupId',
+  projectId: 'projectId',
+  gdekVersion: 'gdekVersion',
+  certificateSerial: 'certificateSerial',
+  createdAt: 'createdAt',
+  dataKind: 'dataKind',
+  mimeType: 'mimeType',
+  sizeBytes: 'sizeBytes',
+  fileNameHash: 'fileNameHash',
+  outcome: 'outcome',
+  errorCode: 'errorCode',
+  errorReason: 'errorReason',
+  durationMs: 'durationMs',
+  engineVersion: 'engineVersion',
+  occurredAt: 'occurredAt'
+} as const
+
+export type EnvelopeDeliveryScalarFieldEnum = (typeof EnvelopeDeliveryScalarFieldEnum)[keyof typeof EnvelopeDeliveryScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -2087,6 +2190,76 @@ export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$Prisma
 
 
 /**
+ * Reference to a field of type 'CryptoOperation'
+ */
+export type EnumCryptoOperationFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CryptoOperation'>
+    
+
+
+/**
+ * Reference to a field of type 'CryptoOperation[]'
+ */
+export type ListEnumCryptoOperationFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CryptoOperation[]'>
+    
+
+
+/**
+ * Reference to a field of type 'DeliveryStatus'
+ */
+export type EnumDeliveryStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeliveryStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'DeliveryStatus[]'
+ */
+export type ListEnumDeliveryStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeliveryStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'CryptoDataKind'
+ */
+export type EnumCryptoDataKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CryptoDataKind'>
+    
+
+
+/**
+ * Reference to a field of type 'CryptoDataKind[]'
+ */
+export type ListEnumCryptoDataKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CryptoDataKind[]'>
+    
+
+
+/**
+ * Reference to a field of type 'BigInt'
+ */
+export type BigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt'>
+    
+
+
+/**
+ * Reference to a field of type 'BigInt[]'
+ */
+export type ListBigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt[]'>
+    
+
+
+/**
+ * Reference to a field of type 'CryptoOutcome'
+ */
+export type EnumCryptoOutcomeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CryptoOutcome'>
+    
+
+
+/**
+ * Reference to a field of type 'CryptoOutcome[]'
+ */
+export type ListEnumCryptoOutcomeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CryptoOutcome[]'>
+    
+
+
+/**
  * Reference to a field of type 'Float'
  */
 export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -2266,6 +2439,7 @@ export type GlobalOmitConfig = {
   deviceEnvelope?: Prisma.DeviceEnvelopeOmit
   envelopeJob?: Prisma.EnvelopeJobOmit
   auditEvent?: Prisma.AuditEventOmit
+  envelopeDelivery?: Prisma.EnvelopeDeliveryOmit
 }
 
 /* Types for Logging */

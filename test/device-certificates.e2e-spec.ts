@@ -236,6 +236,8 @@ describe('Device certificates (e2e)', () => {
 
   afterAll(async () => {
     const where = { deviceId: { in: deviceIds } };
+    // First: deliveries point at devices, groups, projects and audit rows.
+    await cipseqPrisma.envelopeDelivery.deleteMany({ where });
     await cipseqPrisma.deviceEnvelope.deleteMany({ where });
     await cipseqPrisma.groupDevice.deleteMany({ where });
     await cipseqPrisma.deviceCertificateNotice.deleteMany({ where });
@@ -955,6 +957,31 @@ describe('Device certificates (e2e)', () => {
         where: { groupId, deviceId, deletedAt: null },
       });
       expect(body.envelope).toEqual(JSON.parse(row.envelopeJson));
+
+      // Counted for the metrics, and linked to its audit row both ways.
+      const delivery = await cipseqPrisma.envelopeDelivery.findUniqueOrThrow({
+        where: { requestId: body.requestId },
+        include: { auditEvent: true },
+      });
+      expect(delivery).toMatchObject({
+        operation: 'ENCRYPT',
+        status: 'APPROVED',
+        userId: owner.id,
+        deviceId,
+        groupId,
+        dataKind: null,
+        sizeBytes: null,
+        outcome: null,
+        errorReason: null,
+        engineVersion: null,
+        occurredAt: null,
+      });
+      expect(delivery.certificateSerial).toMatch(/^[a-f0-9]+$/);
+      expect(delivery.auditEvent.action).toBe('device.envelope_delivered');
+      expect(delivery.auditEvent.metadata).toMatchObject({
+        requestId: body.requestId,
+        operation: 'ENCRYPT',
+      });
     });
 
     it('refuses a session alone, a certificate alone and another user', async () => {
@@ -993,7 +1020,21 @@ describe('Device certificates (e2e)', () => {
         body: { groupId, gdekVersion: current.currentGdekVersion },
       });
       expect(older.status).toBe(200);
-      expect(older.json<{ status: string }>().status).toBe('SUPERSEDED');
+      const delivered = older.json<{ status: string; requestId: string }>();
+      expect(delivered.status).toBe('SUPERSEDED');
+      // Only successful deliveries are counted: the 503 above left no row.
+      expect(
+        await cipseqPrisma.envelopeDelivery.findMany({
+          where: { deviceId },
+          select: { requestId: true, operation: true, status: true },
+        }),
+      ).toEqual([
+        {
+          requestId: delivered.requestId,
+          operation: 'DECRYPT',
+          status: 'SUPERSEDED',
+        },
+      ]);
 
       const missing = await send('POST', '/cipseq/crypto/decrypt', {
         ...session,

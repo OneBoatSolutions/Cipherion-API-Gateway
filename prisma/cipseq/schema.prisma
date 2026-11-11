@@ -29,6 +29,7 @@ model Project {
   keys        ProjectKeys?
   keyVersions ProjectKeyVersion[]
   groups      Group[]
+  deliveries  EnvelopeDelivery[]
 
   @@map("project")
 }
@@ -85,7 +86,7 @@ model Group {
   // Soft delete: the wrapped keys stay, because removing them can't be undone.
   deletedAt   DateTime?
 
-  project     Project           @relation(fields: [projectId], references: [id])
+  project     Project            @relation(fields: [projectId], references: [id])
   keys        GroupKeys?
   keyVersions GroupKeyVersion[]
   members     GroupMember[]
@@ -93,6 +94,7 @@ model Group {
   devices     GroupDevice[]
   envelopes   DeviceEnvelope[]
   envelopeJob EnvelopeJob?
+  deliveries  EnvelopeDelivery[]
 
   @@index([projectId])
   @@map("group")
@@ -197,6 +199,7 @@ model Device {
   envelopes           DeviceEnvelope[]
   certificates        DeviceCertificate[]
   certificateAttempts DeviceCertificateAttempt[]
+  deliveries          EnvelopeDelivery[]
 
   @@index([userId])
   @@map("device")
@@ -378,7 +381,82 @@ model AuditEvent {
   metadata  Json?
   createdAt DateTime @default(now())
 
+  delivery EnvelopeDelivery?
+
   @@index([userId, createdAt])
   @@index([projectId, createdAt])
   @@map("auditEvent")
+}
+
+enum CryptoOperation {
+  ENCRYPT
+  DECRYPT
+}
+
+enum DeliveryStatus {
+  APPROVED
+  SUPERSEDED
+}
+
+enum CryptoDataKind {
+  TEXT
+  FILE
+  STREAM
+  OTHER
+}
+
+enum CryptoOutcome {
+  SUCCESS
+  FAILED
+}
+
+// One successful envelope delivery, which is what the metrics count: the engine
+// fetches an envelope for every operation. Written with its audit row, in the
+// same transaction, under the device lock.
+model EnvelopeDelivery {
+  id                String          @id @default(uuid(7)) @db.Uuid
+  // Returned to the engine, and also in the audit row's metadata.
+  requestId         String          @unique @db.Uuid
+  auditEventId      String          @unique @db.Uuid
+  operation         CryptoOperation
+  status            DeliveryStatus
+  // Better Auth user id, from the session.
+  userId            String
+  // From the client certificate, never the request.
+  deviceId          String
+  groupId           String          @db.Uuid
+  projectId         String          @db.Uuid
+  gdekVersion       Int
+  certificateSerial String
+  createdAt         DateTime        @default(now())
+
+  // Reported by the engine after the operation, matched by requestId. Null until
+  // the engine sends them, and made required later. Untrusted: usage data, not
+  // evidence. Never the content, keys or a plain file name.
+  dataKind     CryptoDataKind?
+  mimeType     String?
+  // Files can pass 2 GB.
+  sizeBytes    BigInt?
+  // A salted hash, never the plain name.
+  fileNameHash String?
+  outcome      CryptoOutcome?
+  errorCode    String?
+  // A short description of why it failed, for support. Never content or keys.
+  errorReason  String?
+  durationMs   Int?
+  // The crypto engine's software version that did the operation.
+  engineVersion String?
+  // When the engine did it; createdAt is when the gateway delivered.
+  occurredAt   DateTime?
+
+  auditEvent AuditEvent @relation(fields: [auditEventId], references: [id])
+  device     Device     @relation(fields: [deviceId], references: [id])
+  group      Group      @relation(fields: [groupId], references: [id])
+  project    Project    @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, createdAt])
+  @@index([groupId, createdAt])
+  @@index([userId, createdAt])
+  @@index([deviceId, createdAt])
+  @@map("envelopeDelivery")
 }

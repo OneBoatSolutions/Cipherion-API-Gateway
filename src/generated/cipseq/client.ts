@@ -121,3 +121,8 @@ export type EnvelopeJob = Prisma.EnvelopeJobModel
  * 
  */
 export type AuditEvent = Prisma.AuditEventModel
+/**
+ * Model EnvelopeDelivery
+ * 
+ */
+export type EnvelopeDelivery = Prisma.EnvelopeDeliveryModel

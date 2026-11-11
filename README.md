@@ -80,7 +80,7 @@ The console app sits behind Traefik on `PORT`. The [engine listener](#engine-lis
 │   ├── auth.ts              # Better Auth configuration
 │   ├── auth/                # AuthController (/api/v1/auth/*), global AuthGuard, @Public() / @CurrentUser(), email templates, Google/GitHub providers
 │   ├── dashboard/           # Dashboard routes (/api/v1/dashboard/profile, /settings)
-│   ├── cipseq/              # CipSeq routes (projects, groups, invitations, devices), envelope jobs, access checks, audit events, device certificates and envelope delivery
+│   ├── cipseq/              # CipSeq routes (projects, groups, invitations, devices), envelope jobs, access checks, audit events, device certificates, envelope delivery and metrics
 │   ├── engine/              # Engine listener on :3443: TLS setup, device identity, guards, enrol/renew and encrypt/decrypt controllers
 │   ├── workspace/           # GET /api/v1/workspace: everything the signed-in user is a part of
 │   ├── health/              # Liveness (/api/v1/health) and readiness (/api/v1/ready) endpoints
@@ -694,6 +694,25 @@ Under `/api/v1/cipseq`:
 - **Audit:** `device.certificate_enrolled`, `.certificate_renewed`, `.certificate_refused`, `.certificate_issue_failed`, `.certificate_notice_dismissed` and `.envelope_delivered`.
 
 See [docs/device-certificates.md](docs/device-certificates.md) for what's implemented and tested, [docs/tls-pins.md](docs/tls-pins.md) for keys and rotation, and [docs/envelope-signing.md](docs/envelope-signing.md) for signing.
+
+## CipSeq metrics
+
+Counts of encryptions and decryptions. The gateway never sees the operations, but the engine fetches an envelope for each one, so every successful delivery on `/crypto/encrypt` or `/crypto/decrypt` writes an `envelopeDelivery` row with its audit row, in one transaction. Counting starts from the deploy that added the table.
+
+Under `/api/v1/cipseq/metrics`, on the console port:
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/leaderboard?period=` | For the caller's own admin projects: the top 10 projects, users and devices, the totals and one time series. `period` is `today`, `week`, `month` (default), `year` or `all`. Empty lists for someone who's admin of nothing |
+| `GET` | `/usage?scope=&id=&period=` | Totals and a time series for one `project`, `group`, `user` or `device`. `period` is `today`, `week`, `month` or `year` |
+
+- **Buckets:** in UTC, with every bucket present and empty ones as zeros. `today` has 4 six-hour buckets, `week` and `month` one per day for the last 7 or 30 days, `year` one per calendar month for the last 12, and `all` one per month from the first delivery. The current bucket is partial.
+- **Usage access:** a project or group needs its project admin. Anyone can read themselves and their own devices, everywhere. Another user or device is counted only inside the caller's admin projects, and only if it's in one of them. Anything else answers `404`, the same as an unknown id.
+- **Ranking:** by total, then encryptions, then id. Users and devices are counted only inside the caller's admin projects.
+- **Engine-reported columns:** `dataKind`, `mimeType`, `sizeBytes`, `fileNameHash`, `outcome`, `errorCode`, `errorReason`, `durationMs`, `engineVersion` and `occurredAt` are empty until the engine's usage report exists. The API doesn't return them.
+- **Timing:** over 100,000 deliveries in one project, the slowest call (leaderboard `all`) took about 100 ms locally.
+
+Swagger at `/api/v1/docs` (tag `cipseq`) has the full response shapes and an example for each period, for the frontend.
 
 ## Protecting routes
 

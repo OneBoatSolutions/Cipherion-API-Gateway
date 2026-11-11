@@ -5,6 +5,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import type { DevicePeer } from '../engine/device-peer.js';
+import type { CryptoOperation } from '../generated/cipseq/enums.js';
 import { auditEvent } from './audit.js';
 import { checkCertificate } from './device-certificates.js';
 import { type CipSeqTransaction, withDeviceLock } from './device-lock.js';
@@ -25,6 +26,7 @@ export interface EnvelopeDelivery {
 interface DeliveryRequest {
   peer: DevicePeer;
   userId: string;
+  operation: CryptoOperation;
   groupId: string;
   // Absent for encrypt, which always uses the current version.
   gdekVersion?: number;
@@ -54,7 +56,7 @@ function loadEnvelope(
 
 async function deliver(
   tx: CipSeqTransaction,
-  { peer, userId, groupId, gdekVersion }: DeliveryRequest,
+  { peer, userId, operation, groupId, gdekVersion }: DeliveryRequest,
 ): Promise<EnvelopeDelivery | HttpException> {
   // Under the lock, so that a revocation can't race the guard's check.
   const certificate = await checkCertificate(peer, userId, tx);
@@ -102,16 +104,39 @@ async function deliver(
   }
 
   const requestId = randomUUID();
-  await auditEvent(
+  const status = version === current ? 'APPROVED' : 'SUPERSEDED';
+  const audit = await auditEvent(
     userId,
     'device.envelope_delivered',
     group.projectId,
-    { deviceId: peer.deviceId, groupId, gdekVersion: version, requestId },
+    {
+      deviceId: peer.deviceId,
+      groupId,
+      gdekVersion: version,
+      requestId,
+      operation,
+    },
     tx,
   );
+  // What the metrics count. Same transaction as the audit row it links to, so
+  // both commit or neither does.
+  await tx.envelopeDelivery.create({
+    data: {
+      requestId,
+      auditEventId: audit.id,
+      operation,
+      status,
+      userId,
+      deviceId: peer.deviceId,
+      groupId,
+      projectId: group.projectId,
+      gdekVersion: version,
+      certificateSerial: peer.serial,
+    },
+  });
   return {
     requestId,
-    status: version === current ? 'APPROVED' : 'SUPERSEDED',
+    status,
     envelope: JSON.parse(row.envelopeJson) as unknown,
   };
 }

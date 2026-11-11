@@ -202,6 +202,7 @@ export type DeviceWhereInput = {
   envelopes?: Prisma.DeviceEnvelopeListRelationFilter
   certificates?: Prisma.DeviceCertificateListRelationFilter
   certificateAttempts?: Prisma.DeviceCertificateAttemptListRelationFilter
+  deliveries?: Prisma.EnvelopeDeliveryListRelationFilter
 }
 
 export type DeviceOrderByWithRelationInput = {
@@ -216,6 +217,7 @@ export type DeviceOrderByWithRelationInput = {
   envelopes?: Prisma.DeviceEnvelopeOrderByRelationAggregateInput
   certificates?: Prisma.DeviceCertificateOrderByRelationAggregateInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptOrderByRelationAggregateInput
+  deliveries?: Prisma.EnvelopeDeliveryOrderByRelationAggregateInput
 }
 
 export type DeviceWhereUniqueInput = Prisma.AtLeast<{
@@ -233,6 +235,7 @@ export type DeviceWhereUniqueInput = Prisma.AtLeast<{
   envelopes?: Prisma.DeviceEnvelopeListRelationFilter
   certificates?: Prisma.DeviceCertificateListRelationFilter
   certificateAttempts?: Prisma.DeviceCertificateAttemptListRelationFilter
+  deliveries?: Prisma.EnvelopeDeliveryListRelationFilter
 }, "id">
 
 export type DeviceOrderByWithAggregationInput = {
@@ -273,6 +276,7 @@ export type DeviceCreateInput = {
   envelopes?: Prisma.DeviceEnvelopeCreateNestedManyWithoutDeviceInput
   certificates?: Prisma.DeviceCertificateCreateNestedManyWithoutDeviceInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptCreateNestedManyWithoutDeviceInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutDeviceInput
 }
 
 export type DeviceUncheckedCreateInput = {
@@ -287,6 +291,7 @@ export type DeviceUncheckedCreateInput = {
   envelopes?: Prisma.DeviceEnvelopeUncheckedCreateNestedManyWithoutDeviceInput
   certificates?: Prisma.DeviceCertificateUncheckedCreateNestedManyWithoutDeviceInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptUncheckedCreateNestedManyWithoutDeviceInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutDeviceInput
 }
 
 export type DeviceUpdateInput = {
@@ -301,6 +306,7 @@ export type DeviceUpdateInput = {
   envelopes?: Prisma.DeviceEnvelopeUpdateManyWithoutDeviceNestedInput
   certificates?: Prisma.DeviceCertificateUpdateManyWithoutDeviceNestedInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptUpdateManyWithoutDeviceNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutDeviceNestedInput
 }
 
 export type DeviceUncheckedUpdateInput = {
@@ -315,6 +321,7 @@ export type DeviceUncheckedUpdateInput = {
   envelopes?: Prisma.DeviceEnvelopeUncheckedUpdateManyWithoutDeviceNestedInput
   certificates?: Prisma.DeviceCertificateUncheckedUpdateManyWithoutDeviceNestedInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptUncheckedUpdateManyWithoutDeviceNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutDeviceNestedInput
 }
 
 export type DeviceCreateManyInput = {
@@ -442,6 +449,20 @@ export type DeviceUpdateOneRequiredWithoutEnvelopesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.DeviceUpdateToOneWithWhereWithoutEnvelopesInput, Prisma.DeviceUpdateWithoutEnvelopesInput>, Prisma.DeviceUncheckedUpdateWithoutEnvelopesInput>
 }
 
+export type DeviceCreateNestedOneWithoutDeliveriesInput = {
+  create?: Prisma.XOR<Prisma.DeviceCreateWithoutDeliveriesInput, Prisma.DeviceUncheckedCreateWithoutDeliveriesInput>
+  connectOrCreate?: Prisma.DeviceCreateOrConnectWithoutDeliveriesInput
+  connect?: Prisma.DeviceWhereUniqueInput
+}
+
+export type DeviceUpdateOneRequiredWithoutDeliveriesNestedInput = {
+  create?: Prisma.XOR<Prisma.DeviceCreateWithoutDeliveriesInput, Prisma.DeviceUncheckedCreateWithoutDeliveriesInput>
+  connectOrCreate?: Prisma.DeviceCreateOrConnectWithoutDeliveriesInput
+  upsert?: Prisma.DeviceUpsertWithoutDeliveriesInput
+  connect?: Prisma.DeviceWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.DeviceUpdateToOneWithWhereWithoutDeliveriesInput, Prisma.DeviceUpdateWithoutDeliveriesInput>, Prisma.DeviceUncheckedUpdateWithoutDeliveriesInput>
+}
+
 export type DeviceCreateWithoutCertificatesInput = {
   id: string
   userId: string
@@ -453,6 +474,7 @@ export type DeviceCreateWithoutCertificatesInput = {
   groups?: Prisma.GroupDeviceCreateNestedManyWithoutDeviceInput
   envelopes?: Prisma.DeviceEnvelopeCreateNestedManyWithoutDeviceInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptCreateNestedManyWithoutDeviceInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutDeviceInput
 }
 
 export type DeviceUncheckedCreateWithoutCertificatesInput = {
@@ -466,6 +488,7 @@ export type DeviceUncheckedCreateWithoutCertificatesInput = {
   groups?: Prisma.GroupDeviceUncheckedCreateNestedManyWithoutDeviceInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedCreateNestedManyWithoutDeviceInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptUncheckedCreateNestedManyWithoutDeviceInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutDeviceInput
 }
 
 export type DeviceCreateOrConnectWithoutCertificatesInput = {
@@ -495,6 +518,7 @@ export type DeviceUpdateWithoutCertificatesInput = {
   groups?: Prisma.GroupDeviceUpdateManyWithoutDeviceNestedInput
   envelopes?: Prisma.DeviceEnvelopeUpdateManyWithoutDeviceNestedInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptUpdateManyWithoutDeviceNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutDeviceNestedInput
 }
 
 export type DeviceUncheckedUpdateWithoutCertificatesInput = {
@@ -508,6 +532,7 @@ export type DeviceUncheckedUpdateWithoutCertificatesInput = {
   groups?: Prisma.GroupDeviceUncheckedUpdateManyWithoutDeviceNestedInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedUpdateManyWithoutDeviceNestedInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptUncheckedUpdateManyWithoutDeviceNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutDeviceNestedInput
 }
 
 export type DeviceCreateWithoutCertificateAttemptsInput = {
@@ -521,6 +546,7 @@ export type DeviceCreateWithoutCertificateAttemptsInput = {
   groups?: Prisma.GroupDeviceCreateNestedManyWithoutDeviceInput
   envelopes?: Prisma.DeviceEnvelopeCreateNestedManyWithoutDeviceInput
   certificates?: Prisma.DeviceCertificateCreateNestedManyWithoutDeviceInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutDeviceInput
 }
 
 export type DeviceUncheckedCreateWithoutCertificateAttemptsInput = {
@@ -534,6 +560,7 @@ export type DeviceUncheckedCreateWithoutCertificateAttemptsInput = {
   groups?: Prisma.GroupDeviceUncheckedCreateNestedManyWithoutDeviceInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedCreateNestedManyWithoutDeviceInput
   certificates?: Prisma.DeviceCertificateUncheckedCreateNestedManyWithoutDeviceInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutDeviceInput
 }
 
 export type DeviceCreateOrConnectWithoutCertificateAttemptsInput = {
@@ -563,6 +590,7 @@ export type DeviceUpdateWithoutCertificateAttemptsInput = {
   groups?: Prisma.GroupDeviceUpdateManyWithoutDeviceNestedInput
   envelopes?: Prisma.DeviceEnvelopeUpdateManyWithoutDeviceNestedInput
   certificates?: Prisma.DeviceCertificateUpdateManyWithoutDeviceNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutDeviceNestedInput
 }
 
 export type DeviceUncheckedUpdateWithoutCertificateAttemptsInput = {
@@ -576,6 +604,7 @@ export type DeviceUncheckedUpdateWithoutCertificateAttemptsInput = {
   groups?: Prisma.GroupDeviceUncheckedUpdateManyWithoutDeviceNestedInput
   envelopes?: Prisma.DeviceEnvelopeUncheckedUpdateManyWithoutDeviceNestedInput
   certificates?: Prisma.DeviceCertificateUncheckedUpdateManyWithoutDeviceNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutDeviceNestedInput
 }
 
 export type DeviceCreateWithoutGroupsInput = {
@@ -589,6 +618,7 @@ export type DeviceCreateWithoutGroupsInput = {
   envelopes?: Prisma.DeviceEnvelopeCreateNestedManyWithoutDeviceInput
   certificates?: Prisma.DeviceCertificateCreateNestedManyWithoutDeviceInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptCreateNestedManyWithoutDeviceInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutDeviceInput
 }
 
 export type DeviceUncheckedCreateWithoutGroupsInput = {
@@ -602,6 +632,7 @@ export type DeviceUncheckedCreateWithoutGroupsInput = {
   envelopes?: Prisma.DeviceEnvelopeUncheckedCreateNestedManyWithoutDeviceInput
   certificates?: Prisma.DeviceCertificateUncheckedCreateNestedManyWithoutDeviceInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptUncheckedCreateNestedManyWithoutDeviceInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutDeviceInput
 }
 
 export type DeviceCreateOrConnectWithoutGroupsInput = {
@@ -631,6 +662,7 @@ export type DeviceUpdateWithoutGroupsInput = {
   envelopes?: Prisma.DeviceEnvelopeUpdateManyWithoutDeviceNestedInput
   certificates?: Prisma.DeviceCertificateUpdateManyWithoutDeviceNestedInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptUpdateManyWithoutDeviceNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutDeviceNestedInput
 }
 
 export type DeviceUncheckedUpdateWithoutGroupsInput = {
@@ -644,6 +676,7 @@ export type DeviceUncheckedUpdateWithoutGroupsInput = {
   envelopes?: Prisma.DeviceEnvelopeUncheckedUpdateManyWithoutDeviceNestedInput
   certificates?: Prisma.DeviceCertificateUncheckedUpdateManyWithoutDeviceNestedInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptUncheckedUpdateManyWithoutDeviceNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutDeviceNestedInput
 }
 
 export type DeviceCreateWithoutEnvelopesInput = {
@@ -657,6 +690,7 @@ export type DeviceCreateWithoutEnvelopesInput = {
   groups?: Prisma.GroupDeviceCreateNestedManyWithoutDeviceInput
   certificates?: Prisma.DeviceCertificateCreateNestedManyWithoutDeviceInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptCreateNestedManyWithoutDeviceInput
+  deliveries?: Prisma.EnvelopeDeliveryCreateNestedManyWithoutDeviceInput
 }
 
 export type DeviceUncheckedCreateWithoutEnvelopesInput = {
@@ -670,6 +704,7 @@ export type DeviceUncheckedCreateWithoutEnvelopesInput = {
   groups?: Prisma.GroupDeviceUncheckedCreateNestedManyWithoutDeviceInput
   certificates?: Prisma.DeviceCertificateUncheckedCreateNestedManyWithoutDeviceInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptUncheckedCreateNestedManyWithoutDeviceInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedCreateNestedManyWithoutDeviceInput
 }
 
 export type DeviceCreateOrConnectWithoutEnvelopesInput = {
@@ -699,6 +734,7 @@ export type DeviceUpdateWithoutEnvelopesInput = {
   groups?: Prisma.GroupDeviceUpdateManyWithoutDeviceNestedInput
   certificates?: Prisma.DeviceCertificateUpdateManyWithoutDeviceNestedInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptUpdateManyWithoutDeviceNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUpdateManyWithoutDeviceNestedInput
 }
 
 export type DeviceUncheckedUpdateWithoutEnvelopesInput = {
@@ -710,6 +746,79 @@ export type DeviceUncheckedUpdateWithoutEnvelopesInput = {
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   groups?: Prisma.GroupDeviceUncheckedUpdateManyWithoutDeviceNestedInput
+  certificates?: Prisma.DeviceCertificateUncheckedUpdateManyWithoutDeviceNestedInput
+  certificateAttempts?: Prisma.DeviceCertificateAttemptUncheckedUpdateManyWithoutDeviceNestedInput
+  deliveries?: Prisma.EnvelopeDeliveryUncheckedUpdateManyWithoutDeviceNestedInput
+}
+
+export type DeviceCreateWithoutDeliveriesInput = {
+  id: string
+  userId: string
+  name?: string | null
+  publicKey: string
+  status?: $Enums.DeviceStatus
+  revokedAt?: Date | string | null
+  createdAt?: Date | string
+  groups?: Prisma.GroupDeviceCreateNestedManyWithoutDeviceInput
+  envelopes?: Prisma.DeviceEnvelopeCreateNestedManyWithoutDeviceInput
+  certificates?: Prisma.DeviceCertificateCreateNestedManyWithoutDeviceInput
+  certificateAttempts?: Prisma.DeviceCertificateAttemptCreateNestedManyWithoutDeviceInput
+}
+
+export type DeviceUncheckedCreateWithoutDeliveriesInput = {
+  id: string
+  userId: string
+  name?: string | null
+  publicKey: string
+  status?: $Enums.DeviceStatus
+  revokedAt?: Date | string | null
+  createdAt?: Date | string
+  groups?: Prisma.GroupDeviceUncheckedCreateNestedManyWithoutDeviceInput
+  envelopes?: Prisma.DeviceEnvelopeUncheckedCreateNestedManyWithoutDeviceInput
+  certificates?: Prisma.DeviceCertificateUncheckedCreateNestedManyWithoutDeviceInput
+  certificateAttempts?: Prisma.DeviceCertificateAttemptUncheckedCreateNestedManyWithoutDeviceInput
+}
+
+export type DeviceCreateOrConnectWithoutDeliveriesInput = {
+  where: Prisma.DeviceWhereUniqueInput
+  create: Prisma.XOR<Prisma.DeviceCreateWithoutDeliveriesInput, Prisma.DeviceUncheckedCreateWithoutDeliveriesInput>
+}
+
+export type DeviceUpsertWithoutDeliveriesInput = {
+  update: Prisma.XOR<Prisma.DeviceUpdateWithoutDeliveriesInput, Prisma.DeviceUncheckedUpdateWithoutDeliveriesInput>
+  create: Prisma.XOR<Prisma.DeviceCreateWithoutDeliveriesInput, Prisma.DeviceUncheckedCreateWithoutDeliveriesInput>
+  where?: Prisma.DeviceWhereInput
+}
+
+export type DeviceUpdateToOneWithWhereWithoutDeliveriesInput = {
+  where?: Prisma.DeviceWhereInput
+  data: Prisma.XOR<Prisma.DeviceUpdateWithoutDeliveriesInput, Prisma.DeviceUncheckedUpdateWithoutDeliveriesInput>
+}
+
+export type DeviceUpdateWithoutDeliveriesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumDeviceStatusFieldUpdateOperationsInput | $Enums.DeviceStatus
+  revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  groups?: Prisma.GroupDeviceUpdateManyWithoutDeviceNestedInput
+  envelopes?: Prisma.DeviceEnvelopeUpdateManyWithoutDeviceNestedInput
+  certificates?: Prisma.DeviceCertificateUpdateManyWithoutDeviceNestedInput
+  certificateAttempts?: Prisma.DeviceCertificateAttemptUpdateManyWithoutDeviceNestedInput
+}
+
+export type DeviceUncheckedUpdateWithoutDeliveriesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumDeviceStatusFieldUpdateOperationsInput | $Enums.DeviceStatus
+  revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  groups?: Prisma.GroupDeviceUncheckedUpdateManyWithoutDeviceNestedInput
+  envelopes?: Prisma.DeviceEnvelopeUncheckedUpdateManyWithoutDeviceNestedInput
   certificates?: Prisma.DeviceCertificateUncheckedUpdateManyWithoutDeviceNestedInput
   certificateAttempts?: Prisma.DeviceCertificateAttemptUncheckedUpdateManyWithoutDeviceNestedInput
 }
@@ -724,6 +833,7 @@ export type DeviceCountOutputType = {
   envelopes: number
   certificates: number
   certificateAttempts: number
+  deliveries: number
 }
 
 export type DeviceCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -731,6 +841,7 @@ export type DeviceCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions
   envelopes?: boolean | DeviceCountOutputTypeCountEnvelopesArgs
   certificates?: boolean | DeviceCountOutputTypeCountCertificatesArgs
   certificateAttempts?: boolean | DeviceCountOutputTypeCountCertificateAttemptsArgs
+  deliveries?: boolean | DeviceCountOutputTypeCountDeliveriesArgs
 }
 
 /**
@@ -771,6 +882,13 @@ export type DeviceCountOutputTypeCountCertificateAttemptsArgs<ExtArgs extends ru
   where?: Prisma.DeviceCertificateAttemptWhereInput
 }
 
+/**
+ * DeviceCountOutputType without action
+ */
+export type DeviceCountOutputTypeCountDeliveriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.EnvelopeDeliveryWhereInput
+}
+
 
 export type DeviceSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -784,6 +902,7 @@ export type DeviceSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   envelopes?: boolean | Prisma.Device$envelopesArgs<ExtArgs>
   certificates?: boolean | Prisma.Device$certificatesArgs<ExtArgs>
   certificateAttempts?: boolean | Prisma.Device$certificateAttemptsArgs<ExtArgs>
+  deliveries?: boolean | Prisma.Device$deliveriesArgs<ExtArgs>
   _count?: boolean | Prisma.DeviceCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["device"]>
 
@@ -823,6 +942,7 @@ export type DeviceInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   envelopes?: boolean | Prisma.Device$envelopesArgs<ExtArgs>
   certificates?: boolean | Prisma.Device$certificatesArgs<ExtArgs>
   certificateAttempts?: boolean | Prisma.Device$certificateAttemptsArgs<ExtArgs>
+  deliveries?: boolean | Prisma.Device$deliveriesArgs<ExtArgs>
   _count?: boolean | Prisma.DeviceCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type DeviceIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -835,6 +955,7 @@ export type $DevicePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     envelopes: Prisma.$DeviceEnvelopePayload<ExtArgs>[]
     certificates: Prisma.$DeviceCertificatePayload<ExtArgs>[]
     certificateAttempts: Prisma.$DeviceCertificateAttemptPayload<ExtArgs>[]
+    deliveries: Prisma.$EnvelopeDeliveryPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1242,6 +1363,7 @@ export interface Prisma__DeviceClient<T, Null = never, ExtArgs extends runtime.T
   envelopes<T extends Prisma.Device$envelopesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Device$envelopesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeviceEnvelopePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   certificates<T extends Prisma.Device$certificatesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Device$certificatesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeviceCertificatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   certificateAttempts<T extends Prisma.Device$certificateAttemptsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Device$certificateAttemptsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeviceCertificateAttemptPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  deliveries<T extends Prisma.Device$deliveriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Device$deliveriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$EnvelopeDeliveryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1764,6 +1886,30 @@ export type Device$certificateAttemptsArgs<ExtArgs extends runtime.Types.Extensi
   take?: number
   skip?: number
   distinct?: Prisma.DeviceCertificateAttemptScalarFieldEnum | Prisma.DeviceCertificateAttemptScalarFieldEnum[]
+}
+
+/**
+ * Device.deliveries
+ */
+export type Device$deliveriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the EnvelopeDelivery
+   */
+  select?: Prisma.EnvelopeDeliverySelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the EnvelopeDelivery
+   */
+  omit?: Prisma.EnvelopeDeliveryOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.EnvelopeDeliveryInclude<ExtArgs> | null
+  where?: Prisma.EnvelopeDeliveryWhereInput
+  orderBy?: Prisma.EnvelopeDeliveryOrderByWithRelationInput | Prisma.EnvelopeDeliveryOrderByWithRelationInput[]
+  cursor?: Prisma.EnvelopeDeliveryWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.EnvelopeDeliveryScalarFieldEnum | Prisma.EnvelopeDeliveryScalarFieldEnum[]
 }
 
 /**
