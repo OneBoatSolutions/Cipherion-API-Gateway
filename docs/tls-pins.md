@@ -2,7 +2,7 @@
 
 How the gateway's TLS pins are generated, delivered, checked and rotated. For anyone operating the gateway or releasing the engine.
 
-> **Status (2026-11-07):** the engine listener, its start-up checks and `npm run certs:engine` are built and tested locally. It hasn't
+> **Status (2026-11-07):** the engine listener, its start-up checks and its key tooling (now in the KMS repository) are built and tested locally. It hasn't
 > been deployed behind a real Coolify setup or used by a real engine; see [what was tested](#what-was-tested).
 
 ## What a pin is
@@ -40,7 +40,8 @@ Browser / dashboard → https://api.example.com → Traefik (Let's Encrypt) → 
 Engine              → engine.example.com:3443 → published port, no proxy → gateway :3443 (gateway's own TLS)
 ```
 
-In Coolify, publish `3443:3443` directly and keep the domain pointing at 3000. Confirm this on staging, using
+In Coolify, publish `3443:3443` directly and keep the domain pointing at 3000. The pin files live in `/data/cipherion/gateway/` on the server (see
+`docs/environment.md`, "Certificate files on Coolify"). Confirm this on staging, using
 [the live check](#check-the-live-server), **before** any pin ships in an engine.
 
 ## The two keys
@@ -59,15 +60,18 @@ The two pins must differ. Each environment has its own keys, and development pin
 Run this on the admin machine, once per key, using the real host name of the engine endpoint. Self-signed is correct here, because the
 engine trusts the pin and not a CA.
 
-**The script is the safest way, and works in any shell.** It avoids every problem under [Windows](#windows), never replaces an existing key, and refuses
-a pin file that doesn't match:
+**The KMS repository makes the keys for you.** It creates the active key (A) and the spare (B) together, never replaces an existing key, refuses a pin
+file that doesn't match, and records both pins in `pins.json` for the engine team. Run it in `D:\OneBoatSolutions\servers\Cipherion-KMS`:
 
 ```bash
-npm run certs:engine -- --host engine.example.com --name engine-server-a --dir ./keys
-npm run certs:engine -- --host engine.example.com --name engine-server-b --dir ./keys
+ENGINE_HOSTS=engine.example.com make setup-all     # the real host name of the engine endpoint (default: localhost,127.0.0.1)
+make pin-status                                    # shows both pins and when the certificate ends
 ```
 
-With no options, it creates a development key for `localhost` in `certs/engine`. Then do [step 3](#3-check-the-pin-before-using-it) and
+The files for the gateway are then in `D:\OneBoatSolutions\servers\Cipherion-KMS\certs\deploy\gateway\` (`engine-server.key`, `engine-server.crt`,
+`engine-server.spki.sha256`), and the pins for the engine team are in `...\certs\deploy\engine\pins.json`. For local testing run
+`make local-gateway GATEWAY_DIR=D:/OneBoatSolutions/servers/Cipherion-API_Gateway`; for a server run `make server-push SERVER=user@host`. Both are explained in
+`docs/local-gateway-testing.md` and `docs/coolify-certificate-routine.md` in the KMS repository. Then do [step 3](#3-check-the-pin-before-using-it) and
 [step 4](#4-store-the-spare).
 
 The manual commands are below. **Use a bash shell** for them, not Windows PowerShell.
@@ -176,10 +180,12 @@ doesn't mean the listener is down.
 
 ### Renewing the certificate, same key (yearly)
 
-The pin doesn't change, and no engine release is needed. Use the script, which keeps the key and refuses a mismatched pin:
+The pin doesn't change, and no engine release is needed. Use the KMS repository, which keeps the key and refuses a mismatched pin:
 
 ```bash
-npm run certs:engine -- --renew --host engine.example.com --name engine-server-a --dir ./keys
+cd D:\OneBoatSolutions\servers\Cipherion-KMS
+make pin-renew
+make server-push SERVER=user@YOUR_SERVER_IP     # then restart the gateway in Coolify
 ```
 
 Or by hand:
@@ -249,7 +255,7 @@ Run on 2026-11-06 in Git Bash, with OpenSSL 3.5.7 and Node 22.23.2, using throwa
 | Live check against a local TLS server using the planned settings | Matches the pin |
 | Classical-only key exchange, and TLS 1.2 | Both refused |
 | Same pin pipeline in Windows PowerShell 5.1 | **Wrong value, with no error** |
-| `npm run certs:engine` | Creates a working key, keeps it on a second run, keeps the pin with `--renew`, and refuses a wrong pin file |
+| The KMS repository's pin tooling (`make pin-setup`, `make pin-renew`) | Creates a working key, keeps it on a second run, keeps the pin on renewal, and refuses a wrong pin file |
 | The built gateway with the listener on | Live check from OpenSSL matches the pin file |
 | Start-up with a mismatched key, a wrong pin file or a bad CA bundle | Refused |
 

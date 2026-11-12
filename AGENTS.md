@@ -33,7 +33,6 @@ npm run test                                        # unit tests (vitest)
 npm run test:e2e                                    # e2e tests (need the KMS running locally)
 npm run db:generate                                 # regenerate both Prisma clients
 npm run proto:generate                              # regenerate the KMS gRPC client after a .proto change
-npm run certs:engine                                # development key, certificate and pin for the engine listener
 npm run users:migrate-ids                           # one-off: move pre-UUID user ids to UUID v4 (dry run; -- --apply)
 npx prisma migrate dev --name <name> --config prisma7.config.ts          # auth database
 npx prisma migrate dev --name <name> --config prisma7.cipseq.config.ts   # CipSeq database

@@ -81,8 +81,10 @@
 - [x] Device and member revocation (soft delete all versions of the envelopes, with no rotation)
 - [x] Show envelope jobs as in progress, stopped or completed, and resume a stopped one with the passphrase
 - [x] Certificate branch: port 3443, device certificates, enrol and renew, `POST /cipseq/crypto/encrypt` and `/decrypt`, Better Auth bearer plugin and fixed 1-day sessions. This is what delivers envelopes to devices, and proves a device is genuine
-- [x] TLS pin tooling (`npm run certs:engine`) and docs for generating, delivering and rotating pins
+- [x] TLS pin tooling (now `make pin-setup` and `make local-gateway` in the KMS repository) and docs for generating, delivering and rotating pins
 - [x] Revoke a device's certificates with the device
+- [x] Dockerfile for Coolify, with certificates mounted at `/certs` instead of baked into the image
+- [ ] Run the built image on Coolify with the engine port published, and check the live pin ([docs/tls-pins.md](docs/tls-pins.md))
 - [x] UUID v4 ids for users, sessions and accounts, and `npm run users:migrate-ids` for existing ones
 - [ ] Complete the encrypt and decrypt response to the agreed 11-field contract (only `requestId`, `status` and `envelope` today). Blocks shipping these routes to an engine
 - [ ] Send the certificate-issued notice by email, through a retrying outbox worker on `deviceCertificateNotice`. Blocks production, because a stolen session can enrol a certificate

@@ -30,7 +30,7 @@ if a required one is missing or invalid. [.env.example](../.env.example) has the
 | `KMS_CLIENT_CERT` | `certs/deploy/gateway/gateway.crt` | The gateway's client certificate. Start-up fails if it has expired, and warns under 30 days |
 | `KMS_CLIENT_KEY` | `certs/deploy/gateway/gateway.key` | **Secret.** Its private key |
 
-The three KMS files come from `certs/deploy/gateway/` after `make rotate-init` in the KMS repository. There's no plaintext mode, so they're required even
+The three KMS files come from `certs/deploy/gateway/` after `make setup-all` in the KMS repository (`D:\OneBoatSolutions\servers\Cipherion-KMS`). There's no plaintext mode, so they're required even
 locally.
 
 ## Optional
@@ -72,9 +72,18 @@ Neither fails at start-up if swapped. Swapped, every KMS call fails, and no devi
 
 ## Local setup
 
+The certificate files are made in the KMS repository (`D:\OneBoatSolutions\servers\Cipherion-KMS`), not here. This copies them into this
+repository's `certs/` folder (`certs/deploy/gateway/` for the KMS connection, the device CA bundle and the engine listener):
+
 ```bash
-npm run certs:engine
+cd D:\OneBoatSolutions\servers\Cipherion-KMS
+make setup-all            # once: makes every key and certificate
+make local-gateway GATEWAY_DIR=D:/OneBoatSolutions/servers/Cipherion-API_Gateway
 ```
+
+Without `GATEWAY_DIR`, the command only makes the folder `D:\OneBoatSolutions\servers\Cipherion-KMS\certs\deploy\local-gateway\`; copy its contents into
+this repository's `certs/` folder yourself. The engine certificate is made for `localhost` and `127.0.0.1`; for another name set `ENGINE_HOSTS` in the KMS `.env`
+before the first `make setup-all`. The full explanation is `docs/local-gateway-testing.md` in the KMS repository.
 
 Then, in `.env`:
 
@@ -90,9 +99,9 @@ KMS_CLIENT_KEY=certs/deploy/gateway/gateway.key
 DEVICE_ENGINE_ENABLED=true
 DEVICE_ENGINE_HOST=127.0.0.1
 DEVICE_ENGINE_PORT=3443
-DEVICE_TLS_KEY=certs/engine/engine-server.key
-DEVICE_TLS_CERT=certs/engine/engine-server.crt
-DEVICE_TLS_PIN_FILE=certs/engine/engine-server.spki.sha256
+DEVICE_TLS_KEY=certs/deploy/gateway/engine-server.key
+DEVICE_TLS_CERT=certs/deploy/gateway/engine-server.crt
+DEVICE_TLS_PIN_FILE=certs/deploy/gateway/engine-server.spki.sha256
 DEVICE_CA_BUNDLE=certs/deploy/gateway/device-ca-trust.pem
 ```
 
@@ -109,6 +118,15 @@ Restart the gateway, and look for `Engine listener is running on port 3443` in t
 | `DEVICE_ENGINE_HOST` | `0.0.0.0` |
 | `DEVICE_TLS_*` | Key **A** only, from a secret mount, readable only by the gateway's user |
 | Port 3443 | Published directly, never through Traefik, with a firewall connection limit |
+
+### Certificate files on Coolify
+
+On the server, put the files from `D:\OneBoatSolutions\servers\Cipherion-KMS\certs\deploy\gateway\` in `/data/cipherion/gateway/`
+(owner UID 1000, the image's `node` user, with `chmod 400` on the `.key` files) and add a read-only bind mount in Coolify: source
+`/data/cipherion/gateway`, destination `/certs`. Then set `KMS_CA_CERT=/certs/ca.crt`, `KMS_CLIENT_CERT=/certs/gateway.crt`,
+`KMS_CLIENT_KEY=/certs/gateway.key`, `DEVICE_TLS_KEY=/certs/engine-server.key`, `DEVICE_TLS_CERT=/certs/engine-server.crt`,
+`DEVICE_TLS_PIN_FILE=/certs/engine-server.spki.sha256` and `DEVICE_CA_BUNDLE=/certs/device-ca-trust.pem`. After a rotation, replace the
+files and **restart**; the full routine is `docs/coolify-certificate-routine.md` in the KMS repository.
 
 Secret files: `KMS_CLIENT_KEY` and `DEVICE_TLS_KEY`. Never put a CA private key, `device-ca.key`, the KMS's `server.key` or a spare server key on the
 gateway.

@@ -12,7 +12,7 @@ finished. Last updated 2026-11-07, on branch `feat/certs`.
 | Client certificate expiry check, and a daily check of all certificates | Done |
 | KMS proto and generated client for `IssueDeviceCertificate` | Done, with real signing tested. See [the proto note](#proto) |
 | Certificate tables | Done |
-| Dev server key and TLS pin tooling (`npm run certs:engine`) | Done. Keys and rotation are in [tls-pins.md](tls-pins.md) |
+| Dev server key and TLS pin tooling (`make local-gateway` in the KMS repository) | Done. Keys and rotation are in [tls-pins.md](tls-pins.md) |
 | Engine listener on port 3443 | Done, off by default |
 | Device identity guards | Done |
 | Enrol and renew endpoints | Done |
@@ -92,22 +92,24 @@ the load should be tested before production, and the audit table will need a ret
 ## Running it locally
 
 ```bash
-npm run certs:engine
+cd D:\OneBoatSolutions\servers\Cipherion-KMS
+make setup-all            # once: makes every key and certificate
+make local-gateway GATEWAY_DIR=D:/OneBoatSolutions/servers/Cipherion-API_Gateway
 ```
 
-Then set these in `.env`, and restart the gateway. Every setting, and when it's required, is in [environment.md](environment.md).
+This makes the keys in the KMS repository and copies them into this repository's `certs/` folder. Then set these in `.env`, and restart the gateway. Every setting, and when it's required, is in [environment.md](environment.md).
 
 ```
 DEVICE_ENGINE_ENABLED=true
 DEVICE_ENGINE_HOST=127.0.0.1
 DEVICE_ENGINE_PORT=3443
-DEVICE_TLS_KEY=certs/engine/engine-server.key
-DEVICE_TLS_CERT=certs/engine/engine-server.crt
-DEVICE_TLS_PIN_FILE=certs/engine/engine-server.spki.sha256
+DEVICE_TLS_KEY=certs/deploy/gateway/engine-server.key
+DEVICE_TLS_CERT=certs/deploy/gateway/engine-server.crt
+DEVICE_TLS_PIN_FILE=certs/deploy/gateway/engine-server.spki.sha256
 DEVICE_CA_BUNDLE=certs/deploy/gateway/device-ca-trust.pem
 ```
 
-The e2e suite needs the KMS (`make rotate-init`, `make mtls`, `make run`), both databases, Redis, OpenSSL 3.5 or later, and `certs/deploy/gateway/` in this repository:
+The e2e suite needs the KMS (`make setup-all`, `make mtls`, `make run`), both databases, Redis, OpenSSL 3.5 or later, and `certs/deploy/gateway/` in this repository:
 
 ```bash
 npx vitest run --config ./vitest.config.e2e.ts test/device-certificates.e2e-spec.ts

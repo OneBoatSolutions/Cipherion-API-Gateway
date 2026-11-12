@@ -1,0 +1,15 @@
+node_modules
+dist
+*.tsbuildinfo
+.git
+.env
+.env.*
+!.env.example
+certs
+certs.zip
+temp
+test
+coverage
+*.log
+.claude
+Dockerfile

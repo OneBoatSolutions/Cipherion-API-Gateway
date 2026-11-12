@@ -6,8 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Removed `npm run certs:engine` and `scripts/setup-device-tls.mjs`. The engine listener's key, certificate and pin now come from the KMS repository (`make setup-all`, then `make local-gateway GATEWAY_DIR=<this folder>` for local testing, `make server-push` for a server), which also handles the spare key, renewal, rotation and rollback.
+- `.env.example`, `docs/environment.md` and `docs/device-certificates.md` now point `DEVICE_TLS_KEY`, `DEVICE_TLS_CERT` and `DEVICE_TLS_PIN_FILE` at `certs/deploy/gateway/engine-server.*`, where the KMS repository puts every file the gateway needs. `certs/engine/` is no longer used.
+- Documented the Coolify certificate layout (`/data/cipherion/gateway` mounted at `/certs`) in `docs/environment.md` and `docs/tls-pins.md`.
+
 ### Added
 
+- `Dockerfile` and `.dockerignore` for Coolify: a two-stage Node 24 build (OpenSSL 3.5, needed by the engine listener) that runs as the `node` user, exposes 3000 and 3443, and has a `/health` check. Certificates are never copied into the image.
 - Project setup: NestJS 12 on Fastify, Joi environment validation, global validation pipe and NestJS Observe instrumentation.
 - Prisma ORM 7 with PostgreSQL, plus the Better Auth schema (User, Session, Account, Verification, RateLimit).
 - Better Auth configuration with email/password sign-in, database sessions and database-backed rate limiting.

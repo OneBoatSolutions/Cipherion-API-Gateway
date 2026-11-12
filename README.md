@@ -94,7 +94,7 @@ The console app sits behind Traefik on `PORT`. The [engine listener](#engine-lis
 │   ├── lib/mailer.ts        # Shared SMTP sender: queued, pooled, never awaited by a request
 │   ├── kms/kms-call.ts      # kmsCall(): one KMS RPC with a 2 s deadline, gRPC status → HTTP error
 │   └── generated/           # Generated clients: prisma/, cipseq/ (Prisma) and kms/ (gRPC). Do not edit by hand
-├── scripts/                 # certs:engine (engine key and pin) and users:migrate-ids (one-off UUID migration)
+├── scripts/                 # users:migrate-ids (one-off UUID migration)
 ├── docs/                    # Device certificates, TLS pins, envelope signing and environment settings
 ├── test/                    # End-to-end tests (helpers/ cleans up test users and makes throwaway keys)
 ├── .env.example             # Template for environment variables
@@ -108,7 +108,7 @@ The console app sits behind Traefik on `PORT`. The [engine listener](#engine-lis
 ### Prerequisites
 
 - **Node.js** 22.23.2 or later, and npm. The engine listener needs Node's OpenSSL to be 3.5 or later, and start-up fails if it isn't
-- **OpenSSL** 3.5 or later on the `PATH`, only for `npm run certs:engine` and the e2e tests
+- **OpenSSL** 3.5 or later on the `PATH`, only for the e2e tests
 - **PostgreSQL** 14 or later, running locally, in Docker, or hosted
 - **Redis** 6.2 or later (`GETDEL` is required), running locally, in Docker, or hosted
 - **Cipherion KMS** running and reachable over gRPC with mutual TLS (locally on `localhost:50051`), plus a CA certificate for the KMS and a client certificate and key for the gateway
@@ -394,7 +394,6 @@ The API documentation is at http://localhost:3000/api/v1/docs.
 | `npm run test:e2e` | Run end-to-end tests (needs both databases, Redis and the KMS running locally) |
 | `npm run proto:generate` | Regenerate the typed KMS gRPC client from `proto/kms` into `src/generated/kms` |
 | `npm run users:migrate-ids` | One-off: gives users created before UUID ids a UUID v4, in both databases, and signs them out. Dry run by default; `-- --apply` makes the change. Stop the gateway and back up both databases first. Safe to rerun, and resumes if interrupted |
-| `npm run certs:engine` | Create a development server key, certificate and pin in `certs/engine`. Never replaces a key; `-- --renew` renews the certificate and keeps the pin |
 
 ## API documentation
 
@@ -890,6 +889,10 @@ Requests that fail DTO validation return `400 Bad Request` in this format:
 ---
 
 ## Deployment
+
+**On Coolify:** the repository has a `Dockerfile` (Base Directory `/`, Dockerfile Location `/Dockerfile`). Run migrations once per release with
+`npm run db:deploy` in the container's terminal, put the certificate files in `/data/cipherion/gateway/` and mount that folder at `/certs`
+(see [docs/environment.md](docs/environment.md)). The full guide, including Hostinger, AWS and Cloudflare, is `docs/deployment-guide.md` in the KMS repository.
 
 1. Set `NODE_ENV=production` and provide every required variable through the host's environment or `.env.prod`.
 2. Install dependencies, generate the client and build:
