@@ -1,9 +1,29 @@
-import { Module } from '@nestjs/common';
+import {
+  BeforeApplicationShutdown,
+  Module,
+  OnApplicationShutdown,
+} from '@nestjs/common';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { ConfigModule } from '@nestjs/config';
-import Joi from 'joi';
+import { AuthModule } from './auth/auth.module.js';
+import { CipSeqModule } from './cipseq/cipseq.module.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
+import { HealthModule } from './health/health.module.js';
+import { envFilePath } from './config/env.js';
+import { envSchema } from './config/env.schema.js';
+import { closeEngineApp } from './engine/engine-app.js';
+import { cipseqPrisma } from './lib/cipseq-prisma.js';
+import { stopConnectionEvents } from './lib/connection-events.js';
+import { stopDatabaseWatches } from './lib/database-watch.js';
+import { closeSystemEvents } from './lib/system-events.js';
+import { closeKms } from './lib/kms.js';
+import { mailer } from './lib/mailer.js';
+import { prisma } from './lib/prisma.js';
+import { redis } from './lib/redis.js';
+import { MasterModule } from './master/master.module.js';
+import { WorkspaceModule } from './workspace/workspace.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -16,22 +36,8 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
-      envFilePath:
-        process.env.NODE_ENV === 'production' ? '.env.prod' : '.env.dev',
-      validationSchema: Joi.object({
-        NODE_ENV: Joi.string()
-          .valid('development', 'test', 'production')
-          .default('development'),
-
-        PORT: Joi.number().port().default(3000),
-
-        DATABASE_URL: Joi.string()
-          .uri({ scheme: ['postgresql', 'postgres'] })
-          .required(),
-
-        OBSERVE_APP_KEY: Joi.string().optional(),
-        OBSERVE_APP_SECRET: Joi.string().optional(),
-      }),
+      envFilePath,
+      validationSchema: envSchema,
     }),
 
     ObserveModule.forRoot({
@@ -39,8 +45,39 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       appSecret: process.env.OBSERVE_APP_SECRET ?? 'YOUR_APP_SECRET',
       serviceId: 'Cipherion-API_Gateway',
     }),
+
+    AuthModule,
+    HealthModule,
+    DashboardModule,
+    CipSeqModule,
+    WorkspaceModule,
+    MasterModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule
+  implements BeforeApplicationShutdown, OnApplicationShutdown
+{
+  // Nest runs this first, so engine requests in flight finish before the shared
+  // clients below close.
+  async beforeApplicationShutdown(): Promise<void> {
+    await closeEngineApp();
+  }
+
+  // The shared clients live for the whole process, so close them with the app.
+  async onApplicationShutdown(): Promise<void> {
+    // Stop reporting first, so closing the connections isn't logged or
+    // recorded as an outage, then write any system events still queued.
+    stopConnectionEvents();
+    stopDatabaseWatches();
+    await closeSystemEvents();
+    await Promise.allSettled([
+      redis.quit(),
+      prisma.$disconnect(),
+      cipseqPrisma.$disconnect(),
+      Promise.resolve().then(closeKms),
+      Promise.resolve().then(mailer.close),
+    ]);
+  }
+}

@@ -1,0 +1,47 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import {
+  FastifyAdapter,
+  NestFastifyApplication,
+} from '@nestjs/platform-fastify';
+import { AppModule } from './../src/app.module.js';
+import { configureApp } from './../src/app.setup.js';
+
+describe('Health (e2e)', () => {
+  let app: NestFastifyApplication;
+
+  // One app per file: closing it also closes the shared Prisma and Redis clients.
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication<NestFastifyApplication>(
+      new FastifyAdapter(),
+    );
+    configureApp(app);
+    await app.init();
+    await app.getHttpAdapter().getInstance().ready();
+  });
+
+  it('/api/v1/health (GET) is public and reports the process is up', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/v1/health' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: 'ok' });
+  });
+
+  // Needs the KMS running locally with the mTLS certificates from .env.dev.
+  it('/api/v1/ready (GET) is public and checks both databases, Redis and the KMS', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/v1/ready' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      status: 'ok',
+      checks: { database: 'up', cipseq: 'up', redis: 'up', kms: 'up' },
+    });
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+});

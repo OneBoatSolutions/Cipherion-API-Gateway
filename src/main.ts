@@ -1,16 +1,26 @@
 import { NestFactory } from '@nestjs/core';
 import {
-  BadRequestException,
-  ValidationError,
-  ValidationPipe,
-} from '@nestjs/common';
-import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { AppModule, ObserveInstrument } from './app.module.js';
+import { configureApp } from './app.setup.js';
+import { watchCertificateExpiry } from './engine/certificate-expiry.js';
+import { engineEnabled, startEngineApp } from './engine/engine-app.js';
+import { engineTlsOptions } from './engine/engine-tls.js';
+import { startConnectionEvents } from './lib/connection-events.js';
+import { mailer } from './lib/mailer.js';
+import { checkDependenciesOnStartup } from './lib/startup-checks.js';
+import { setupOpenApi } from './openapi.js';
 
 async function bootstrap() {
+  // Exits with 10–14 if a database, Redis, the KMS or SMTP is unreachable.
+  await checkDependenciesOnStartup();
+  // From here on, an outage is logged once each way and recorded.
+  startConnectionEvents();
+  mailer.startWatch();
+
+  // Created first, because AppModule is what validates the environment.
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),
@@ -19,34 +29,22 @@ async function bootstrap() {
     },
   );
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      forbidUnknownValues: true,
-      stopAtFirstError: false,
-      exceptionFactory: (validationErrors: ValidationError[] = []) => {
-        const errors = validationErrors.map((error) => ({
-          property: error.property,
-          constraints: error.constraints
-            ? Object.values(error.constraints)
-            : [],
-        }));
+  configureApp(app);
+  await setupOpenApi(app);
 
-        return new BadRequestException({
-          message: 'Validation failed',
-          errors,
-        });
-      },
-    }),
-  );
+  // Before either port opens, so a wrong key or pin never serves anything.
+  const engineTls = engineEnabled() ? engineTlsOptions() : undefined;
 
   const port = Number(process.env.PORT ?? 3000);
 
   await app.listen(port, '0.0.0.0');
 
   console.log(`Application is running on port ${port}`);
+
+  if (engineTls) {
+    await startEngineApp(engineTls);
+  }
+  watchCertificateExpiry();
 }
 
 await bootstrap();

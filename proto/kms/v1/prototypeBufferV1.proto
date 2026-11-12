@@ -1,0 +1,137 @@
+syntax = "proto3";
+package prototypeBuffer.v1;
+option go_package = "cipsec/services/core/generated/v1;prototypeBufferV1";
+
+import "google/protobuf/timestamp.proto";
+
+
+
+service grpcCallBackfromNest {
+  rpc CreateAndWrapNewProjectRootKey(createAndWrapNewProjectRootKey_Request) returns (createAndWrapNewProjectRootKey_Response);
+  rpc CreateAndWrapNewProjectEncryptionKey(createAndWrapNewProjectEncryptionKey_Request) returns (createAndWrapNewProjectEncryptionKey_Response);
+  rpc CreateAndWrapNewGroupRootKeyAndGroupDataEncryptionKey(CreateAndWrapNewGroupRootKeyAndGroupDataEncryptionKey_Request) returns (CreateAndWrapNewGroupRootKeyAndGroupDataEncryptionKey_Response);
+  // REMOVED: CreateAndWrapNewDeviceGroupDataEncryptionKey. It was dev-only and deprecated: it returned an
+  // UNSIGNED device envelope in the old layout. Use CreateDeviceEnvelope. Do not add it back.
+  rpc RotateWrappingKeyforProjectEncryptionKey(RotateWrappingKeyforProjectEncryptionKey_Request) returns (RotateWrappingKeyforProjectEncryptionKey_Response);
+  rpc CreateDeviceEnvelope(CreateDeviceEnvelope_Request) returns (CreateDeviceEnvelope_Response);
+  // Gateway-only certificate issuance. Ownership, enrolment/renewal and revocation live in the gateway.
+  rpc IssueDeviceCertificate(IssueDeviceCertificateRequest) returns (IssueDeviceCertificateResponse);
+}
+
+message IssueDeviceCertificateRequest {
+    string device_id = 1; // ^dvc_[A-Za-z0-9_-]{43}$, authenticated/authorized by the gateway
+    bytes csr_der = 2;    // one signed P-256 PKCS#10 request, DER, at most 4096 bytes
+}
+
+message IssueDeviceCertificateResponse {
+    bytes certificate_der = 1;
+    repeated bytes chain_der = 2; // issuing CA first; excludes the self-signed root
+    string serial_number = 3;    // positive, lower-case hexadecimal without leading zeros
+    bytes public_key_sha256 = 4; // SHA-256 of DER SubjectPublicKeyInfo, 32 bytes
+    google.protobuf.Timestamp not_before = 5;
+    google.protobuf.Timestamp not_after = 6;
+}
+
+message createAndWrapNewProjectRootKey_Request {
+    string ProjectId                = 1;    
+}
+
+message createAndWrapNewProjectRootKey_Response { 
+    string ProjectId                = 1;
+    string WrappedProjectRootKeyIV  = 2;
+    string WrappedProjectRootKey    = 3; 
+    string WrappedProjectRootKeyTag = 4;
+}
+
+message createAndWrapNewProjectEncryptionKey_Request {
+    string ProjectId                = 1;
+    string WrappedProjectRootKeyIV  = 2;
+    string WrappedProjectRootKey    = 3; 
+    string WrappedProjectRootKeyTag = 4;
+    string UserPassphrase           = 5;
+}
+
+message createAndWrapNewProjectEncryptionKey_Response { 
+    string ProjectId                        = 1;
+    string WrappedProjectEncryptionKeyIV    = 2; 
+    string WrappedProjectEncryptionKey      = 3; 
+    string WrappedProjectEncryptionKeyTag   = 4;
+    string UserPassphraseSalt               = 5; 
+}
+
+message CreateAndWrapNewGroupRootKeyAndGroupDataEncryptionKey_Request {
+    string GroupId                          = 1;
+    string WrappedProjectRootKeyIV          = 2;
+    string WrappedProjectRootKey            = 3; 
+    string WrappedProjectRootKeyTag         = 4;
+    string WrappedProjectEncryptionKeyIV    = 5; 
+    string WrappedProjectEncryptionKey      = 6; 
+    string WrappedProjectEncryptionKeyTag   = 7;
+    string UserPassphrase                   = 8;
+    string UserPassphraseSalt               = 9; 
+}
+
+message CreateAndWrapNewGroupRootKeyAndGroupDataEncryptionKey_Response { 
+    string GroupId                          = 1;
+    string WrappedGroupRootKeyIV            = 2; 
+    string WrappedGroupRootKey              = 3; 
+    string WrappedGroupRootKeyTag           = 4;
+    string WrappedGroupDataEncryptionKeyIV  = 5;
+    string WrappedGroupDataEncryptionKey    = 6;
+    string WrappedGroupDataEncryptionKeyTag = 7;
+}
+
+
+message RotateWrappingKeyforProjectEncryptionKey_Request {
+    string ProjectId                        = 1;
+    string CurrentUserPassphrase            = 2;
+    string CurrentUserPassphraseSalt        = 3; 
+    string NewUserPassphrase                = 4;
+    string CurrentWrappedProjectRootKeyIV   = 5;
+    string CurrentWrappedProjectRootKey     = 6;
+    string CurrentWrappedProjectRootKeyTag  = 7;
+    // The project encryption key as it is stored now (wrapped with the current passphrase).
+    // Rotation unwraps it with the current passphrase and re-wraps it with the new one.
+    string CurrentWrappedProjectEncryptionKeyIV  = 8;
+    string CurrentWrappedProjectEncryptionKey    = 9;
+    string CurrentWrappedProjectEncryptionKeyTag = 10;
+}
+
+
+message RotateWrappingKeyforProjectEncryptionKey_Response {
+    string ProjectId                          = 1;
+    string NewWrappedProjectEncryptionKeyIV   = 2;
+    string NewWrappedProjectEncryptionKey     = 3; 
+    string NewWrappedProjectEncryptionKeyTag  = 4;
+    string NewUserPassphraseSalt              = 5;
+}
+
+
+// CreateDeviceEnvelope opens the key chain with the passphrase, wraps the GDEK for the device's
+// ML-KEM public key and signs the result (docs/design/04 section 5.1). Signing happens only here.
+message CreateDeviceEnvelope_Request {
+    uint32 Suite                            = 1;    // 1 = ML-KEM-768, 2 = ML-KEM-1024
+    string ProjectId                        = 2;
+    string GroupId                          = 3;    // lower-case dashed UUID
+    string DeviceId                         = 4;    // dvc_ + 43 base64url characters
+    uint32 GdekVersion                      = 5;
+    string DeviceEncapsulationKey           = 6;    // the device's registered ML-KEM public key, base64 or base64url
+    string WrappedProjectRootKeyIV          = 7;
+    string WrappedProjectRootKey            = 8;
+    string WrappedProjectRootKeyTag         = 9;
+    string WrappedProjectEncryptionKeyIV    = 10;
+    string WrappedProjectEncryptionKey      = 11;
+    string WrappedProjectEncryptionKeyTag   = 12;
+    string WrappedGroupRootKeyIV            = 13;
+    string WrappedGroupRootKey              = 14;
+    string WrappedGroupRootKeyTag           = 15;
+    string WrappedGroupDataEncryptionKeyIV  = 16;
+    string WrappedGroupDataEncryptionKey    = 17;
+    string WrappedGroupDataEncryptionKeyTag = 18;
+    string UserPassphrase                   = 19;
+    string UserPassphraseSalt               = 20;
+}
+
+message CreateDeviceEnvelope_Response {
+    string EnvelopeJson = 1;    // the signed envelope; store it exactly as returned
+}

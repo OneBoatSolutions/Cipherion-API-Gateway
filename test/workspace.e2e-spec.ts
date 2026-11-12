@@ -1,0 +1,262 @@
+import { randomUUID } from 'node:crypto';
+import { Test, TestingModule } from '@nestjs/testing';
+import {
+  FastifyAdapter,
+  NestFastifyApplication,
+} from '@nestjs/platform-fastify';
+import { AppModule } from './../src/app.module.js';
+import { configureApp } from './../src/app.setup.js';
+import { cipseqPrisma } from './../src/lib/cipseq-prisma.js';
+import { deleteTestUser } from './helpers/delete-test-user.js';
+import { signUpVerified } from './helpers/users.js';
+
+interface TestUser {
+  id: string;
+  email: string;
+  cookie: string;
+}
+
+interface Workspace {
+  profile: { id: string; email: string };
+  settings: { timezone: string };
+  account: {
+    accountType: string | null;
+    companyName: string | null;
+    limits: unknown;
+  };
+  projects: {
+    id: string;
+    role: string;
+    keyVersion: number | null;
+    groups: {
+      id: string;
+      role: string;
+      gdekVersion: number;
+      members: { userId: string; name: string; email: string; role: string }[];
+    }[];
+  }[];
+  notifications: unknown[];
+}
+
+const wrappedKeys = {
+  wrappedGroupRootKeyIv: 'wrapped-iv',
+  wrappedGroupRootKey: 'wrapped-key',
+  wrappedGroupRootKeyTag: 'wrapped-tag',
+  wrappedGroupDataEncryptionKeyIv: 'wrapped-iv',
+  wrappedGroupDataEncryptionKey: 'wrapped-key',
+  wrappedGroupDataEncryptionKeyTag: 'wrapped-tag',
+};
+
+// Runs against the .env.dev databases. The rows are inserted directly, so the
+// KMS isn't called. The test users and their CipSeq rows are removed afterwards.
+describe('Workspace (e2e)', () => {
+  let app: NestFastifyApplication;
+  let admin: TestUser;
+  let acting: TestUser;
+  let member: TestUser;
+  let outsideGroups: TestUser;
+  let newUser: TestUser;
+  const stamp = Date.now();
+  const projectId = randomUUID();
+  const deletedProjectId = randomUUID();
+  const sharedGroupId = randomUUID();
+  const hiddenGroupId = randomUUID();
+  const deletedGroupId = randomUUID();
+  const projectIds = [projectId, deletedProjectId];
+
+  const signUp = (name: string): Promise<TestUser> =>
+    signUpVerified(
+      app,
+      `E2E ${name}`,
+      `e2e-workspace-${name}-${stamp}@cipherion.test`,
+    );
+
+  const workspace = async (user: TestUser): Promise<Workspace> => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/workspace',
+      headers: { cookie: user.cookie },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.body).not.toMatch(/wrapped|salt/i);
+    return response.json<Workspace>();
+  };
+
+  const createGroup = (
+    id: string,
+    deletedAt: Date | null,
+    members: { userId: string; role: 'ADMIN' | 'ACTING_ADMIN' | 'MEMBER' }[],
+  ) =>
+    cipseqPrisma.group.create({
+      data: {
+        id,
+        projectId,
+        name: 'Finance',
+        description: 'Invoices and payroll',
+        deletedAt,
+        keys: { create: { ...wrappedKeys, currentGdekVersion: 3 } },
+        members: { create: members },
+      },
+    });
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication<NestFastifyApplication>(
+      new FastifyAdapter(),
+    );
+    configureApp(app);
+    await app.init();
+    await app.getHttpAdapter().getInstance().ready();
+
+    admin = await signUp('admin');
+    acting = await signUp('acting');
+    member = await signUp('member');
+    outsideGroups = await signUp('outside-groups');
+    newUser = await signUp('new');
+
+    const adminRow = { userId: admin.id, role: 'ADMIN' } as const;
+    await cipseqPrisma.project.create({
+      data: {
+        id: projectId,
+        name: 'Payments',
+        description: 'Card and invoice data',
+        adminUserId: admin.id,
+      },
+    });
+    await cipseqPrisma.project.create({
+      data: {
+        id: deletedProjectId,
+        name: 'Deleted',
+        description: 'Deleted',
+        adminUserId: admin.id,
+        deletedAt: new Date(),
+      },
+    });
+    await createGroup(sharedGroupId, null, [
+      adminRow,
+      { userId: acting.id, role: 'ACTING_ADMIN' },
+      { userId: member.id, role: 'MEMBER' },
+    ]);
+    await createGroup(hiddenGroupId, null, [adminRow]);
+    await createGroup(deletedGroupId, new Date(), [
+      adminRow,
+      { userId: member.id, role: 'MEMBER' },
+    ]);
+  });
+
+  afterAll(async () => {
+    const where = { projectId: { in: projectIds } };
+    const groupWhere = { group: where };
+    await cipseqPrisma.$transaction([
+      cipseqPrisma.groupMember.deleteMany({ where: groupWhere }),
+      cipseqPrisma.groupKeys.deleteMany({ where: groupWhere }),
+      cipseqPrisma.group.deleteMany({ where }),
+      cipseqPrisma.project.deleteMany({ where: { id: { in: projectIds } } }),
+    ]);
+    for (const user of [admin, acting, member, outsideGroups, newUser]) {
+      await deleteTestUser(user.email);
+    }
+    await app.close();
+  });
+
+  const groupIds = (result: Workspace) =>
+    result.projects[0].groups.map(({ id }) => id).sort();
+
+  it('needs a session', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/workspace',
+    });
+    expect(response.statusCode).toBe(401);
+  });
+
+  it('gives a new user empty projects and default settings', async () => {
+    const result = await workspace(newUser);
+
+    expect(result.profile).toMatchObject({
+      id: newUser.id,
+      email: newUser.email,
+    });
+    expect(result.settings.timezone).toBe('UTC');
+    expect(result.account).toMatchObject({
+      accountType: null,
+      companyName: null,
+      limits: {
+        master: false,
+        projects: { used: 0 },
+        devices: { used: 0 },
+        encryptions: { used: 0 },
+        decryptions: { used: 0 },
+      },
+    });
+    expect(result.projects).toEqual([]);
+    expect(result.notifications).toEqual([]);
+  });
+
+  it('returns the chosen account type once, at the top level', async () => {
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/dashboard/account-type',
+      headers: { cookie: member.cookie },
+      payload: { accountType: 'COMPANY', companyName: 'Acme Labs' },
+    });
+    expect(put.statusCode).toBe(200);
+
+    const result = await workspace(member);
+
+    expect(result.account).toMatchObject({
+      accountType: 'COMPANY',
+      companyName: 'Acme Labs',
+    });
+    expect(result.profile).not.toHaveProperty('accountType');
+    expect(result.settings).not.toHaveProperty('accountType');
+  });
+
+  it('shows the project admin every group and leaves out deleted rows', async () => {
+    const result = await workspace(admin);
+
+    expect(result.projects.map(({ id }) => id)).toEqual([projectId]);
+    expect(result.projects[0].role).toBe('ADMIN');
+    expect(groupIds(result)).toEqual([sharedGroupId, hiddenGroupId].sort());
+    for (const group of result.projects[0].groups) {
+      expect(group.role).toBe('ADMIN');
+      expect(group.gdekVersion).toBe(3);
+    }
+  });
+
+  it('shows an acting admin only their groups', async () => {
+    const result = await workspace(acting);
+
+    expect(result.projects[0].role).toBe('MEMBER');
+    expect(groupIds(result)).toEqual([sharedGroupId]);
+    expect(result.projects[0].groups[0].role).toBe('ACTING_ADMIN');
+  });
+
+  it("shows a member their groups and those groups' members", async () => {
+    const result = await workspace(member);
+
+    expect(groupIds(result)).toEqual([sharedGroupId]);
+    const [group] = result.projects[0].groups;
+    expect(group.role).toBe('MEMBER');
+    expect(group.members.map(({ userId }) => userId).sort()).toEqual(
+      [admin.id, acting.id, member.id].sort(),
+    );
+    expect(
+      group.members.find(({ userId }) => userId === acting.id),
+    ).toMatchObject({
+      name: 'E2E acting',
+      email: acting.email,
+      role: 'ACTING_ADMIN',
+    });
+  });
+
+  it('shows someone in none of the groups nothing of the project', async () => {
+    const result = await workspace(outsideGroups);
+
+    expect(result.projects).toEqual([]);
+  });
+});

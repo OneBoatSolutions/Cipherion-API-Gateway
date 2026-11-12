@@ -1,0 +1,54 @@
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  IntersectionType,
+} from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { AccountTypeSummary } from './account-type.dto.js';
+
+export const NAME_MAX_LENGTH = 100;
+
+export class ProfileResponse {
+  @ApiProperty({ example: 'y7GQvKJgV0mOa6vS1kq0nZ3d' })
+  id!: string;
+
+  @ApiProperty({ example: 'Ada Lovelace' })
+  name!: string;
+
+  @ApiProperty({ example: 'ada@cipherion.com' })
+  email!: string;
+
+  @ApiProperty({ example: true })
+  emailVerified!: boolean;
+
+  @ApiProperty({ example: '2026-11-03T06:36:46.000Z' })
+  createdAt!: Date;
+}
+
+// The profile from GET and PATCH /dashboard/profile. /workspace returns the
+// account type once at its top level instead, so it keeps ProfileResponse.
+export class ProfileWithAccountResponse extends IntersectionType(
+  ProfileResponse,
+  AccountTypeSummary,
+) {}
+
+export function toProfileResponse({
+  id,
+  name,
+  email,
+  emailVerified,
+  createdAt,
+}: ProfileResponse): ProfileResponse {
+  return { id, name, email, emailVerified, createdAt };
+}
+
+// Email and password are changed through Better Auth's own endpoints
+// (/api/v1/auth/change-email, /api/v1/auth/change-password), not here.
+export class UpdateProfileDto {
+  @ApiPropertyOptional({ maxLength: NAME_MAX_LENGTH, example: 'Ada Lovelace' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(NAME_MAX_LENGTH)
+  name?: string;
+}

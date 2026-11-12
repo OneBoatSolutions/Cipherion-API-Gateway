@@ -1,0 +1,15 @@
+# Generates the typed KMS gRPC client into src/generated/kms (npm run proto:generate).
+# The plugin runs through node so it works the same on Windows and Unix.
+
+# buf config format version (not the KMS API version, which is v1 in proto/kms/v1).
+version: v2
+clean: true
+plugins:
+  - local: ["node", "node_modules/ts-proto/protoc-gen-ts_proto"]
+    out: src/generated/kms
+    opt:
+      - outputServices=grpc-js
+      - esModuleInterop=true
+      - importSuffix=.js
+      - env=node
+      - useOptionals=none

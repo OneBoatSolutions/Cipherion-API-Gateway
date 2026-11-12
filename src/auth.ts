@@ -1,0 +1,206 @@
+import { apiDocsEnabled, trustedOrigins } from './config/env.js';
+import { betterAuth } from 'better-auth';
+import { prismaAdapter } from 'better-auth/adapters/prisma';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
+import { bearer, openAPI } from 'better-auth/plugins';
+import {
+  passwordChangedEmail,
+  passwordResetEmail,
+  verificationEmail,
+} from './auth/emails.js';
+import { socialProviders } from './auth/social-providers.js';
+import { mailer } from './lib/mailer.js';
+import { prisma } from './lib/prisma.js';
+import { redis } from './lib/redis.js';
+
+const authSecret = process.env.BETTER_AUTH_SECRET;
+const authUrl = process.env.BETTER_AUTH_URL;
+
+if (!authSecret || authSecret.length < 32) {
+  throw new Error('BETTER_AUTH_SECRET must be configured securely');
+}
+
+if (!authUrl) {
+  throw new Error('BETTER_AUTH_URL is required');
+}
+
+if (trustedOrigins.length === 0) {
+  throw new Error('AUTH_TRUSTED_ORIGINS must contain trusted origins');
+}
+
+// Atomic counter for rate limiting: the TTL is set only when the key is created.
+const INCREMENT_SCRIPT = `
+local value = redis.call('INCR', KEYS[1])
+if value == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return value
+`;
+
+export const SESSION_STORE_UNAVAILABLE =
+  'Unavailable. Please try again shortly.';
+
+// Fail closed: without Redis, sessions can't be checked or revoked safely, so
+// auth answers 503 instead of a 500 or falling back to a possibly stale state.
+const sessionStoreUnavailable = (cause: unknown): never => {
+  throw new APIError('SERVICE_UNAVAILABLE', {
+    message: SESSION_STORE_UNAVAILABLE,
+    cause,
+  });
+};
+
+// Cipherion has no profile images. Better Auth's user table must keep the
+// image column, so clients are stopped from setting it instead.
+const USER_WRITE_PATHS = new Set(['/sign-up/email', '/update-user']);
+
+const beforeAuth = createAuthMiddleware(async (ctx) => {
+  const body = ctx.body as Record<string, unknown> | undefined;
+  if (USER_WRITE_PATHS.has(ctx.path) && body?.image !== undefined) {
+    throw new APIError('BAD_REQUEST', {
+      message: 'Profile images are not supported',
+    });
+  }
+
+  // A password change always signs out every other session, whatever the
+  // client sends, so a stolen session can't outlive it. Better Auth gives the
+  // current one a new session in the response.
+  if (ctx.path === '/change-password') {
+    return { context: { body: { ...body, revokeOtherSessions: true } } };
+  }
+});
+
+// Tells the owner, so a change made from a stolen session doesn't go unnoticed.
+const afterAuth = createAuthMiddleware(async (ctx) => {
+  if (ctx.path !== '/change-password') {
+    return;
+  }
+  const returned = ctx.context.returned as
+    { user?: { id: string; name: string; email: string } } | undefined;
+  if (returned instanceof APIError || !returned?.user) {
+    return;
+  }
+  const { user } = returned;
+  mailer.send(passwordChangedEmail(user, new Date()), user.id);
+});
+
+export const auth = betterAuth({
+  appName: 'Cipherion',
+  secret: authSecret,
+  baseURL: authUrl,
+  basePath: '/api/v1/auth',
+  trustedOrigins,
+
+  database: prismaAdapter(prisma, {
+    provider: 'postgresql',
+  }),
+
+  // Sessions and rate limits are read from Redis first.
+  secondaryStorage: {
+    get: (key) => redis.get(key).catch(sessionStoreUnavailable),
+    getAndDelete: (key) => redis.getdel(key).catch(sessionStoreUnavailable),
+    set: (key, value, ttl) =>
+      (ttl ? redis.set(key, value, 'EX', ttl) : redis.set(key, value)).catch(
+        sessionStoreUnavailable,
+      ),
+    delete: async (key) => {
+      await redis.del(key).catch(sessionStoreUnavailable);
+    },
+    increment: async (key, ttl) =>
+      Number(
+        await redis
+          .eval(INCREMENT_SCRIPT, 1, key, ttl)
+          .catch(sessionStoreUnavailable),
+      ),
+  },
+
+  emailAndPassword: {
+    enabled: true,
+    // Sign-up returns no session, and email sign-in answers 403 until the
+    // address is verified, so nobody can use someone else's email.
+    requireEmailVerification: true,
+    sendResetPassword: async ({ user, url }) => {
+      mailer.send(passwordResetEmail(user, url), user.id);
+    },
+    resetPasswordTokenExpiresIn: 60 * 60,
+    // A stolen session ends when the owner resets their password.
+    revokeSessionsOnPasswordReset: true,
+    // The reset link proves the inbox. This is how someone recovers an address
+    // another person registered: the reset replaces that person's password.
+    onPasswordReset: async ({ user }) => {
+      await prisma.user.updateMany({
+        where: { id: user.id, emailVerified: false },
+        data: { emailVerified: true },
+      });
+    },
+  },
+
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      mailer.send(verificationEmail(user, url), user.id);
+    },
+    sendOnSignUp: true,
+    // An unverified sign-in with the right password sends a new link.
+    sendOnSignIn: true,
+    // A link in an email never creates a session: the user signs in afterwards.
+    autoSignInAfterVerification: false,
+    expiresIn: 60 * 60,
+  },
+
+  // Each provider is on only when both its id and secret are set.
+  socialProviders: socialProviders(),
+
+  account: {
+    accountLinking: {
+      // Better Auth's default, stated so it can't drift: social sign-in only
+      // joins an existing account whose email is verified.
+      requireLocalEmailVerified: true,
+    },
+  },
+
+  session: {
+    // Fixed at one day and never extended, because a stolen session can enrol a
+    // device certificate for as long as it lasts.
+    expiresIn: 60 * 60 * 24,
+    disableSessionRefresh: true,
+    // Postgres stays the source of truth; a missing Redis entry falls back to it.
+    storeSessionInDatabase: true,
+  },
+
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 100,
+    storage: 'secondary-storage',
+    // Each of these sends an email, so they're limited harder against flooding
+    // an inbox. Per IP, like the rest.
+    customRules: {
+      '/request-password-reset': { window: 60, max: 3 },
+      '/send-verification-email': { window: 60, max: 3 },
+    },
+  },
+
+  advanced: {
+    useSecureCookies: process.env.NODE_ENV === 'production',
+    // Better Auth skips its origin, callback URL and CSRF checks when
+    // NODE_ENV=test. Stated so they also run in tests, and are never off.
+    disableOriginCheck: false,
+    // User, session and account ids are UUIDs. On Postgres, Better Auth leaves the
+    // id to the database, so prisma/schema.prisma gives each model a uuid() (v4) default.
+    database: { generateId: 'uuid' },
+  },
+
+  hooks: {
+    before: beforeAuth,
+    after: afterAuth,
+  },
+
+  plugins: [
+    // How the engine sends the owner's session. It takes the signed token from the
+    // set-auth-token header at sign-in, and an unsigned token is refused.
+    bearer({ requireSignature: true }),
+    // Feeds the auth endpoints into the gateway's Swagger document. Its schema
+    // endpoint is public, so the plugin is left out entirely in production; its
+    // own Scalar page is disabled in favour of Swagger UI.
+    ...(apiDocsEnabled ? [openAPI({ disableDefaultReference: true })] : []),
+  ],
+});
