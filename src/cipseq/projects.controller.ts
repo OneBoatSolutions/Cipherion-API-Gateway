@@ -53,6 +53,7 @@ import {
   assertMayRevokeMember,
   memberFromProjectWrites,
 } from './revocations.js';
+import { assertProjectAllowed } from './plan-limits.js';
 import { withPassphraseAttempt } from './with-passphrase-attempt.js';
 
 const FIRST_KEY_VERSION = 1;
@@ -68,6 +69,9 @@ export class ProjectsController {
   @ApiOperation({ summary: 'Create a project with the caller as its admin' })
   @ApiCreatedResponse({ type: ProjectResponse })
   @ApiBadRequestResponse({ description: 'Validation failed' })
+  @ApiForbiddenResponse({
+    description: 'PLAN_LIMIT_REACHED: the free plan allows no more projects',
+  })
   @ApiServiceUnavailableResponse({ description: 'The KMS is unavailable' })
   @ApiBadGatewayResponse({ description: 'The KMS call failed' })
   @Post()
@@ -75,14 +79,16 @@ export class ProjectsController {
     @CurrentUser() user: AuthUser,
     @Body() { name, description }: CreateProjectDto,
   ): Promise<ProjectResponse> {
+    await assertProjectAllowed(user);
     const id = randomUUID();
     const wrapped = await kmsCall('createAndWrapNewProjectRootKey', {
       ProjectId: id,
     });
     assertSameId(id, wrapped.ProjectId);
 
-    const [project] = await cipseqPrisma.$transaction([
-      cipseqPrisma.project.create({
+    const project = await cipseqPrisma.$transaction(async (tx) => {
+      await assertProjectAllowed(user, tx);
+      const created = await tx.project.create({
         data: {
           id,
           name,
@@ -97,9 +103,10 @@ export class ProjectsController {
           },
         },
         select: PROJECT_FIELDS,
-      }),
-      auditEvent(user.id, 'project.created', id),
-    ]);
+      });
+      await auditEvent(user.id, 'project.created', id, undefined, tx);
+      return created;
+    });
     return toProjectResponse(project, user.id);
   }
 

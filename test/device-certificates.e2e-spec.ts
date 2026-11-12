@@ -984,6 +984,61 @@ describe('Device certificates (e2e)', () => {
       });
     });
 
+    it('refuses past the monthly free-plan limit, counting encryptions and decryptions apart', async () => {
+      const { groupId, credentials } = await approvedDevice();
+      const options = {
+        token: owner.token,
+        key: credentials.key,
+        cert: credentials.cert,
+      };
+      // Earlier tests already delivered to this owner this month.
+      const now = new Date();
+      const monthStart = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+      );
+      const used = (operation: 'ENCRYPT' | 'DECRYPT') =>
+        cipseqPrisma.envelopeDelivery.count({
+          where: {
+            userId: owner.id,
+            operation,
+            createdAt: { gte: monthStart },
+          },
+        });
+      vi.stubEnv(
+        'FREE_PLAN_MAX_ENCRYPTIONS_PER_MONTH',
+        String((await used('ENCRYPT')) + 1),
+      );
+      vi.stubEnv(
+        'FREE_PLAN_MAX_DECRYPTIONS_PER_MONTH',
+        String((await used('DECRYPT')) + 1),
+      );
+
+      try {
+        expect((await encrypt(groupId, options)).status).toBe(200);
+        const before = await used('ENCRYPT');
+
+        const refused = await encrypt(groupId, options);
+        expect(refused.status, refused.text).toBe(403);
+        expect(refused.json()).toMatchObject({
+          code: 'PLAN_LIMIT_REACHED',
+          limit: 'encryptionsPerMonth',
+          resetsAt: new Date(
+            Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+          ).toISOString(),
+        });
+        // A refusal is not a delivery, so it isn't counted.
+        expect(await used('ENCRYPT')).toBe(before);
+
+        const decrypted = await send('POST', '/cipseq/crypto/decrypt', {
+          ...options,
+          body: { groupId, gdekVersion: 1 },
+        });
+        expect(decrypted.status, decrypted.text).toBe(200);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
     it('refuses a session alone, a certificate alone and another user', async () => {
       const { groupId, credentials } = await approvedDevice();
       const certificate = { key: credentials.key, cert: credentials.cert };

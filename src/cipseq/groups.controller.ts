@@ -51,6 +51,7 @@ import {
   UpdateGroupDto,
   UpdateGroupMemberDto,
 } from './groups.dto.js';
+import { assertGroupAllowed } from './plan-limits.js';
 import { findProjectForAdmin } from './project-access.js';
 import { assertMayRevokeMember, memberFromGroupWrites } from './revocations.js';
 import { withPassphraseAttempt } from './with-passphrase-attempt.js';
@@ -70,7 +71,8 @@ export class GroupsController {
   @ApiCreatedResponse({ type: GroupResponse })
   @ApiBadRequestResponse({ description: 'Validation failed' })
   @ApiForbiddenResponse({
-    description: 'Not the project admin, or an incorrect passphrase',
+    description:
+      'Not the project admin, an incorrect passphrase, or PLAN_LIMIT_REACHED (the free plan allows no more groups in this project)',
   })
   @ApiNotFoundResponse({ description: 'No such project' })
   @ApiConflictResponse({ description: 'The project is not initialised' })
@@ -87,6 +89,8 @@ export class GroupsController {
     if (project.keys?.currentKeyVersion == null) {
       throw new ConflictException('The project is not initialised');
     }
+    // Before the passphrase is tried, so a refusal doesn't use an attempt.
+    await assertGroupAllowed(project);
 
     const devices = await cipseqPrisma.device.findMany({
       where: { userId: user.id, status: 'ACTIVE' },
@@ -96,8 +100,9 @@ export class GroupsController {
     const id = randomUUID();
     const group = await withPassphraseAttempt(projectId, async () => {
       const keys = await createGroupKeys(projectId, id, passphrase);
-      const [created] = await cipseqPrisma.$transaction([
-        cipseqPrisma.group.create({
+      return cipseqPrisma.$transaction(async (tx) => {
+        await assertGroupAllowed(project, tx);
+        const created = await tx.group.create({
           data: {
             id,
             projectId,
@@ -116,10 +121,16 @@ export class GroupsController {
             },
           },
           select: GROUP_FIELDS,
-        }),
-        auditEvent(user.id, 'group.created', projectId, { groupId: id }),
-      ]);
-      return created;
+        });
+        await auditEvent(
+          user.id,
+          'group.created',
+          projectId,
+          { groupId: id },
+          tx,
+        );
+        return created;
+      });
     });
     return toGroupResponse(group, 'ADMIN');
   }

@@ -128,6 +128,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `systemEvent` table in the auth database for infrastructure events, apart from the user audit trail: `CONNECTION_ESTABLISHED` for each dependency at startup, and `CONNECTION_LOST` (with the reason) and `CONNECTION_RESTORED` afterwards, with the gateway instance (`hostname:pid`) and when it happened. Written from an in-memory queue of up to 1,000 events, so an outage of the auth database itself is recorded once it's back.
 - `account.type_set` and `account.company_renamed` audit rows in CipSeq's `auditEvent`. Sending the same values again or a refused change writes none.
 - Unit tests for connection events, the event queue, the startup checks, the SMTP watch and the KMS serving status; e2e tests that start the built gateway with an unreachable SMTP server (exit `14`) and with Redis and SMTP unreachable (exit `12`, both logged), and for the account-type audit rows.
+- Master accounts: `MASTER_EMAILS`, a comma-separated list of emails, each counting once its address is verified. Masters have no free-plan limits, and nothing in the API can grant the status.
+- Free-plan limits for every other account, each an environment variable: `FREE_PLAN_MAX_PROJECTS` (1), `FREE_PLAN_MAX_GROUPS_PER_PROJECT` (2), `FREE_PLAN_MAX_PEOPLE_PER_GROUP` (3 members besides the project admin, counting open invitations), `FREE_PLAN_MAX_DEVICES` (1 active) and `FREE_PLAN_MAX_ENCRYPTIONS_PER_MONTH` / `FREE_PLAN_MAX_DECRYPTIONS_PER_MONTH` (500 each per calendar month, UTC). A refusal answers `403` with `code: PLAN_LIMIT_REACHED`, the limit and its `max` (plus `resetsAt` for the monthly ones), before any KMS call or passphrase attempt. Each check counts and writes in one transaction under a Postgres advisory lock. Group and people limits follow the project admin's plan, the rest the caller's. Existing data over a limit is kept.
+- `GET /api/v1/master/metrics` (master accounts only, `404` for anyone else): encryptions, decryptions, accounts, projects and groups created and deleted, devices registered, and members and devices revoked, for `today` (4 buckets of 6 hours), `week` (7 days), `month` (4 weeks of 7 days) and `year` (12 months), each with `totals` and a `series`, in UTC.
+- `account.limits` in `GET /api/v1/workspace`: each free-plan maximum (`null` for a master) and what the user has used, including this month's encryptions and decryptions.
+- CipSeq indexes for the master metrics: `auditEvent(action, createdAt)`, `envelopeDelivery(createdAt)`, and `deletedAt` on `project` and `group` (migration `master_metrics`). The `account.deleted` audit action is named for the future delete-account work.
+- Unit tests for the limits, the master check, the metric buckets and the new environment variables; e2e tests for every limit against the real databases, the master going past them, the master metrics and the monthly limit on the engine listener.
 
 ### Changed
 
@@ -167,6 +173,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Breaking:** an unreachable database at startup exits with `10` (auth) or `11` (CipSeq) instead of `1`, and the gateway no longer starts without Redis, the KMS or the SMTP server. `1` now means invalid configuration only.
 - Lost and restored connections for every dependency are logged from one place (`src/lib/connection-events.ts`): exactly one ERROR line when a connection is lost and one line when it's back, and nothing during startup or shutdown. `/ready` no longer logs its own KMS "Readiness check failed" and "passing again" lines.
 - Choosing or renaming an account type no longer prints a console line; it's audited instead.
+- **Breaking:** accounts other than the master accounts can no longer create more than the free plan allows (projects, groups, people per group, devices) or encrypt and decrypt more than 500 times each a month. `/crypto/encrypt` and `/crypto/decrypt` can answer `403` `PLAN_LIMIT_REACHED`, which the engine needs to handle.
+- Creating a project, group, invitation or device and accepting an invitation now run in interactive transactions, so the limit check and the write commit together. `OPEN_INVITATION_STATUSES` moved to `invitations.dto.ts`.
+- e2e tests run with the free-plan limits lifted and no master (`test/setup-e2e.ts`); `test/plan-limits.e2e-spec.ts` sets the defaults back.
 
 ### Fixed
 

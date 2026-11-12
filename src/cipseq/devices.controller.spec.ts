@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.types.js';
@@ -23,6 +24,15 @@ const mocks = vi.hoisted(() => ({
   auditEvent: { create: vi.fn() },
 }));
 
+const plan = vi.hoisted(() => ({ assertDeviceAllowed: vi.fn() }));
+vi.mock('./plan-limits.js', () => plan);
+
+// Array transactions run their operations; interactive ones get the mocked
+// models as their client.
+const runTransaction = (operations: unknown) =>
+  typeof operations === 'function'
+    ? (operations as (tx: unknown) => Promise<unknown>)(mocks)
+    : Promise.all(operations as unknown[]);
 vi.mock('../lib/cipseq-prisma.js', () => ({
   cipseqPrisma: {
     $transaction: mocks.$transaction,
@@ -67,9 +77,7 @@ describe('DevicesController', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.$transaction.mockImplementation((operations: unknown[]) =>
-      Promise.all(operations),
-    );
+    mocks.$transaction.mockImplementation(runTransaction);
     mocks.device.findUnique.mockResolvedValue(null);
     mocks.groupMember.findMany.mockResolvedValue([]);
     mocks.device.create.mockResolvedValue(deviceRow());
@@ -83,6 +91,31 @@ describe('DevicesController', () => {
         publicKey: key,
         name: 'Work laptop',
       });
+
+    it('refuses a new device past the free-plan limit', async () => {
+      plan.assertDeviceAllowed.mockRejectedValue(new ForbiddenException());
+
+      await expect(register()).rejects.toBeInstanceOf(ForbiddenException);
+      expect(plan.assertDeviceAllowed).toHaveBeenCalledWith(user, deviceId);
+      expect(mocks.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('checks the limit again inside the transaction', async () => {
+      await register();
+
+      expect(plan.assertDeviceAllowed).toHaveBeenLastCalledWith(
+        user,
+        deviceId,
+        mocks,
+      );
+    });
+
+    it('lets a retry of a registered device through without a limit check', async () => {
+      mocks.device.findUnique.mockResolvedValue(stored());
+
+      await expect(register()).resolves.toEqual(deviceRow());
+      expect(plan.assertDeviceAllowed).not.toHaveBeenCalled();
+    });
 
     it('just registers a device for someone in no groups', async () => {
       await expect(register()).resolves.toEqual(deviceRow());

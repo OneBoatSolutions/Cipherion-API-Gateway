@@ -22,6 +22,7 @@ import { closeKms } from './lib/kms.js';
 import { mailer } from './lib/mailer.js';
 import { prisma } from './lib/prisma.js';
 import { redis } from './lib/redis.js';
+import { MasterModule } from './master/master.module.js';
 import { WorkspaceModule } from './workspace/workspace.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
@@ -50,6 +51,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     DashboardModule,
     CipSeqModule,
     WorkspaceModule,
+    MasterModule,
   ],
   controllers: [AppController],
   providers: [AppService],

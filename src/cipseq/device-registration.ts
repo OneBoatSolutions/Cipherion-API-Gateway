@@ -8,6 +8,7 @@ import {
   ML_KEM_1024_PUBLIC_KEY_BYTES,
   type RegisterDeviceDto,
 } from './devices.dto.js';
+import { assertDeviceAllowed } from './plan-limits.js';
 
 export const DEVICE_FIELDS = {
   id: true,
@@ -68,6 +69,7 @@ export async function registerDevice(
   if (existing) {
     return existing;
   }
+  await assertDeviceAllowed(user, deviceId);
 
   const memberships = await cipseqPrisma.groupMember.findMany({
     where: {
@@ -78,8 +80,9 @@ export async function registerDevice(
   });
 
   try {
-    const [device] = await cipseqPrisma.$transaction([
-      cipseqPrisma.device.create({
+    return await cipseqPrisma.$transaction(async (tx) => {
+      await assertDeviceAllowed(user, deviceId, tx);
+      const device = await tx.device.create({
         data: {
           id: deviceId,
           userId: user.id,
@@ -93,10 +96,10 @@ export async function registerDevice(
           },
         },
         select: DEVICE_FIELDS,
-      }),
-      auditEvent(user.id, 'device.registered', null, { deviceId }),
-    ]);
-    return device;
+      });
+      await auditEvent(user.id, 'device.registered', null, { deviceId }, tx);
+      return device;
+    });
   } catch (error) {
     // Two registrations of one device at the same time.
     if (isUniqueViolation(error)) {

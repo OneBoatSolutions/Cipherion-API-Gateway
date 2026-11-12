@@ -34,6 +34,15 @@ vi.mock('./passphrase-attempts.js', () => ({
   releasePassphraseAttempt: mocks.releasePassphraseAttempt,
   clearPassphraseAttempts: mocks.clearPassphraseAttempts,
 }));
+const plan = vi.hoisted(() => ({ assertProjectAllowed: vi.fn() }));
+vi.mock('./plan-limits.js', () => plan);
+
+// Array transactions run their operations; interactive ones get the mocked
+// models as their client.
+const runTransaction = (operations: unknown) =>
+  typeof operations === 'function'
+    ? (operations as (tx: unknown) => Promise<unknown>)(mocks)
+    : Promise.all(operations as unknown[]);
 vi.mock('../lib/cipseq-prisma.js', () => ({
   cipseqPrisma: {
     $transaction: mocks.$transaction,
@@ -81,9 +90,7 @@ describe('ProjectsController', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.$transaction.mockImplementation((operations: unknown[]) =>
-      Promise.all(operations),
-    );
+    mocks.$transaction.mockImplementation(runTransaction);
   });
 
   describe('create', () => {
@@ -92,6 +99,35 @@ describe('ProjectsController', () => {
       WrappedProjectRootKeyIV: 'root-iv',
       WrappedProjectRootKey: 'root-key',
       WrappedProjectRootKeyTag: 'root-tag',
+    });
+
+    it('refuses past the free-plan limit before calling the KMS', async () => {
+      plan.assertProjectAllowed.mockRejectedValue(new ForbiddenException());
+
+      await expect(
+        controller.create(admin, {
+          name: 'Payments',
+          description: DESCRIPTION,
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(plan.assertProjectAllowed).toHaveBeenCalledWith(admin);
+      expect(mocks.kmsCall).not.toHaveBeenCalled();
+      expect(mocks.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('checks the limit again inside the transaction', async () => {
+      mocks.kmsCall.mockImplementation(
+        (_method, request: { ProjectId: string }) =>
+          Promise.resolve(kmsResponse(request.ProjectId)),
+      );
+      mocks.project.create.mockResolvedValue(row());
+
+      await controller.create(admin, {
+        name: 'Payments',
+        description: DESCRIPTION,
+      });
+
+      expect(plan.assertProjectAllowed).toHaveBeenLastCalledWith(admin, mocks);
     });
 
     it('stores the wrapped root key and makes the caller the admin', async () => {

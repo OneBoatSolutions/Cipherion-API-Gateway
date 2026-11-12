@@ -20,6 +20,15 @@ const mocks = vi.hoisted(() => ({
   user: { findUnique: vi.fn() },
 }));
 
+const plan = vi.hoisted(() => ({ assertPersonAllowed: vi.fn() }));
+vi.mock('./plan-limits.js', () => plan);
+
+// Array transactions run their operations; interactive ones get the mocked
+// models as their client.
+const runTransaction = (operations: unknown) =>
+  typeof operations === 'function'
+    ? (operations as (tx: unknown) => Promise<unknown>)(mocks)
+    : Promise.all(operations as unknown[]);
 vi.mock('../lib/cipseq-prisma.js', () => ({
   cipseqPrisma: {
     $transaction: mocks.$transaction,
@@ -87,9 +96,7 @@ describe('InvitationsController', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.$transaction.mockImplementation((operations: unknown[]) =>
-      Promise.all(operations),
-    );
+    mocks.$transaction.mockImplementation(runTransaction);
     mocks.project.findFirst.mockResolvedValue(projectRow);
     mocks.user.findUnique.mockResolvedValue(null);
     mocks.groupInvitation.findFirst.mockResolvedValue(invitationRow());
@@ -143,6 +150,28 @@ describe('InvitationsController', () => {
         expect.objectContaining({
           data: expect.objectContaining({ status: 'PENDING_APPROVAL' }),
         }),
+      );
+    });
+
+    it("refuses past the project admin's free-plan limit", async () => {
+      mocks.group.findFirst.mockResolvedValue(groupRow('ACTING_ADMIN'));
+      plan.assertPersonAllowed.mockRejectedValue(new ForbiddenException());
+
+      await expect(create(acting)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(plan.assertPersonAllowed).toHaveBeenCalledWith(groupId, admin.id);
+      expect(mocks.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('checks the limit again inside the transaction', async () => {
+      mocks.group.findFirst.mockResolvedValue(groupRow('ACTING_ADMIN'));
+      mocks.groupInvitation.create.mockResolvedValue(invitationRow());
+
+      await create(admin);
+
+      expect(plan.assertPersonAllowed).toHaveBeenLastCalledWith(
+        groupId,
+        admin.id,
+        mocks,
       );
     });
 
@@ -282,19 +311,43 @@ describe('InvitationResponsesController', () => {
     id,
     groupId,
     status,
-    group: { projectId },
+    group: { projectId, project: { adminUserId: admin.id } },
   });
 
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.$transaction.mockImplementation((operations: unknown[]) =>
-      Promise.all(operations),
-    );
+    mocks.$transaction.mockImplementation(runTransaction);
     mocks.groupInvitation.findFirst.mockResolvedValue(own());
     mocks.groupInvitation.update.mockResolvedValue(
       invitationRow('ACCEPTED', admin.id),
     );
     mocks.device.findMany.mockResolvedValue([{ id: 'dvc_1' }]);
+  });
+
+  it('refuses to join a group at the free-plan limit, not counting this invitation', async () => {
+    plan.assertPersonAllowed.mockRejectedValue(new ForbiddenException());
+
+    await expect(controller.accept(invitee, id)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(plan.assertPersonAllowed).toHaveBeenCalledWith(
+      groupId,
+      admin.id,
+      undefined,
+      id,
+    );
+    expect(mocks.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('checks the limit again inside the transaction', async () => {
+    await controller.accept(invitee, id);
+
+    expect(plan.assertPersonAllowed).toHaveBeenLastCalledWith(
+      groupId,
+      admin.id,
+      mocks,
+      id,
+    );
   });
 
   it('adds the invitee to the group, and asks to approve their active devices', async () => {

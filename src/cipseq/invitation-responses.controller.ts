@@ -11,6 +11,7 @@ import {
   ApiBadRequestResponse,
   ApiConflictResponse,
   ApiCookieAuth,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -31,6 +32,7 @@ import {
   INVITATION_FIELDS,
   toInvitationResponse,
 } from './invitations.controller.js';
+import { assertPersonAllowed } from './plan-limits.js';
 
 // Someone else's invitation answers 404, so its id reveals nothing. Emails aren't
 // verified yet: accepting gives no keys, because those need an approved device.
@@ -45,7 +47,9 @@ async function findOwnInvitation(id: string, user: AuthUser) {
       id: true,
       groupId: true,
       status: true,
-      group: { select: { projectId: true } },
+      group: {
+        select: { projectId: true, project: { select: { adminUserId: true } } },
+      },
     },
   });
   if (!invitation) {
@@ -69,6 +73,9 @@ export class InvitationResponsesController {
   @ApiOperation({ summary: 'Accept an invitation and join the group' })
   @ApiOkResponse({ type: InvitationResponse })
   @ApiConflictResponse({ description: 'Already handled, or already a member' })
+  @ApiForbiddenResponse({
+    description: 'PLAN_LIMIT_REACHED: the group is full on the free plan',
+  })
   @HttpCode(200)
   @Post(':id/accept')
   async accept(
@@ -82,29 +89,38 @@ export class InvitationResponsesController {
       select: { id: true },
     });
 
+    const { adminUserId } = group.project;
+    // Invitations sent before the limit existed could push a group over it.
+    await assertPersonAllowed(groupId, adminUserId, undefined, id);
+
     try {
-      const [updated] = await cipseqPrisma.$transaction([
-        cipseqPrisma.groupInvitation.update({
+      const updated = await cipseqPrisma.$transaction(async (tx) => {
+        await assertPersonAllowed(groupId, adminUserId, tx, id);
+        const accepted = await tx.groupInvitation.update({
           where: { id, status: 'PENDING_ACCEPTANCE' },
           data: { status: 'ACCEPTED', respondedAt: new Date() },
           select: INVITATION_FIELDS,
-        }),
-        cipseqPrisma.groupMember.create({
+        });
+        await tx.groupMember.create({
           data: { groupId, userId: user.id, role: 'MEMBER' },
-        }),
-        cipseqPrisma.groupDevice.createMany({
+        });
+        await tx.groupDevice.createMany({
           data: devices.map(({ id: deviceId }) => ({
             groupId,
             deviceId,
             status: 'PENDING_APPROVAL' as const,
           })),
           skipDuplicates: true,
-        }),
-        auditEvent(user.id, 'invitation.accepted', projectId, {
-          groupId,
-          invitationId: id,
-        }),
-      ]);
+        });
+        await auditEvent(
+          user.id,
+          'invitation.accepted',
+          projectId,
+          { groupId, invitationId: id },
+          tx,
+        );
+        return accepted;
+      });
       return toInvitationResponse(updated, projectId);
     } catch (error) {
       if (isRecordNotFound(error)) {

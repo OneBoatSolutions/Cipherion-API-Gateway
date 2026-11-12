@@ -6,6 +6,7 @@ import {
 } from '../cipseq/devices.dto.js';
 import { GroupMemberResponse, GroupResponse } from '../cipseq/groups.dto.js';
 import { InvitationResponse } from '../cipseq/invitations.dto.js';
+import { PlanLimitsResponse } from '../cipseq/plan-limits.dto.js';
 import { ProjectResponse } from '../cipseq/projects.dto.js';
 import { AccountTypeSummary } from '../dashboard/account-type.dto.js';
 import { ProfileResponse } from '../dashboard/profile.dto.js';
@@ -265,6 +266,15 @@ export class WorkspaceNotification {
   inviteeEmail?: string;
 }
 
+export class WorkspaceAccount extends AccountTypeSummary {
+  @ApiProperty({
+    type: PlanLimitsResponse,
+    description:
+      'Free-plan limits and what is used of them, so the client can disable actions before they are refused with 403 PLAN_LIMIT_REACHED',
+  })
+  limits!: PlanLimitsResponse;
+}
+
 export class WorkspaceResponse {
   @ApiProperty({ type: ProfileResponse })
   profile!: ProfileResponse;
@@ -273,11 +283,11 @@ export class WorkspaceResponse {
   settings!: SettingsResponse;
 
   @ApiProperty({
-    type: AccountTypeSummary,
+    type: WorkspaceAccount,
     description:
-      'INDIVIDUAL or COMPANY, with the company name. Both null until the user chooses through PUT /dashboard/account-type.',
+      'INDIVIDUAL or COMPANY, with the company name (both null until the user chooses through PUT /dashboard/account-type), and the plan limits.',
   })
-  account!: AccountTypeSummary;
+  account!: WorkspaceAccount;
 
   @ApiProperty({ type: [WorkspaceProject] })
   projects!: WorkspaceProject[];

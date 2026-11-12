@@ -19,7 +19,11 @@ interface TestUser {
 interface Workspace {
   profile: { id: string; email: string };
   settings: { timezone: string };
-  account: { accountType: string | null; companyName: string | null };
+  account: {
+    accountType: string | null;
+    companyName: string | null;
+    limits: unknown;
+  };
   projects: {
     id: string;
     role: string;
@@ -178,7 +182,17 @@ describe('Workspace (e2e)', () => {
       email: newUser.email,
     });
     expect(result.settings.timezone).toBe('UTC');
-    expect(result.account).toEqual({ accountType: null, companyName: null });
+    expect(result.account).toMatchObject({
+      accountType: null,
+      companyName: null,
+      limits: {
+        master: false,
+        projects: { used: 0 },
+        devices: { used: 0 },
+        encryptions: { used: 0 },
+        decryptions: { used: 0 },
+      },
+    });
     expect(result.projects).toEqual([]);
     expect(result.notifications).toEqual([]);
   });
@@ -194,7 +208,7 @@ describe('Workspace (e2e)', () => {
 
     const result = await workspace(member);
 
-    expect(result.account).toEqual({
+    expect(result.account).toMatchObject({
       accountType: 'COMPANY',
       companyName: 'Acme Labs',
     });

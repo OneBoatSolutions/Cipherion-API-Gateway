@@ -13,6 +13,7 @@ import {
   ApiConflictResponse,
   ApiCookieAuth,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -62,6 +63,10 @@ export class DevicesController {
   @ApiConflictResponse({
     description:
       'The id belongs to someone else, has a different key, or was revoked',
+  })
+  @ApiForbiddenResponse({
+    description:
+      'PLAN_LIMIT_REACHED: the free plan allows no more active devices',
   })
   @Post()
   async register(

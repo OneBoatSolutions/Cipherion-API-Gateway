@@ -33,7 +33,12 @@ import {
   findGroupForGroupAdmin,
   findGroupForMember,
 } from './group-access.js';
-import { CreateInvitationDto, InvitationResponse } from './invitations.dto.js';
+import {
+  CreateInvitationDto,
+  InvitationResponse,
+  OPEN_INVITATION_STATUSES,
+} from './invitations.dto.js';
+import { assertPersonAllowed } from './plan-limits.js';
 
 export const INVITATION_FIELDS = {
   id: true,
@@ -44,10 +49,7 @@ export const INVITATION_FIELDS = {
   createdAt: true,
 } as const;
 
-export const OPEN_INVITATION_STATUSES = [
-  'PENDING_APPROVAL',
-  'PENDING_ACCEPTANCE',
-] as const;
+export { OPEN_INVITATION_STATUSES };
 
 export function toInvitationResponse(
   { groupId, ...invitation }: Omit<InvitationResponse, 'projectId'>,
@@ -82,7 +84,10 @@ export class InvitationsController {
   })
   @ApiCreatedResponse({ type: InvitationResponse })
   @ApiBadRequestResponse({ description: 'Validation failed' })
-  @ApiForbiddenResponse({ description: 'Not a group admin' })
+  @ApiForbiddenResponse({
+    description:
+      'Not a group admin, or PLAN_LIMIT_REACHED (members and open invitations are at the free-plan limit)',
+  })
   @ApiConflictResponse({
     description: 'Already a member, or an invitation is already open',
   })
@@ -93,11 +98,12 @@ export class InvitationsController {
     @Param('groupId', ParseUUIDPipe) groupId: string,
     @Body() { email }: CreateInvitationDto,
   ): Promise<InvitationResponse> {
-    const { isProjectAdmin } = await findGroupForGroupAdmin(
+    const { isProjectAdmin, project } = await findGroupForGroupAdmin(
       projectId,
       groupId,
       user.id,
     );
+    await assertPersonAllowed(groupId, project.adminUserId);
 
     const inviteeEmail = email.toLowerCase();
     const account = await prisma.user.findUnique({
@@ -116,8 +122,9 @@ export class InvitationsController {
 
     const id = randomUUID();
     try {
-      const [invitation] = await cipseqPrisma.$transaction([
-        cipseqPrisma.groupInvitation.create({
+      const invitation = await cipseqPrisma.$transaction(async (tx) => {
+        await assertPersonAllowed(groupId, project.adminUserId, tx);
+        const created = await tx.groupInvitation.create({
           data: {
             id,
             groupId,
@@ -126,12 +133,16 @@ export class InvitationsController {
             status: isProjectAdmin ? 'PENDING_ACCEPTANCE' : 'PENDING_APPROVAL',
           },
           select: INVITATION_FIELDS,
-        }),
-        auditEvent(user.id, 'invitation.created', projectId, {
-          groupId,
-          invitationId: id,
-        }),
-      ]);
+        });
+        await auditEvent(
+          user.id,
+          'invitation.created',
+          projectId,
+          { groupId, invitationId: id },
+          tx,
+        );
+        return created;
+      });
       return toInvitationResponse(invitation, projectId);
     } catch (error) {
       // A partial unique index allows one open invitation per group and email.

@@ -9,6 +9,7 @@ import type { CryptoOperation } from '../generated/cipseq/enums.js';
 import { auditEvent } from './audit.js';
 import { checkCertificate } from './device-certificates.js';
 import { type CipSeqTransaction, withDeviceLock } from './device-lock.js';
+import { usageRefusal } from './plan-limits.js';
 
 // How long the engine waits while the background job creates a new envelope. A
 // 10,000-device job takes about 5 minutes.
@@ -30,6 +31,8 @@ interface DeliveryRequest {
   groupId: string;
   // Absent for encrypt, which always uses the current version.
   gdekVersion?: number;
+  // The master account has no monthly limit (isMaster in plan-limits.ts).
+  master: boolean;
 }
 
 function loadEnvelope(
@@ -56,7 +59,7 @@ function loadEnvelope(
 
 async function deliver(
   tx: CipSeqTransaction,
-  { peer, userId, operation, groupId, gdekVersion }: DeliveryRequest,
+  { peer, userId, operation, groupId, gdekVersion, master }: DeliveryRequest,
 ): Promise<EnvelopeDelivery | HttpException> {
   // Under the lock, so that a revocation can't race the guard's check.
   const certificate = await checkCertificate(peer, userId, tx);
@@ -101,6 +104,15 @@ async function deliver(
       message: 'The envelope for the current key is not ready yet.',
       retryAfter: ENVELOPE_NOT_READY_RETRY_AFTER_SECONDS,
     });
+  }
+
+  // Last, so a certificate, 404 or not-ready answer isn't hidden behind it. A
+  // refusal writes no delivery row, so it doesn't count.
+  if (!master) {
+    const refusal = await usageRefusal(tx, userId, operation);
+    if (refusal) {
+      return refusal;
+    }
   }
 
   const requestId = randomUUID();
