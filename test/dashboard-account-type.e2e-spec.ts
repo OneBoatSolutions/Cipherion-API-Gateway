@@ -6,6 +6,7 @@ import {
 import { AppModule } from './../src/app.module.js';
 import { configureApp } from './../src/app.setup.js';
 import { trustedOrigins } from './../src/config/env.js';
+import { cipseqPrisma } from './../src/lib/cipseq-prisma.js';
 import { prisma } from './../src/lib/prisma.js';
 import { deleteTestUser } from './helpers/delete-test-user.js';
 import { signUpVerified, type SignedInUser } from './helpers/users.js';
@@ -63,6 +64,11 @@ describe('Dashboard account type (e2e)', () => {
   });
 
   afterAll(async () => {
+    await cipseqPrisma.auditEvent.deleteMany({
+      where: {
+        userId: { in: [individual, company, racer].map(({ id }) => id) },
+      },
+    });
     for (const user of [individual, company, racer]) {
       await deleteTestUser(user.email);
     }
@@ -179,6 +185,33 @@ describe('Dashboard account type (e2e)', () => {
       accountType: 'COMPANY',
       companyName: 'Acme Labs Pvt Ltd',
     });
+  });
+
+  // In CipSeq's audit trail, not the console. A refused change, and sending
+  // the same values again, write nothing.
+  it('audits the choice and the rename, and nothing else', async () => {
+    await put(company, {
+      accountType: 'COMPANY',
+      companyName: 'Acme Labs Pvt Ltd',
+    });
+
+    const rows = await cipseqPrisma.auditEvent.findMany({
+      where: { userId: company.id },
+      orderBy: { createdAt: 'asc' },
+      select: { action: true, projectId: true, metadata: true },
+    });
+    expect(rows).toEqual([
+      {
+        action: 'account.type_set',
+        projectId: null,
+        metadata: { accountType: 'COMPANY' },
+      },
+      {
+        action: 'account.company_renamed',
+        projectId: null,
+        metadata: { changed: ['companyName'] },
+      },
+    ]);
   });
 
   it.each([

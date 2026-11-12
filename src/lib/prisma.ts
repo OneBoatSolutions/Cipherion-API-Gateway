@@ -1,5 +1,4 @@
 import '../config/env.js';
-import { Logger } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { PrismaClient } from '../generated/prisma/client.js';
@@ -18,7 +17,7 @@ export const pool = new Pool({
   connectionTimeoutMillis: 2000,
 });
 
-watchDatabase(pool, new Logger('Database'));
+watchDatabase(pool, 'AUTH_DATABASE');
 
 // disposeExternalPool: prisma.$disconnect() also closes the pool.
 const adapter = new PrismaPg(pool, { disposeExternalPool: true });

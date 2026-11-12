@@ -1,5 +1,9 @@
 import { EventEmitter } from 'node:events';
 import {
+  resetConnectionEvents,
+  startConnectionEvents,
+} from './connection-events.js';
+import {
   connectionErrorReason,
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_TIMEOUT_MS,
@@ -23,6 +27,10 @@ function fakePool() {
 
 const refused = Object.assign(new Error(''), { code: 'ECONNREFUSED' });
 
+// Events are recorded through system-events.ts, which would write to the
+// database; the log lines are what these tests check.
+vi.mock('./system-events.js', () => ({ recordSystemEvent: vi.fn() }));
+
 describe('watchDatabase', () => {
   const logger = { error: vi.fn(), log: vi.fn() };
 
@@ -30,6 +38,9 @@ describe('watchDatabase', () => {
     vi.useFakeTimers();
     logger.error.mockReset();
     logger.log.mockReset();
+    // The watch reports through connection-events.ts, which logs once each way.
+    resetConnectionEvents(() => logger);
+    startConnectionEvents();
   });
 
   afterEach(() => {
@@ -41,7 +52,7 @@ describe('watchDatabase', () => {
 
   it('checks the database regularly and stays quiet while it is up', async () => {
     const { pool, query } = fakePool();
-    watchDatabase(pool, logger);
+    watchDatabase(pool, 'AUTH_DATABASE');
 
     await tick();
     await tick();
@@ -54,7 +65,7 @@ describe('watchDatabase', () => {
 
   it('logs an outage once with its reason and the recovery once', async () => {
     const { pool, query } = fakePool();
-    watchDatabase(pool, logger);
+    watchDatabase(pool, 'AUTH_DATABASE');
 
     query.mockRejectedValue(refused);
     await tick();
@@ -74,7 +85,7 @@ describe('watchDatabase', () => {
 
   it('handles the pool error event instead of crashing, and logs it once', async () => {
     const { pool, emit, query } = fakePool();
-    watchDatabase(pool, logger);
+    watchDatabase(pool, 'AUTH_DATABASE');
     const restart = Object.assign(
       new Error('terminating connection due to administrator command'),
       { code: '57P01' },
@@ -92,7 +103,7 @@ describe('watchDatabase', () => {
 
   it('counts a heartbeat that does not answer in time as an outage', async () => {
     const { pool, query } = fakePool();
-    watchDatabase(pool, logger);
+    watchDatabase(pool, 'AUTH_DATABASE');
 
     query.mockReturnValue(new Promise(() => {}));
     await tick();
@@ -105,7 +116,7 @@ describe('watchDatabase', () => {
 
   it('stops checking and logging once stopped', async () => {
     const { pool, query } = fakePool();
-    watchDatabase(pool, logger);
+    watchDatabase(pool, 'AUTH_DATABASE');
 
     stopDatabaseWatches();
     query.mockRejectedValue(refused);
@@ -117,7 +128,7 @@ describe('watchDatabase', () => {
 
   it('does not report a heartbeat that fails because the pool is closing', async () => {
     const { pool, query } = fakePool();
-    watchDatabase(pool, logger);
+    watchDatabase(pool, 'AUTH_DATABASE');
 
     let fail: (error: Error) => void = () => {};
     query.mockReturnValue(new Promise((_, reject) => (fail = reject)));

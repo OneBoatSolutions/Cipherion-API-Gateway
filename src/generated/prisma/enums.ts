@@ -15,3 +15,23 @@ export const AccountType = {
 } as const
 
 export type AccountType = (typeof AccountType)[keyof typeof AccountType]
+
+
+export const SystemService = {
+  AUTH_DATABASE: 'AUTH_DATABASE',
+  CIPSEQ_DATABASE: 'CIPSEQ_DATABASE',
+  REDIS: 'REDIS',
+  KMS: 'KMS',
+  SMTP: 'SMTP'
+} as const
+
+export type SystemService = (typeof SystemService)[keyof typeof SystemService]
+
+
+export const SystemEventKind = {
+  CONNECTION_ESTABLISHED: 'CONNECTION_ESTABLISHED',
+  CONNECTION_LOST: 'CONNECTION_LOST',
+  CONNECTION_RESTORED: 'CONNECTION_RESTORED'
+} as const
+
+export type SystemEventKind = (typeof SystemEventKind)[keyof typeof SystemEventKind]

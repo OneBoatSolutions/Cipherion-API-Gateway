@@ -52,3 +52,8 @@ export type Verification = Prisma.VerificationModel
  * 
  */
 export type RateLimit = Prisma.RateLimitModel
+/**
+ * Model SystemEvent
+ * 
+ */
+export type SystemEvent = Prisma.SystemEventModel

@@ -87,7 +87,7 @@ The console app sits behind Traefik on `PORT`. The [engine listener](#engine-lis
 │   ├── lib/prisma.ts        # Shared pg pool and PrismaClient for the auth database
 │   ├── lib/cipseq-prisma.ts # Shared pg pool and PrismaClient for the CipSeq database
 │   ├── lib/database-watch.ts# Heartbeat and connection-loss logging for both pools
-│   ├── lib/startup-checks.ts# Exits with code 1 if a database is unreachable at startup
+│   ├── lib/startup-checks.ts# Exits with 10–14 if a database, Redis, the KMS or SMTP is unreachable at startup
 │   ├── lib/redis.ts         # Shared Redis client (sessions, rate limits, caching)
 │   ├── lib/kms.ts           # Shared KMS gRPC client (mTLS) and its health client
 │   ├── lib/mailer.ts        # Shared SMTP sender: queued, pooled, never awaited by a request
@@ -291,31 +291,59 @@ LOG   [KMS] Connection restored
 
 ### 5. Startup checks and connection logs
 
-Before Nest starts, the gateway runs `SELECT 1` on both databases (5-second timeout). If either fails, it logs which one and why, then **exits with code 1**, so Docker, Kubernetes or systemd treat it as a failed start:
+Before Nest starts, the gateway checks every dependency at once, each with a 5-second timeout:
+- `SELECT 1` on both databases
+- `PING` to Redis
+- a `grpc.health.v1` check that the KMS answers `SERVING`
+- a login to the SMTP server, which sends nothing
+
+If any fails, it logs each failure and why, then **exits with that dependency's code**, so Docker, Kubernetes or systemd treat it as a failed start and you can tell which one it was:
+
+| Exit code | Unreachable |
+| --- | --- |
+| `10` | Auth database |
+| `11` | CipSeq database |
+| `12` | Redis |
+| `13` | KMS |
+| `14` | SMTP server |
+| `1` | Not a dependency: invalid configuration, such as a failed env validation or an unreadable certificate |
+
+When several fail, every one is logged and the lowest code is used.
 
 ```
-LOG   [Startup] Connected to the auth and CipSeq databases
-ERROR [Startup] Can't connect to the CipSeq database (localhost:5432/cipherion_cipseq): 3D000 database "cipherion_cipseq" does not exist
-ERROR [Startup] Exiting: a database is unreachable
+LOG   [Startup] Connected to the auth database, the CipSeq database, Redis, the KMS and the SMTP server
+ERROR [Startup] Can't connect to Redis (localhost:6380): ECONNREFUSED
+ERROR [Startup] Can't connect to the SMTP server (smtp.example.com:587): ETIMEDOUT
+ERROR [Startup] Exiting: can't reach Redis and the SMTP server
 ```
 
-Only host, port and database name are logged, never the user or password. Redis and the KMS aren't required at startup: their outages are logged and reported by `/ready`.
+Only host, port and path are logged, never a user or password. In tests (`NODE_ENV=test`) there's no SMTP server, so it isn't checked.
 
-While the gateway runs, every dependency logs a lost connection once, with its reason, and its recovery once:
+While the gateway runs, each dependency logs **one** error when its connection is lost, with the reason, and **one** line when it's back:
 
-| Dependency | Log context | Example reason |
-| --- | --- | --- |
-| Auth database | `[Database]` | `ECONNREFUSED`, `57P01 terminating connection due to administrator command` |
-| CipSeq database | `[CipSeqDatabase]` | same as above |
-| Redis | `[Redis]` | `ECONNREFUSED` |
-| KMS | `[KMS]` | `ECONNREFUSED`, `TLS: tlsv1 alert unknown ca` |
+| Dependency | Log context | How it's watched | Example reason |
+| --- | --- | --- | --- |
+| Auth database | `[Database]` | `SELECT 1` every 5 s | `ECONNREFUSED`, `57P01 terminating connection due to administrator command` |
+| CipSeq database | `[CipSeqDatabase]` | `SELECT 1` every 5 s | same as above |
+| Redis | `[Redis]` | the client's connection events | `ECONNREFUSED`, `SELF_SIGNED_CERT_IN_CHAIN` |
+| KMS | `[KMS]` | the gRPC channel's state | `ECONNREFUSED`, `TLS: tlsv1 alert unknown ca` |
+| SMTP server | `[Mailer]` | a login every 60 s, and any failed send | `ESOCKET`, `ETIMEDOUT`, `EAUTH` |
 
 ```
 ERROR [Database] Connection lost, reconnecting: ECONNREFUSED
 LOG   [Database] Connection restored
+LOG   [Mailer] Connection restored (3 emails not sent during the outage)
 ```
 
-The databases are checked by a `SELECT 1` every 5 seconds, so an outage is noticed even without traffic.
+During an SMTP outage, failed emails aren't logged one by one. The restored line gives the count. `/ready` reports outages in its response but doesn't log them.
+
+**System events.** Every startup connection, lost connection and restored connection is also written to the `systemEvent` table in the auth database. Each row has:
+- the service and the event (`CONNECTION_ESTABLISHED`, `CONNECTION_LOST` or `CONNECTION_RESTORED`)
+- the reason, for a lost connection
+- the gateway instance (`hostname:pid`)
+- `occurredAt`, when it happened
+
+Rows are written from an in-memory queue, so an outage of the auth database itself is recorded once it's back. The queue holds at most 1,000 events. These rows are kept apart from the user audit trail in CipSeq's `auditEvent`.
 
 ### 6. Run the gateway
 
@@ -474,6 +502,8 @@ Routes for the signed-in user's dashboard. They need the session cookie.
 | `PUT` | `/api/v1/dashboard/account-type` | Chooses the type once: `{"accountType":"INDIVIDUAL"}` or `{"accountType":"COMPANY","companyName":"Acme Labs"}` (1–200 characters, refused for an individual). The same type again answers `200` and renames a company; a different type answers `409`, and support changes it by hand. |
 
 Profile and settings responses also carry `accountType` and `companyName` (both `null` until chosen), and `/workspace` has them once as `account`. Settings can't change them: `PATCH /dashboard/settings` with `accountType` answers `400`.
+
+Choosing the type writes an `account.type_set` audit row (`{ accountType }`), and renaming a company writes `account.company_renamed` (`{ changed: ["companyName"] }`). Both go in CipSeq's `auditEvent` with no project. Sending the same values again, or a refused change, writes nothing. The account type is in the auth database and the audit trail in the CipSeq database, so the audit row is written after the change commits. If that write fails, it's logged with the user id and the request still succeeds.
 
 The password is changed through Better Auth's `/api/v1/auth/change-password` (see [Auth endpoints](#auth-endpoints)). Changing the email address isn't available yet.
 
@@ -797,7 +827,7 @@ Requests that fail DTO validation return `400 Bad Request` in this format:
 - Google and GitHub OAuth apps, if used, have the production redirect URIs (`<BETTER_AUTH_URL>/api/v1/auth/callback/google` and `/github`).
 - CipSeq backups are protected and expire on a schedule. A backup from before a rotation still opens with the old passphrase and holds the old group keys, so after rotating because of a leak, old backups stay a risk until they expire.
 - `NODE_ENV=production` is set, which also turns off the API docs (`/api/v1/docs`) and Better Auth's schema endpoint.
-- The orchestrator restarts the gateway when it exits (it exits with code 1 if a database is unreachable at startup), and starts the databases before the gateway.
+- The orchestrator restarts the gateway when it exits (it exits with 10–14 if a database, Redis, the KMS or the SMTP server is unreachable at startup), and starts them before the gateway.
 - The load balancer or orchestrator uses `/api/v1/health` as the liveness probe and `/api/v1/ready` as the readiness probe, so instances stop receiving traffic while either database, Redis or the KMS is unreachable.
 - `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` are set so that telemetry is sent.
 

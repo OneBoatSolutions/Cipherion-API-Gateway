@@ -1,9 +1,17 @@
 import { connectivityState } from '@grpc/grpc-js';
+import { HealthCheckResponse_ServingStatus } from '../generated/kms/grpc/health/v1/health.js';
 import {
   checkClientCertificateExpiry,
   failureReason,
+  servingFailure,
   watchKmsConnection,
 } from './kms-connection.js';
+
+// The default reporter would load the database clients; every test passes its own.
+vi.mock('../lib/connection-events.js', () => ({
+  reportLost: vi.fn(),
+  reportRestored: vi.fn(),
+}));
 
 describe('checkClientCertificateExpiry', () => {
   const now = Date.parse('2026-11-06T00:00:00Z');
@@ -71,35 +79,36 @@ function fakeChannel(initial: connectivityState) {
 // Lets the async failure description resolve before asserting on the log.
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+// connection-events.ts turns these reports into one log line each way; its own
+// spec covers that.
 describe('watchKmsConnection', () => {
-  const logger = { error: vi.fn(), log: vi.fn() };
+  const report = { lost: vi.fn(), restored: vi.fn() };
   const describeFailure = vi.fn();
 
   beforeEach(() => {
-    logger.error.mockReset();
-    logger.log.mockReset();
+    report.lost.mockReset();
+    report.restored.mockReset();
     describeFailure.mockReset().mockResolvedValue('ECONNREFUSED');
   });
 
-  it('connects at startup and stays quiet while the KMS is healthy', async () => {
+  it('connects at startup and reports no outage while the KMS is healthy', async () => {
     const { channel, move } = fakeChannel(IDLE);
-    watchKmsConnection(channel, describeFailure, logger);
+    watchKmsConnection(channel, describeFailure, report);
 
     expect(channel.getConnectivityState).toHaveBeenCalledWith(true);
     move(CONNECTING);
     move(READY);
     await flush();
 
-    expect(logger.error).not.toHaveBeenCalled();
-    expect(logger.log).not.toHaveBeenCalled();
+    expect(report.lost).not.toHaveBeenCalled();
     expect(describeFailure).not.toHaveBeenCalled();
   });
 
-  it('logs a lost connection once, with the reason, and its recovery once', async () => {
+  it('reports a lost connection once, with the reason, then the recovery', async () => {
     const { channel, move } = fakeChannel(READY);
-    watchKmsConnection(channel, describeFailure, logger);
+    watchKmsConnection(channel, describeFailure, report);
 
-    // Several failed reconnect attempts produce a single error.
+    // Several failed reconnect attempts ask for the reason only once.
     move(TRANSIENT_FAILURE);
     move(CONNECTING);
     move(TRANSIENT_FAILURE);
@@ -107,33 +116,27 @@ describe('watchKmsConnection', () => {
     move(CONNECTING);
     await flush();
     move(READY);
-    move(READY);
 
     expect(describeFailure).toHaveBeenCalledTimes(1);
-    expect(logger.error).toHaveBeenCalledTimes(1);
-    expect(logger.error).toHaveBeenCalledWith(
-      'Connection lost, reconnecting: ECONNREFUSED',
-    );
-    expect(logger.log).toHaveBeenCalledTimes(1);
-    expect(logger.log).toHaveBeenCalledWith('Connection restored');
+    expect(report.lost).toHaveBeenCalledTimes(1);
+    expect(report.lost).toHaveBeenCalledWith('ECONNREFUSED');
+    expect(report.restored).toHaveBeenCalled();
   });
 
-  it('still logs when the reason cannot be found', async () => {
+  it('still reports when the reason cannot be found', async () => {
     describeFailure.mockRejectedValue(new Error('boom'));
     const { channel, move } = fakeChannel(CONNECTING);
-    watchKmsConnection(channel, describeFailure, logger);
+    watchKmsConnection(channel, describeFailure, report);
 
     move(TRANSIENT_FAILURE);
     await flush();
 
-    expect(logger.error).toHaveBeenCalledWith(
-      'Connection lost, reconnecting: unknown error',
-    );
+    expect(report.lost).toHaveBeenCalledWith('unknown error');
   });
 
   it('asks an idle channel to connect again', () => {
     const { channel, move, connectRequests } = fakeChannel(READY);
-    watchKmsConnection(channel, describeFailure, logger);
+    watchKmsConnection(channel, describeFailure, report);
 
     move(IDLE);
 
@@ -142,12 +145,36 @@ describe('watchKmsConnection', () => {
 
   it('stops watching once the channel is shut down', () => {
     const { channel, move, isWatching } = fakeChannel(READY);
-    watchKmsConnection(channel, describeFailure, logger);
+    watchKmsConnection(channel, describeFailure, report);
     expect(isWatching()).toBe(true);
 
     move(SHUTDOWN);
 
     expect(isWatching()).toBe(false);
+  });
+});
+
+describe('servingFailure', () => {
+  it('is undefined only for SERVING', () => {
+    expect(
+      servingFailure(null, HealthCheckResponse_ServingStatus.SERVING),
+    ).toBeUndefined();
+  });
+
+  it.each([
+    [HealthCheckResponse_ServingStatus.NOT_SERVING, 'NOT_SERVING'],
+    [HealthCheckResponse_ServingStatus.SERVICE_UNKNOWN, 'SERVICE_UNKNOWN'],
+  ])('names a %s answer', (status, name) => {
+    expect(servingFailure(null, status)).toBe(`health check answered ${name}`);
+  });
+
+  it('shortens an error to its cause', () => {
+    expect(
+      servingFailure({
+        details:
+          'No connection established. Last error: Error: connect ECONNREFUSED 127.0.0.1:50051. Resolution note: ',
+      }),
+    ).toBe('ECONNREFUSED');
   });
 });
 

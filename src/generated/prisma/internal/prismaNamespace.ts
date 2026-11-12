@@ -403,7 +403,8 @@ export const ModelName = {
   Session: 'Session',
   Account: 'Account',
   Verification: 'Verification',
-  RateLimit: 'RateLimit'
+  RateLimit: 'RateLimit',
+  SystemEvent: 'SystemEvent'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -419,7 +420,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "userSettings" | "accountProfile" | "session" | "account" | "verification" | "rateLimit"
+    modelProps: "user" | "userSettings" | "accountProfile" | "session" | "account" | "verification" | "rateLimit" | "systemEvent"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -941,6 +942,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    SystemEvent: {
+      payload: Prisma.$SystemEventPayload<ExtArgs>
+      fields: Prisma.SystemEventFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.SystemEventFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemEventPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.SystemEventFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemEventPayload>
+        }
+        findFirst: {
+          args: Prisma.SystemEventFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemEventPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.SystemEventFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemEventPayload>
+        }
+        findMany: {
+          args: Prisma.SystemEventFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemEventPayload>[]
+        }
+        create: {
+          args: Prisma.SystemEventCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemEventPayload>
+        }
+        createMany: {
+          args: Prisma.SystemEventCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.SystemEventCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemEventPayload>[]
+        }
+        delete: {
+          args: Prisma.SystemEventDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemEventPayload>
+        }
+        update: {
+          args: Prisma.SystemEventUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemEventPayload>
+        }
+        deleteMany: {
+          args: Prisma.SystemEventDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.SystemEventUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.SystemEventUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemEventPayload>[]
+        }
+        upsert: {
+          args: Prisma.SystemEventUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SystemEventPayload>
+        }
+        aggregate: {
+          args: Prisma.SystemEventAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSystemEvent>
+        }
+        groupBy: {
+          args: Prisma.SystemEventGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SystemEventGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.SystemEventCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SystemEventCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1071,12 +1146,34 @@ export const RateLimitScalarFieldEnum = {
 export type RateLimitScalarFieldEnum = (typeof RateLimitScalarFieldEnum)[keyof typeof RateLimitScalarFieldEnum]
 
 
+export const SystemEventScalarFieldEnum = {
+  id: 'id',
+  service: 'service',
+  kind: 'kind',
+  reason: 'reason',
+  metadata: 'metadata',
+  instance: 'instance',
+  occurredAt: 'occurredAt',
+  createdAt: 'createdAt'
+} as const
+
+export type SystemEventScalarFieldEnum = (typeof SystemEventScalarFieldEnum)[keyof typeof SystemEventScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
 } as const
 
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
+
+
+export const NullableJsonNullValueInput = {
+  DbNull: DbNull,
+  JsonNull: JsonNull
+} as const
+
+export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
 
 
 export const QueryMode = {
@@ -1093,6 +1190,15 @@ export const NullsOrder = {
 } as const
 
 export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+export const JsonNullValueFilter = {
+  DbNull: DbNull,
+  JsonNull: JsonNull,
+  AnyNull: AnyNull
+} as const
+
+export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
 
 
 
@@ -1175,6 +1281,48 @@ export type BigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 
  * Reference to a field of type 'BigInt[]'
  */
 export type ListBigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt[]'>
+    
+
+
+/**
+ * Reference to a field of type 'SystemService'
+ */
+export type EnumSystemServiceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SystemService'>
+    
+
+
+/**
+ * Reference to a field of type 'SystemService[]'
+ */
+export type ListEnumSystemServiceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SystemService[]'>
+    
+
+
+/**
+ * Reference to a field of type 'SystemEventKind'
+ */
+export type EnumSystemEventKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SystemEventKind'>
+    
+
+
+/**
+ * Reference to a field of type 'SystemEventKind[]'
+ */
+export type ListEnumSystemEventKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SystemEventKind[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Json'
+ */
+export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
+    
+
+
+/**
+ * Reference to a field of type 'QueryMode'
+ */
+export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
     
 
 
@@ -1349,6 +1497,7 @@ export type GlobalOmitConfig = {
   account?: Prisma.AccountOmit
   verification?: Prisma.VerificationOmit
   rateLimit?: Prisma.RateLimitOmit
+  systemEvent?: Prisma.SystemEventOmit
 }
 
 /* Types for Logging */

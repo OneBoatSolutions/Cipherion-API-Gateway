@@ -31,7 +31,11 @@ export type AuditAction =
   | 'device.certificate_renewed'
   | 'device.certificate_refused'
   | 'device.certificate_issue_failed'
-  | 'device.certificate_notice_dismissed';
+  | 'device.certificate_notice_dismissed'
+  // The account type lives in the auth database; its audit rows live here,
+  // written after the change commits (src/dashboard/account-type.ts).
+  | 'account.type_set'
+  | 'account.company_renamed';
 
 type AuditMetadata =
   | { groupId: string; invitationId: string }
@@ -53,6 +57,7 @@ type AuditMetadata =
   | { deviceId: string; serialNumber: string }
   | { deviceId: string; operation: string }
   | { noticeId: string }
+  | { accountType: 'INDIVIDUAL' | 'COMPANY' }
   | {
       deviceId: string;
       groupId: string;

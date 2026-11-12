@@ -1,5 +1,7 @@
 import { type Channel, connectivityState } from '@grpc/grpc-js';
 import { Logger } from '@nestjs/common';
+import { HealthCheckResponse_ServingStatus } from '../generated/kms/grpc/health/v1/health.js';
+import { reportLost, reportRestored } from '../lib/connection-events.js';
 
 // How long one watch waits for a state change before it is simply re-armed.
 const WATCH_INTERVAL_MS = 60_000;
@@ -7,8 +9,8 @@ const WATCH_INTERVAL_MS = 60_000;
 const DAY_MS = 86_400_000;
 const CLIENT_CERT_WARNING_DAYS = 30;
 
-// Mirrors the Redis client's logging: one error when the KMS connection is
-// lost and one line when it is back, instead of a log per failed attempt.
+// Reports the KMS connection to connection-events.ts, which logs one error
+// when it's lost and one line when it's back.
 // gRPC lets an unused channel go IDLE and only reconnects on the next call,
 // so an IDLE channel is told to connect again: the gateway stays connected,
 // a broken KMS shows up in the log without waiting for traffic, and the
@@ -19,25 +21,30 @@ const CLIENT_CERT_WARNING_DAYS = 30;
 export function watchKmsConnection(
   channel: Pick<Channel, 'getConnectivityState' | 'watchConnectivityState'>,
   describeFailure: () => Promise<string>,
-  logger: Pick<Logger, 'error' | 'log'> = new Logger('KMS'),
+  report: {
+    lost: (reason: string) => void;
+    restored: () => void;
+  } = {
+    lost: (reason) => reportLost('KMS', reason),
+    restored: () => reportRestored('KMS'),
+  },
 ): void {
-  let connectionLost = false;
+  // Only to ask for the reason once per failure, not on every state change.
+  let failing = false;
 
   const onState = (state: connectivityState): void => {
     if (state === connectivityState.SHUTDOWN) {
       return; // closeKms() was called
     }
 
-    if (state === connectivityState.TRANSIENT_FAILURE && !connectionLost) {
-      connectionLost = true;
+    if (state === connectivityState.TRANSIENT_FAILURE && !failing) {
+      failing = true;
       void describeFailure()
         .catch(() => 'unknown error')
-        .then((reason) =>
-          logger.error(`Connection lost, reconnecting: ${reason}`),
-        );
-    } else if (state === connectivityState.READY && connectionLost) {
-      connectionLost = false;
-      logger.log('Connection restored');
+        .then(report.lost);
+    } else if (state === connectivityState.READY) {
+      failing = false;
+      report.restored();
     }
 
     if (state === connectivityState.IDLE) {
@@ -68,6 +75,21 @@ export function checkClientCertificateExpiry(
       `KMS_CLIENT_CERT expires in ${Math.floor(daysLeft)} days. Run make renew-transport.`,
     );
   }
+}
+
+// Why a grpc.health.v1 Check answer means the KMS can't be used, or undefined
+// when it is SERVING.
+export function servingFailure(
+  error: { details: string } | null,
+  status?: HealthCheckResponse_ServingStatus,
+): string | undefined {
+  if (error) {
+    return failureReason(error.details);
+  }
+  if (status !== HealthCheckResponse_ServingStatus.SERVING) {
+    return `health check answered ${HealthCheckResponse_ServingStatus[status ?? -1] ?? status}`;
+  }
+  return undefined;
 }
 
 // Turns gRPC error details into a short reason like the Redis log's. grpc-js

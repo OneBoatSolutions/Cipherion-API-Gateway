@@ -1,7 +1,7 @@
 import '../config/env.js';
-import { Logger } from '@nestjs/common';
 import { readFileSync } from 'node:fs';
 import { Redis } from 'ioredis';
+import { reportLost, reportRestored } from './connection-events.js';
 
 const redisUrl = process.env.REDIS_URL;
 
@@ -33,23 +33,20 @@ export const redis = new Redis(redisUrl, {
 });
 
 // Without an `error` listener ioredis prints every failed reconnect to stderr.
-// Log the outage once and its recovery once instead.
-const logger = new Logger('Redis');
-let connectionLost = false;
+// connection-events.ts logs the outage once and its recovery once instead.
+let lastError: string | undefined;
 
 redis.on('error', (error: NodeJS.ErrnoException) => {
-  if (connectionLost) {
-    return;
-  }
-  connectionLost = true;
-  logger.error(
-    `Connection lost, reconnecting: ${error.message || error.code || error.name}`,
-  );
+  lastError = error.code || error.message || error.name;
+  reportLost('REDIS', lastError);
 });
 
 redis.on('ready', () => {
-  if (connectionLost) {
-    connectionLost = false;
-    logger.log('Connection restored');
-  }
+  lastError = undefined;
+  reportRestored('REDIS');
 });
+
+// The connection's own error (ECONNREFUSED, SELF_SIGNED_CERT_IN_CHAIN, ...),
+// which says more than a failed command's "max retries" error.
+export const redisErrorReason = (fallback: string): string =>
+  lastError ?? fallback;
