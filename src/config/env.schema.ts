@@ -84,6 +84,18 @@ export const envSchema = Joi.object({
       .uri({ scheme: ['redis', 'rediss'] })
       .required(),
   }),
+  // A PEM CA to trust for Redis's TLS certificate, for a self-signed one such
+  // as the local docker Redis. Not needed when a public CA signed it. Only
+  // meaningful with rediss://.
+  REDIS_CA_CERT: Joi.string().when('REDIS_URL', {
+    is: Joi.string().pattern(/^rediss:\/\//),
+    // `then` is Joi's conditional API here, not a Promise-like object.
+    // oxlint-disable-next-line unicorn/no-thenable
+    then: Joi.optional(),
+    otherwise: Joi.forbidden().messages({
+      'any.unknown': '"REDIS_CA_CERT" needs a rediss:// (TLS) REDIS_URL',
+    }),
+  }),
 
   // Cipherion KMS over gRPC with mutual TLS. The three paths point to PEM files.
   KMS_ADDRESS: Joi.string()

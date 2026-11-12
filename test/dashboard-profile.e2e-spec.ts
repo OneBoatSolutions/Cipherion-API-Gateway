@@ -56,12 +56,16 @@ describe('Dashboard profile (e2e)', () => {
       emailVerified: true,
     });
     expect(Object.keys(profile).sort()).toEqual([
+      'accountType',
+      'companyName',
       'createdAt',
       'email',
       'emailVerified',
       'id',
       'name',
     ]);
+    // Not chosen yet.
+    expect(profile).toMatchObject({ accountType: null, companyName: null });
   });
 
   it('renames the user, and the session sees the new name', async () => {

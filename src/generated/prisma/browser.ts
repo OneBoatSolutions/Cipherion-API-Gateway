@@ -28,6 +28,11 @@ export type User = Prisma.UserModel
  */
 export type UserSettings = Prisma.UserSettingsModel
 /**
+ * Model AccountProfile
+ * 
+ */
+export type AccountProfile = Prisma.AccountProfileModel
+/**
  * Model Session
  * 
  */

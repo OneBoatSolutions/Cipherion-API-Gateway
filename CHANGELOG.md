@@ -118,6 +118,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Time series in UTC with every bucket present, empty ones as zeros: `today` in 4 six-hour buckets, `week` and `month` one per day for the last 7 or 30 days, `year` one per calendar month for the last 12, and `all` monthly from the first delivery.
 - Full Swagger documentation for both metrics endpoints: Markdown descriptions, parameter enums and defaults, response schemas, and example responses for each period and for `400`, `401` and `404`.
 - Unit tests for the buckets (month lengths, leap years, the year boundary, just after midnight) and query validation; e2e tests for both endpoints, access, ordering, the top-10 cut-off and periods, the delivery row written by a real encrypt and decrypt, and the OpenAPI document. Over 100,000 deliveries in one project, the slowest call (leaderboard `all`) took about 100 ms.
+- Account type, for choosing a subscription tier later: `GET` and `PUT /api/v1/dashboard/account-type` with `accountType` (`INDIVIDUAL` or `COMPANY`) and, for a company, `companyName` (1–200 characters, trimmed; refused for an individual). It's set once: the same type again answers `200` and renames a company, a different type answers `409`, and support changes it by hand. It's `null` until chosen, and sign-up is unchanged.
+- `accountProfile` table in the auth database, one row per user, deleted with the user, with a CHECK constraint that a company has a name and an individual has none.
+- `accountType` and `companyName` in `GET` and `PATCH /dashboard/profile` and `/dashboard/settings` (read-only there), and a top-level `account` in `GET /workspace`.
+- `REDIS_CA_CERT`: an optional PEM CA to trust for Redis's TLS certificate, for a self-signed one such as the local docker Redis. Only with `rediss://`; the certificate is still verified. The gateway and `npm run users:migrate-ids` both use it. Previously only `NODE_EXTRA_CA_CERTS`, set in every shell, worked.
+- Unit and e2e tests for the account type (validation, set once, renames, two first choices at once, the CHECK constraint, the cascade and the OpenAPI document) and for `REDIS_CA_CERT`.
 
 ### Changed
 
@@ -165,6 +170,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - When Redis is unreachable, auth requests no longer hang for over a minute: the Redis client fails commands within about 2 seconds (`maxRetriesPerRequest: 1`, `commandTimeout: 2000`) and auth routes and protected routes answer `503 Service Unavailable` instead of `500`.
 - `test/migrate-user-ids.e2e-spec.ts` sorts its two audit rows by `action`, not `createdAt`, which they share, so it no longer fails at random.
 - CORS now allows `PATCH` and `DELETE`. Fastify's default (`GET`, `HEAD`, `POST`) made browsers block them, including Dashboard profile and settings saves.
+- CORS now allows `PUT`, which browsers blocked for `PUT /dashboard/account-type`.
 
 ### Security
 

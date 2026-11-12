@@ -108,6 +108,26 @@ describe('envSchema REDIS_URL', () => {
   });
 });
 
+describe('envSchema REDIS_CA_CERT', () => {
+  const REDIS_CA_CERT = '/home/you/.cipherion/redis-tls/ca.crt';
+
+  it('is optional with rediss://', () => {
+    const REDIS_URL = 'rediss://:secret@localhost:6380';
+    expect(validate({ REDIS_URL }).error).toBeUndefined();
+    expect(validate({ REDIS_URL, REDIS_CA_CERT }).error).toBeUndefined();
+  });
+
+  it('needs a rediss:// URL', () => {
+    const { error } = validate({
+      REDIS_URL: 'redis://localhost:6379',
+      REDIS_CA_CERT,
+    });
+    expect(error?.message).toBe(
+      '"REDIS_CA_CERT" needs a rediss:// (TLS) REDIS_URL',
+    );
+  });
+});
+
 describe('envSchema CIPSEQ_DATABASE_URL', () => {
   const redis = { REDIS_URL: 'rediss://gateway:secret@redis.internal:6380' };
   const authDatabase =

@@ -10,6 +10,7 @@
  */
 export type * from './models/User.js'
 export type * from './models/UserSettings.js'
+export type * from './models/AccountProfile.js'
 export type * from './models/Session.js'
 export type * from './models/Account.js'
 export type * from './models/Verification.js'

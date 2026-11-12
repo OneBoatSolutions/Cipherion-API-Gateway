@@ -61,6 +61,28 @@ describe('OpenAPI docs (e2e)', () => {
     expect(document.components?.schemas).toHaveProperty('UpdateSettingsDto');
   });
 
+  it('documents the account type, set once with a 409', () => {
+    const route = document.paths['/api/v1/dashboard/account-type'];
+
+    expect(route.get?.tags).toEqual(['dashboard']);
+    expect(Object.keys(route.put?.responses ?? {}).sort()).toEqual([
+      '200',
+      '400',
+      '401',
+      '409',
+    ]);
+    const schemas = document.components?.schemas ?? {};
+    expect(schemas).toHaveProperty('SetAccountTypeDto');
+    for (const name of [
+      'AccountTypeResponse',
+      'ProfileWithAccountResponse',
+      'SettingsWithAccountResponse',
+    ]) {
+      expect(JSON.stringify(schemas[name])).toContain('accountType');
+    }
+    expect(JSON.stringify(schemas.WorkspaceResponse)).toContain('"account"');
+  });
+
   it('documents the metrics endpoints fully for the frontend', () => {
     const parameters = (path: string) =>
       Object.fromEntries(

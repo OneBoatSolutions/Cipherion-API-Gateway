@@ -19,6 +19,7 @@ interface TestUser {
 interface Workspace {
   profile: { id: string; email: string };
   settings: { timezone: string };
+  account: { accountType: string | null; companyName: string | null };
   projects: {
     id: string;
     role: string;
@@ -177,8 +178,28 @@ describe('Workspace (e2e)', () => {
       email: newUser.email,
     });
     expect(result.settings.timezone).toBe('UTC');
+    expect(result.account).toEqual({ accountType: null, companyName: null });
     expect(result.projects).toEqual([]);
     expect(result.notifications).toEqual([]);
+  });
+
+  it('returns the chosen account type once, at the top level', async () => {
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/dashboard/account-type',
+      headers: { cookie: member.cookie },
+      payload: { accountType: 'COMPANY', companyName: 'Acme Labs' },
+    });
+    expect(put.statusCode).toBe(200);
+
+    const result = await workspace(member);
+
+    expect(result.account).toEqual({
+      accountType: 'COMPANY',
+      companyName: 'Acme Labs',
+    });
+    expect(result.profile).not.toHaveProperty('accountType');
+    expect(result.settings).not.toHaveProperty('accountType');
   });
 
   it('shows the project admin every group and leaves out deleted rows', async () => {
