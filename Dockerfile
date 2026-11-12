@@ -5,8 +5,14 @@
 
 FROM node:24-bookworm-slim AS build
 WORKDIR /app
+# Prisma generate looks for the system openssl too.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
-RUN npm ci
+# --include=dev: Coolify passes every environment variable as a build argument,
+# including NODE_ENV=production, which would otherwise make npm skip the
+# devDependencies the build needs (@nestjs/cli, typescript, prisma).
+# They are pruned again below, so the runtime image stays production-only.
+RUN npm ci --include=dev
 COPY . .
 # Prisma clients are generated into src/generated; nest build then compiles to dist/.
 # The URLs below are placeholders: generate and build never connect to a database.

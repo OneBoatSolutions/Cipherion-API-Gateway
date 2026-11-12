@@ -187,6 +187,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The image failed to build on Coolify with `nest: not found`: Coolify passes every environment variable as a build argument, including `NODE_ENV=production`, so `npm ci` skipped the devDependencies the build needs. The build stage now runs `npm ci --include=dev` (they're still pruned from the runtime image) and installs `openssl`, which silences Prisma's "failed to detect libssl" warnings.
 - The image's health check requested `/health`, which answers `404` because every route is under `/api/v1`, so every container was marked unhealthy. It now checks `/api/v1/health`, with a 90-second start period instead of 30 to cover migrations and the dependency checks.
 - A `PERMISSION_DENIED` from the KMS only counts as a wrong passphrase when its text is exactly `incorrect passphrase`. A refused gateway certificate now answers `502` instead of "Incorrect passphrase", no longer uses up the project's passphrase attempts, and no longer stops envelope jobs with `WRONG_PASSPHRASE`.
 - A Postgres restart or a dropped idle connection can no longer crash the gateway: both databases now use a `pg` pool owned by the gateway (`connectionTimeoutMillis: 2000`) with an `error` listener, passed to Prisma with `disposeExternalPool`.
