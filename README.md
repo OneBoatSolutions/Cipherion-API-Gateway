@@ -194,6 +194,9 @@ See [docs/environment.md](docs/environment.md) for when each one is required, lo
 | `FREE_PLAN_MAX_DEVICES` | No | `1` | Active devices per non-master user (revoked ones don't count) |
 | `FREE_PLAN_MAX_ENCRYPTIONS_PER_MONTH` | No | `500` | Encryptions per non-master user per calendar month (UTC) |
 | `FREE_PLAN_MAX_DECRYPTIONS_PER_MONTH` | No | `500` | Decryptions per non-master user per calendar month (UTC), counted apart from encryptions |
+| `SKIP_MIGRATIONS` | No | `false` | `true` stops the container entrypoint from applying migrations, when a release job runs them instead |
+| `MIGRATE_ATTEMPTS` | No | `5` | Tries per database for the entrypoint's migrations, while the database is still starting |
+| `MIGRATE_RETRY_SECONDS` | No | `5` | Seconds between those tries |
 | `OBSERVE_APP_KEY` | No | – | NestJS Observe app key |
 | `OBSERVE_APP_SECRET` | No | – | NestJS Observe app secret |
 
@@ -890,9 +893,19 @@ Requests that fail DTO validation return `400 Bad Request` in this format:
 
 ## Deployment
 
-**On Coolify:** the repository has a `Dockerfile` (Base Directory `/`, Dockerfile Location `/Dockerfile`). Run migrations once per release with
-`npm run db:deploy` in the container's terminal, put the certificate files in `/data/cipherion/gateway/` and mount that folder at `/certs`
+**On Coolify:** the repository has a `Dockerfile` (Base Directory `/`, Dockerfile Location `/Dockerfile`). Put the certificate files in `/data/cipherion/gateway/` and mount that folder at `/certs`
 (see [docs/environment.md](docs/environment.md)). The full guide, including Hostinger, AWS and Cloudflare, is `docs/deployment-guide.md` in the KMS repository.
+
+**Migrations run on every container start.** The image's entrypoint, `scripts/entrypoint.sh`, applies both databases' migrations with `prisma migrate deploy` and then starts the gateway (`exec`, so the gateway is PID 1 and gets the platform's `SIGTERM`). There's nothing to run by hand per release.
+
+- **Retries:** each database is tried `MIGRATE_ATTEMPTS` times (default 5), `MIGRATE_RETRY_SECONDS` apart (default 5), for a database that starts just after the gateway.
+- **Exit codes:** `1` if `DATABASE_URL` or `CIPSEQ_DATABASE_URL` is missing, `20` if the auth database's migrations fail, `21` if the CipSeq database's do. The gateway never starts on an old schema. After that, the gateway's own codes apply (`10`–`14`, see [Startup checks](#5-startup-checks-and-connection-logs)).
+- **Several replicas:** safe. `migrate deploy` takes a Postgres advisory lock, so each migration is applied once.
+- **`SKIP_MIGRATIONS=true`** skips both steps, for a platform that runs migrations as a separate release job.
+- **Health check:** the image checks `GET /api/v1/health` every 30 seconds, after a 90-second start period that covers the migrations and the dependency checks.
+- `npm run users:migrate-ids` is a one-off and is never run by the entrypoint.
+
+Without Docker:
 
 1. Set `NODE_ENV=production` and provide every required variable through the host's environment or `.env.prod`.
 2. Install dependencies, generate the client and build:
@@ -901,14 +914,11 @@ Requests that fail DTO validation return `400 Bad Request` in this format:
    npm run db:generate
    npm run build
    ```
-3. Apply migrations to both databases. Use `migrate deploy` in production, never `migrate dev`:
+3. Apply migrations to both databases and start the gateway, with the same script the image uses:
    ```bash
-   NODE_ENV=production npm run db:deploy
+   NODE_ENV=production ./scripts/entrypoint.sh
    ```
-4. Start the gateway:
-   ```bash
-   npm run start:prod
-   ```
+   Or by hand: `NODE_ENV=production npm run db:deploy`, then `npm run start:prod`. Use `migrate deploy` in production, never `migrate dev`.
 
 **Production checklist**
 
