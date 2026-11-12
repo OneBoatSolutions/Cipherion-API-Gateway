@@ -1,5 +1,6 @@
-import { Logger } from '@nestjs/common';
 import type { Pool } from 'pg';
+import type { SystemService } from '../generated/prisma/enums.js';
+import { reportLost, reportRestored } from './connection-events.js';
 
 // How often an idle pool is checked, and how long one check may take.
 export const HEARTBEAT_INTERVAL_MS = 5000;
@@ -9,30 +10,24 @@ type WatchedPool = Pick<Pool, 'query' | 'on'>;
 
 const stopFunctions = new Set<() => void>();
 
-// Mirrors the Redis and KMS logging: one error when a database connection is
-// lost and one line when it is back, instead of a log per failed query.
 // pg has no "reconnected" event, so a heartbeat (SELECT 1) notices both the
-// outage, even without traffic, and the recovery.
+// outage, even without traffic, and the recovery. Every result is reported;
+// connection-events.ts logs only the change, once each way.
 //
 // It also listens for the pool's `error` event, which pg emits when an idle
 // connection dies (e.g. a Postgres restart). Without a listener Node treats
 // that event as an uncaught error and crashes the process.
 export function watchDatabase(
   pool: WatchedPool,
-  logger: Pick<Logger, 'error' | 'log'>,
+  service: SystemService,
 ): () => void {
-  let connectionLost = false;
   let stopped = false;
   let checking = false;
 
   const lost = (error: unknown): void => {
-    if (stopped || connectionLost) {
-      return;
+    if (!stopped) {
+      reportLost(service, connectionErrorReason(error));
     }
-    connectionLost = true;
-    logger.error(
-      `Connection lost, reconnecting: ${connectionErrorReason(error)}`,
-    );
   };
 
   const heartbeat = async (): Promise<void> => {
@@ -42,9 +37,8 @@ export function watchDatabase(
     checking = true;
     try {
       await withTimeout(pool.query('SELECT 1'), HEARTBEAT_TIMEOUT_MS);
-      if (connectionLost && !stopped) {
-        connectionLost = false;
-        logger.log('Connection restored');
+      if (!stopped) {
+        reportRestored(service);
       }
     } catch (error) {
       lost(error);

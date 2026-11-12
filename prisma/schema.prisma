@@ -129,3 +129,40 @@ model RateLimit {
   @@unique([key])
   @@map("rateLimit")
 }
+
+enum SystemService {
+  AUTH_DATABASE
+  CIPSEQ_DATABASE
+  REDIS
+  KMS
+  SMTP
+}
+
+enum SystemEventKind {
+  CONNECTION_ESTABLISHED
+  CONNECTION_LOST
+  CONNECTION_RESTORED
+}
+
+// Gateway infrastructure events, kept apart from the user audit trail
+// (CipSeq's auditEvent). Written only by src/lib/system-events.ts, from an
+// in-memory queue, so an outage of this database is recorded once it's back.
+model SystemEvent {
+  id         String          @id @default(uuid())
+  service    SystemService
+  kind       SystemEventKind
+  // A short reason for CONNECTION_LOST (ECONNREFUSED, TLS: unknown ca, ...).
+  // Never credentials, email addresses or request data.
+  reason     String?
+  // For example { "emailsNotSent": 3 } on SMTP's CONNECTION_RESTORED.
+  metadata   Json?
+  // Which gateway process saw it (hostname:pid), when several run at once.
+  instance   String
+  // When it happened; createdAt is when it was written, which can be later.
+  occurredAt DateTime
+  createdAt  DateTime        @default(now())
+
+  @@index([occurredAt])
+  @@index([service, occurredAt])
+  @@map("systemEvent")
+}

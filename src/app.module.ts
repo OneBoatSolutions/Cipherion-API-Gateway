@@ -15,7 +15,9 @@ import { envFilePath } from './config/env.js';
 import { envSchema } from './config/env.schema.js';
 import { closeEngineApp } from './engine/engine-app.js';
 import { cipseqPrisma } from './lib/cipseq-prisma.js';
+import { stopConnectionEvents } from './lib/connection-events.js';
 import { stopDatabaseWatches } from './lib/database-watch.js';
+import { closeSystemEvents } from './lib/system-events.js';
 import { closeKms } from './lib/kms.js';
 import { mailer } from './lib/mailer.js';
 import { prisma } from './lib/prisma.js';
@@ -63,8 +65,11 @@ export class AppModule
 
   // The shared clients live for the whole process, so close them with the app.
   async onApplicationShutdown(): Promise<void> {
-    // Stop the heartbeats first, so closing the pools isn't logged as an outage.
+    // Stop reporting first, so closing the connections isn't logged or
+    // recorded as an outage, then write any system events still queued.
+    stopConnectionEvents();
     stopDatabaseWatches();
+    await closeSystemEvents();
     await Promise.allSettled([
       redis.quit(),
       prisma.$disconnect(),

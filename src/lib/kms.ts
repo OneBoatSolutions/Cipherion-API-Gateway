@@ -7,6 +7,7 @@ import { grpcCallBackfromNestClient } from '../generated/kms/v1/prototypeBufferV
 import {
   checkClientCertificateExpiry,
   failureReason,
+  servingFailure,
   watchKmsConnection,
 } from '../kms/kms-connection.js';
 
@@ -70,5 +71,26 @@ const describeFailure = (): Promise<string> =>
   });
 
 watchKmsConnection(kms.getChannel(), describeFailure);
+
+// grpc.health.v1 Check on the whole KMS server (empty service name), used by
+// /ready and the startup check. Only SERVING resolves; NOT_SERVING or an error
+// rejects with a short reason. Logs nothing: the connection watch does that.
+export function checkKmsServing(timeoutMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    kmsHealth.check(
+      { service: '' },
+      new Metadata(),
+      { deadline: Date.now() + timeoutMs },
+      (error, response) => {
+        const failure = servingFailure(error, response?.status);
+        if (failure) {
+          reject(new Error(failure));
+        } else {
+          resolve();
+        }
+      },
+    );
+  });
+}
 
 export const closeKms = (): void => kms.close();

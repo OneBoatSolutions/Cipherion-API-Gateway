@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, Logger } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { Prisma } from '../generated/prisma/client.js';
@@ -9,15 +9,17 @@ import {
 } from './account-type.js';
 import { SetAccountTypeDto } from './account-type.dto.js';
 
-const { create, findUnique, updateMany } = vi.hoisted(() => ({
+const { create, findUnique, updateMany, auditEvent } = vi.hoisted(() => ({
   create: vi.fn(),
   findUnique: vi.fn(),
   updateMany: vi.fn(),
+  auditEvent: vi.fn(),
 }));
 
 vi.mock('../lib/prisma.js', () => ({
   prisma: { accountProfile: { create, findUnique, updateMany } },
 }));
+vi.mock('../cipseq/audit.js', () => ({ auditEvent }));
 
 // The same options as the global ValidationPipe in src/app.setup.ts.
 async function errorsFor(body: object): Promise<string[]> {
@@ -94,6 +96,7 @@ describe('account type', () => {
     create.mockReset().mockResolvedValue({});
     findUnique.mockReset();
     updateMany.mockReset();
+    auditEvent.mockReset().mockResolvedValue({ id: 'audit-1' });
   });
 
   it('returns nulls before the user chooses', async () => {
@@ -143,7 +146,23 @@ describe('account type', () => {
     });
   });
 
-  it('accepts the same type again, renaming a company', async () => {
+  it('audits the first choice instead of logging it', async () => {
+    const log = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+    findUnique.mockResolvedValue(null);
+
+    await setAccountType('user-1', { accountType: 'INDIVIDUAL' });
+
+    expect(auditEvent).toHaveBeenCalledWith(
+      'user-1',
+      'account.type_set',
+      null,
+      { accountType: 'INDIVIDUAL' },
+    );
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it('renames a company sent again with another name, and audits it', async () => {
     create.mockRejectedValue(uniqueViolation());
     updateMany.mockResolvedValue({ count: 1 });
     findUnique.mockResolvedValue({
@@ -159,14 +178,57 @@ describe('account type', () => {
       }),
     ).resolves.toMatchObject({ companyName: 'Acme Labs Ltd' });
     expect(updateMany).toHaveBeenCalledWith({
-      where: { userId: 'user-1', accountType: 'COMPANY' },
+      where: {
+        userId: 'user-1',
+        accountType: 'COMPANY',
+        companyName: { not: 'Acme Labs Ltd' },
+      },
       data: { companyName: 'Acme Labs Ltd' },
     });
+    expect(auditEvent).toHaveBeenCalledWith(
+      'user-1',
+      'account.company_renamed',
+      null,
+      { changed: ['companyName'] },
+    );
+  });
+
+  it('accepts the same values again without a write or an audit row', async () => {
+    create.mockRejectedValue(uniqueViolation());
+    updateMany.mockResolvedValue({ count: 0 });
+    findUnique.mockResolvedValue({
+      accountType: 'COMPANY',
+      companyName: 'Acme Labs',
+      createdAt: chosenAt,
+    });
+
+    await expect(
+      setAccountType('user-1', {
+        accountType: 'COMPANY',
+        companyName: 'Acme Labs',
+      }),
+    ).resolves.toMatchObject({ accountType: 'COMPANY' });
+    expect(auditEvent).not.toHaveBeenCalled();
+  });
+
+  it('accepts INDIVIDUAL again without trying to rename', async () => {
+    create.mockRejectedValue(uniqueViolation());
+    findUnique.mockResolvedValue({
+      accountType: 'INDIVIDUAL',
+      companyName: null,
+      createdAt: chosenAt,
+    });
+
+    await setAccountType('user-1', { accountType: 'INDIVIDUAL' });
+
+    expect(updateMany).not.toHaveBeenCalled();
+    expect(auditEvent).not.toHaveBeenCalled();
   });
 
   it('refuses a different type with 409', async () => {
     create.mockRejectedValue(uniqueViolation());
     updateMany.mockResolvedValue({ count: 0 });
+    findUnique.mockResolvedValue({ accountType: 'COMPANY' });
 
     const error = await setAccountType('user-1', {
       accountType: 'INDIVIDUAL',
@@ -176,7 +238,23 @@ describe('account type', () => {
     expect((error as ConflictException).message).toBe(
       ACCOUNT_TYPE_CHANGE_REFUSED,
     );
-    expect(findUnique).not.toHaveBeenCalled();
+    expect(auditEvent).not.toHaveBeenCalled();
+  });
+
+  it('still succeeds when the audit row cannot be written, and logs it', async () => {
+    const logError = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
+    auditEvent.mockRejectedValue(new Error('ECONNREFUSED'));
+    findUnique.mockResolvedValue(null);
+
+    await expect(
+      setAccountType('user-1', { accountType: 'INDIVIDUAL' }),
+    ).resolves.toBeDefined();
+    expect(logError).toHaveBeenCalledWith(
+      'Audit row not written for user user-1: account.type_set',
+    );
+    logError.mockRestore();
   });
 
   it('passes other database errors through', async () => {
@@ -187,5 +265,6 @@ describe('account type', () => {
       setAccountType('user-1', { accountType: 'INDIVIDUAL' }),
     ).rejects.toBe(failure);
     expect(updateMany).not.toHaveBeenCalled();
+    expect(auditEvent).not.toHaveBeenCalled();
   });
 });

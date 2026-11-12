@@ -1,5 +1,4 @@
 import '../config/env.js';
-import { Logger } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { PrismaClient } from '../generated/cipseq/client.js';
@@ -19,7 +18,7 @@ export const cipseqPool = new Pool({
   connectionTimeoutMillis: 2000,
 });
 
-watchDatabase(cipseqPool, new Logger('CipSeqDatabase'));
+watchDatabase(cipseqPool, 'CIPSEQ_DATABASE');
 
 const adapter = new PrismaPg(cipseqPool, { disposeExternalPool: true });
 

@@ -8,12 +8,17 @@ import { configureApp } from './app.setup.js';
 import { watchCertificateExpiry } from './engine/certificate-expiry.js';
 import { engineEnabled, startEngineApp } from './engine/engine-app.js';
 import { engineTlsOptions } from './engine/engine-tls.js';
-import { checkDatabasesOnStartup } from './lib/startup-checks.js';
+import { startConnectionEvents } from './lib/connection-events.js';
+import { mailer } from './lib/mailer.js';
+import { checkDependenciesOnStartup } from './lib/startup-checks.js';
 import { setupOpenApi } from './openapi.js';
 
 async function bootstrap() {
-  // Exits with code 1 if either database is unreachable.
-  await checkDatabasesOnStartup();
+  // Exits with 10–14 if a database, Redis, the KMS or SMTP is unreachable.
+  await checkDependenciesOnStartup();
+  // From here on, an outage is logged once each way and recorded.
+  startConnectionEvents();
+  mailer.startWatch();
 
   // Created first, because AppModule is what validates the environment.
   const app = await NestFactory.create<NestFastifyApplication>(

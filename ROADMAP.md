@@ -118,11 +118,14 @@
 ## Operations
 
 - [x] Health and readiness endpoints (PostgreSQL and Redis)
-- [x] Database startup check (exit with code 1 if either database is unreachable) and connection-loss logging for both databases
+- [x] Database startup check and connection-loss logging for both databases
 - [ ] Require SSL (`sslmode=require` or stricter) on `DATABASE_URL` and `CIPSEQ_DATABASE_URL` in production, like `rediss://` for Redis
 - [ ] Return `503` instead of `500` from Dashboard routes while a database is unreachable
 - [ ] Backups and point-in-time recovery for the CipSeq database, with a tested restore (it holds the only copy of the wrapped keys)
-- [ ] Refuse to start, in its own branch, unless both databases, Redis, the KMS and the SMTP server can all be reached (only the databases are checked today)
+- [x] Refuse to start unless both databases, Redis, the KMS and the SMTP server can all be reached, with an exit code per dependency (10–14)
+- [x] One log line when any dependency's connection is lost and one when it's back (SMTP watched too), recorded in a `systemEvent` table apart from the user audit trail
+- [ ] Retention for `systemEvent` rows, and a read API or dashboard for them
+- [ ] Alert someone (email or a monitoring hook) when a dependency stays down, rather than only logging it
 - [ ] Compress responses before production (`/workspace` was 2.26 MB for 10,000 members and devices, 102 KB gzipped)
 - [ ] Decide whether the public `/ready` response should name its dependencies (`database`, `cipseq`, `redis`, `kms`)
 - [x] OpenAPI / Swagger documentation (`/api/v1/docs`, not served in production)

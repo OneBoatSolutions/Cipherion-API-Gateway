@@ -123,6 +123,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `accountType` and `companyName` in `GET` and `PATCH /dashboard/profile` and `/dashboard/settings` (read-only there), and a top-level `account` in `GET /workspace`.
 - `REDIS_CA_CERT`: an optional PEM CA to trust for Redis's TLS certificate, for a self-signed one such as the local docker Redis. Only with `rediss://`; the certificate is still verified. The gateway and `npm run users:migrate-ids` both use it. Previously only `NODE_EXTRA_CA_CERTS`, set in every shell, worked.
 - Unit and e2e tests for the account type (validation, set once, renames, two first choices at once, the CHECK constraint, the cascade and the OpenAPI document) and for `REDIS_CA_CERT`.
+- Startup checks for every dependency (`checkDependenciesOnStartup()`): both databases, Redis (`PING`), the KMS (`grpc.health.v1` must answer `SERVING`) and the SMTP server (a login, nothing sent), in parallel with a 5-second timeout each. Any failure is logged with host, port and reason, and the gateway exits with that dependency's code: `10` auth database, `11` CipSeq database, `12` Redis, `13` KMS, `14` SMTP (the lowest when several fail). Success logs one line.
+- SMTP connection watch: a login every 60 seconds, and a failed send with a connection error marks SMTP down at once. During an outage, failed emails are counted instead of logged one by one, and the restored line gives the count.
+- `systemEvent` table in the auth database for infrastructure events, apart from the user audit trail: `CONNECTION_ESTABLISHED` for each dependency at startup, and `CONNECTION_LOST` (with the reason) and `CONNECTION_RESTORED` afterwards, with the gateway instance (`hostname:pid`) and when it happened. Written from an in-memory queue of up to 1,000 events, so an outage of the auth database itself is recorded once it's back.
+- `account.type_set` and `account.company_renamed` audit rows in CipSeq's `auditEvent`. Sending the same values again or a refused change writes none.
+- Unit tests for connection events, the event queue, the startup checks, the SMTP watch and the KMS serving status; e2e tests that start the built gateway with an unreachable SMTP server (exit `14`) and with Redis and SMTP unreachable (exit `12`, both logged), and for the account-type audit rows.
 
 ### Changed
 
@@ -159,6 +164,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Breaking:** email sign-in requires a verified email and answers `403` `EMAIL_NOT_VERIFIED` until then, and sign-up returns no session. Existing unverified users get a link on their next sign-in; their open sessions last until they expire.
 - **Breaking:** the gateway won't start without `EMAIL_HOST`, `EMAIL_PORT` and `EMAIL_FROM`, except when `NODE_ENV=test`.
 - The Google and GitHub callback answers `504` after 10 seconds, because Better Auth's calls to the providers have no time limit.
+- **Breaking:** an unreachable database at startup exits with `10` (auth) or `11` (CipSeq) instead of `1`, and the gateway no longer starts without Redis, the KMS or the SMTP server. `1` now means invalid configuration only.
+- Lost and restored connections for every dependency are logged from one place (`src/lib/connection-events.ts`): exactly one ERROR line when a connection is lost and one line when it's back, and nothing during startup or shutdown. `/ready` no longer logs its own KMS "Readiness check failed" and "passing again" lines.
+- Choosing or renaming an account type no longer prints a console line; it's audited instead.
 
 ### Fixed
 

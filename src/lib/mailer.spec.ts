@@ -2,8 +2,21 @@ import { Logger } from '@nestjs/common';
 
 const sendMail = vi.fn();
 const close = vi.fn();
-const createTransport = vi.fn(() => ({ sendMail, close }));
+const verify = vi.fn();
+const createTransport = vi.fn(() => ({ sendMail, close, verify }));
 vi.mock('nodemailer', () => ({ createTransport }));
+
+// Outage state, as connection-events.ts keeps it, without logging or writing.
+const events = vi.hoisted(() => {
+  const down = new Set<string>();
+  return {
+    down,
+    isDown: vi.fn((service: string) => down.has(service)),
+    reportLost: vi.fn((service: string) => down.add(service)),
+    reportRestored: vi.fn((service: string) => down.delete(service)),
+  };
+});
+vi.mock('./connection-events.js', () => events);
 
 const email = {
   to: 'ada@cipherion.test',
@@ -31,7 +44,11 @@ describe('mailer', () => {
 
   beforeEach(() => {
     sendMail.mockReset();
+    verify.mockReset().mockResolvedValue(true);
     createTransport.mockClear();
+    events.down.clear();
+    events.reportLost.mockClear();
+    events.reportRestored.mockClear();
     logError = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
   });
 
@@ -131,5 +148,76 @@ describe('mailer', () => {
     mailer.send(email, 'user-1');
     expect(createTransport).not.toHaveBeenCalled();
     expect(sendMail).not.toHaveBeenCalled();
+    expect(mailer.enabled).toBe(false);
+  });
+
+  describe('SMTP connection', () => {
+    const refused = Object.assign(new Error('connect ECONNREFUSED'), {
+      code: 'ECONNECTION',
+    });
+
+    afterEach(async () => {
+      const { mailer } = await import('./mailer.js');
+      mailer.close();
+      vi.useRealTimers();
+    });
+
+    it('verifies the server for the startup check, rejecting with the code only', async () => {
+      const { mailer } = await loadMailer(MAILPIT);
+      await expect(mailer.verify()).resolves.toBeUndefined();
+
+      verify.mockRejectedValue(refused);
+      await expect(mailer.verify()).rejects.toThrow(/^ECONNECTION$/);
+    });
+
+    it('reports a failed send that means the server is down, and counts later failures instead of logging them', async () => {
+      sendMail.mockRejectedValue(refused);
+      const { mailer } = await loadMailer(MAILPIT);
+
+      mailer.send(email, 'user-1');
+      mailer.send(email, 'user-2');
+      await vi.waitFor(() => expect(sendMail).toHaveBeenCalledTimes(2));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(events.reportLost).toHaveBeenCalledWith('SMTP', 'ECONNECTION');
+      expect(logError).not.toHaveBeenCalled();
+    });
+
+    it('checks the server regularly and reports the recovery with the count', async () => {
+      vi.useFakeTimers();
+      const { mailer, SMTP_HEARTBEAT_INTERVAL_MS } = await loadMailer(MAILPIT);
+      mailer.startWatch();
+
+      verify.mockRejectedValue(refused);
+      await vi.advanceTimersByTimeAsync(SMTP_HEARTBEAT_INTERVAL_MS);
+      expect(events.reportLost).toHaveBeenCalledWith('SMTP', 'ECONNECTION');
+
+      sendMail.mockRejectedValue(refused);
+      for (const id of ['user-1', 'user-2', 'user-3']) {
+        mailer.send(email, id);
+      }
+      await vi.advanceTimersByTimeAsync(0);
+
+      verify.mockResolvedValue(true);
+      await vi.advanceTimersByTimeAsync(SMTP_HEARTBEAT_INTERVAL_MS);
+
+      expect(events.reportRestored).toHaveBeenCalledWith('SMTP', {
+        note: '3 emails not sent during the outage',
+        metadata: { emailsNotSent: 3 },
+      });
+      expect(logError).not.toHaveBeenCalled();
+    });
+
+    it('stays quiet while the server is up', async () => {
+      vi.useFakeTimers();
+      const { mailer, SMTP_HEARTBEAT_INTERVAL_MS } = await loadMailer(MAILPIT);
+      mailer.startWatch();
+
+      await vi.advanceTimersByTimeAsync(SMTP_HEARTBEAT_INTERVAL_MS * 3);
+
+      expect(verify).toHaveBeenCalledTimes(3);
+      expect(events.reportLost).not.toHaveBeenCalled();
+      expect(events.reportRestored).not.toHaveBeenCalled();
+    });
   });
 });
