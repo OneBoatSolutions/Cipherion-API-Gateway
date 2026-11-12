@@ -18,18 +18,19 @@ datasource db {
 // model needs this default.
 // The columns stay TEXT, so ids from before the switch keep working.
 model User {
-  id            String    @id @default(uuid())
-  name          String
-  email         String
-  emailVerified Boolean   @default(false)
+  id             String          @id @default(uuid())
+  name           String
+  email          String
+  emailVerified  Boolean         @default(false)
   // Required by Better Auth's core user schema. Cipherion has no profile
   // images: auth.ts rejects it on sign-up and update-user, so it stays null.
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  settings      UserSettings?
+  image          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  sessions       Session[]
+  accounts       Account[]
+  settings       UserSettings?
+  accountProfile AccountProfile?
 
   @@unique([email])
   @@map("user")
@@ -47,6 +48,28 @@ model UserSettings {
   updatedAt      DateTime @updatedAt
 
   @@map("userSettings")
+}
+
+enum AccountType {
+  INDIVIDUAL
+  COMPANY
+}
+
+// Who holds the account, for choosing a subscription tier. One row per user,
+// created when they first choose; no row means not chosen yet. The type is
+// set once (PUT /dashboard/account-type refuses a change); support changes it
+// by hand.
+model AccountProfile {
+  userId      String      @id
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountType AccountType
+  // Required for COMPANY, null for INDIVIDUAL. Enforced by the API and by a
+  // hand-written CHECK constraint in the migration.
+  companyName String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("accountProfile")
 }
 
 model Session {

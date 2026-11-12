@@ -16,6 +16,7 @@ describe('Dashboard settings (e2e)', () => {
   let cookie: string;
   const email = `e2e-settings-${Date.now()}@cipherion.test`;
   const url = '/api/v1/dashboard/settings';
+  const notChosen = { accountType: null, companyName: null };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -50,7 +51,7 @@ describe('Dashboard settings (e2e)', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual(DEFAULT_SETTINGS);
+    expect(response.json()).toEqual({ ...DEFAULT_SETTINGS, ...notChosen });
   });
 
   it('saves a partial update and keeps the other fields', async () => {
@@ -66,6 +67,7 @@ describe('Dashboard settings (e2e)', () => {
       timezone: 'Asia/Kolkata',
       locale: DEFAULT_SETTINGS.locale,
       securityAlerts: false,
+      ...notChosen,
     };
     expect(patch.json()).toEqual(expected);
 
@@ -94,5 +96,15 @@ describe('Dashboard settings (e2e)', () => {
       payload: { theme: 'dark' },
     });
     expect(unknown.statusCode).toBe(400);
+  });
+
+  it('refuses the account type, which is chosen through /account-type', async () => {
+    const response = await app.inject({
+      method: 'PATCH',
+      url,
+      headers: { cookie },
+      payload: { accountType: 'COMPANY' },
+    });
+    expect(response.statusCode).toBe(400);
   });
 });

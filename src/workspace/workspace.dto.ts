@@ -7,6 +7,7 @@ import {
 import { GroupMemberResponse, GroupResponse } from '../cipseq/groups.dto.js';
 import { InvitationResponse } from '../cipseq/invitations.dto.js';
 import { ProjectResponse } from '../cipseq/projects.dto.js';
+import { AccountTypeSummary } from '../dashboard/account-type.dto.js';
 import { ProfileResponse } from '../dashboard/profile.dto.js';
 import { SettingsResponse } from '../dashboard/settings.dto.js';
 import type {
@@ -270,6 +271,13 @@ export class WorkspaceResponse {
 
   @ApiProperty({ type: SettingsResponse })
   settings!: SettingsResponse;
+
+  @ApiProperty({
+    type: AccountTypeSummary,
+    description:
+      'INDIVIDUAL or COMPANY, with the company name. Both null until the user chooses through PUT /dashboard/account-type.',
+  })
+  account!: AccountTypeSummary;
 
   @ApiProperty({ type: [WorkspaceProject] })
   projects!: WorkspaceProject[];

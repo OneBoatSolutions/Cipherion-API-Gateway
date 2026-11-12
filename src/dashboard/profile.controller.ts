@@ -21,8 +21,10 @@ import { auth } from '../auth.js';
 import type { AuthUser } from '../auth/auth.types.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { prisma } from '../lib/prisma.js';
+import { loadAccountType, toAccountTypeSummary } from './account-type.js';
 import {
   ProfileResponse,
+  ProfileWithAccountResponse,
   toProfileResponse,
   UpdateProfileDto,
 } from './profile.dto.js';
@@ -40,25 +42,28 @@ const PROFILE_FIELDS = {
 @ApiUnauthorizedResponse({ description: 'No valid session' })
 @Controller('dashboard/profile')
 export class ProfileController {
-  // Served from the session the guard already loaded, so no extra query.
+  // The profile comes from the session the guard already loaded; only the
+  // account type is read.
   @ApiOperation({ summary: "Get the signed-in user's profile" })
-  @ApiOkResponse({ type: ProfileResponse })
+  @ApiOkResponse({ type: ProfileWithAccountResponse })
   @Get()
-  get(@CurrentUser() user: AuthUser): ProfileResponse {
-    return toProfileResponse(user);
+  async get(
+    @CurrentUser() user: AuthUser,
+  ): Promise<ProfileWithAccountResponse> {
+    return withAccountType(toProfileResponse(user));
   }
 
   // Goes through Better Auth rather than Prisma so the user cached with the
   // session in Redis is refreshed too.
   @ApiOperation({ summary: "Update the signed-in user's name" })
-  @ApiOkResponse({ type: ProfileResponse })
+  @ApiOkResponse({ type: ProfileWithAccountResponse })
   @ApiBadRequestResponse({ description: 'Validation failed' })
   @Patch()
   async update(
     @Req() request: FastifyRequest,
     @CurrentUser() user: AuthUser,
     @Body() { name }: UpdateProfileDto,
-  ): Promise<ProfileResponse> {
+  ): Promise<ProfileWithAccountResponse> {
     if (name === undefined) {
       return this.get(user);
     }
@@ -75,9 +80,20 @@ export class ProfileController {
         throw error;
       });
 
-    return prisma.user.findUniqueOrThrow({
-      where: { id: user.id },
-      select: PROFILE_FIELDS,
-    });
+    return withAccountType(
+      await prisma.user.findUniqueOrThrow({
+        where: { id: user.id },
+        select: PROFILE_FIELDS,
+      }),
+    );
   }
+}
+
+async function withAccountType(
+  profile: Pick<ProfileResponse, keyof ProfileResponse>,
+): Promise<ProfileWithAccountResponse> {
+  return {
+    ...profile,
+    ...toAccountTypeSummary(await loadAccountType(profile.id)),
+  };
 }

@@ -32,6 +32,10 @@ import {
   projectsOf,
   toProjectResponse,
 } from '../cipseq/project-access.js';
+import {
+  loadAccountType,
+  toAccountTypeSummary,
+} from '../dashboard/account-type.js';
 import { toProfileResponse } from '../dashboard/profile.dto.js';
 import {
   DEFAULT_SETTINGS,
@@ -483,16 +487,18 @@ export class WorkspaceController {
   @Get()
   async get(@CurrentUser() user: AuthUser): Promise<WorkspaceResponse> {
     try {
-      const [settings, cipseq] = await Promise.all([
+      const [settings, account, cipseq] = await Promise.all([
         prisma.userSettings.findUnique({
           where: { userId: user.id },
           select: SETTINGS_FIELDS,
         }),
+        loadAccountType(user.id),
         loadCipSeq(user),
       ]);
       return {
         profile: toProfileResponse(user),
         settings: settings ?? DEFAULT_SETTINGS,
+        account: toAccountTypeSummary(account),
         ...cipseq,
       };
     } catch (error) {

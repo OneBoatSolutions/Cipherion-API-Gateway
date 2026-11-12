@@ -13,7 +13,7 @@
 // remembers each new id until every step is done, so a failure in between can
 // always be finished, never left half-applied.
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
@@ -180,7 +180,12 @@ async function remaining(auth, cipseq) {
 export async function migrateUserIds({ apply, env = process.env, onlyUserIds } = {}) {
   const auth = new pg.Client({ connectionString: env.DATABASE_URL });
   const cipseq = new pg.Client({ connectionString: env.CIPSEQ_DATABASE_URL });
-  const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: 1, lazyConnect: true });
+  // Same as src/lib/redis.ts: trust REDIS_CA_CERT for a self-signed Redis.
+  const redis = new Redis(env.REDIS_URL, {
+    maxRetriesPerRequest: 1,
+    lazyConnect: true,
+    ...(env.REDIS_CA_CERT ? { tls: { ca: readFileSync(env.REDIS_CA_CERT) } } : {}),
+  });
   await auth.connect();
   await cipseq.connect();
   try {

@@ -79,7 +79,7 @@ The console app sits behind Traefik on `PORT`. The [engine listener](#engine-lis
 │   ├── config/env.ts        # Loads the env file before anything reads process.env
 │   ├── auth.ts              # Better Auth configuration
 │   ├── auth/                # AuthController (/api/v1/auth/*), global AuthGuard, @Public() / @CurrentUser(), email templates, Google/GitHub providers
-│   ├── dashboard/           # Dashboard routes (/api/v1/dashboard/profile, /settings)
+│   ├── dashboard/           # Dashboard routes (/api/v1/dashboard/profile, /settings, /account-type)
 │   ├── cipseq/              # CipSeq routes (projects, groups, invitations, devices), envelope jobs, access checks, audit events, device certificates, envelope delivery and metrics
 │   ├── engine/              # Engine listener on :3443: TLS setup, device identity, guards, enrol/renew and encrypt/decrypt controllers
 │   ├── workspace/           # GET /api/v1/workspace: everything the signed-in user is a part of
@@ -168,6 +168,7 @@ See [docs/environment.md](docs/environment.md) for when each one is required, lo
 | `BETTER_AUTH_URL` | **Yes** | – | Public base URL of the gateway, e.g. `http://localhost:3000` |
 | `AUTH_TRUSTED_ORIGINS` | **Yes** | – | Comma-separated list of origins allowed to call auth endpoints (for example, the dashboard URL) |
 | `REDIS_URL` | **Yes** | – | Redis connection string (`redis://` or `rediss://` for TLS; `rediss://` is required when `NODE_ENV=production`), e.g. `redis://localhost:6379` |
+| `REDIS_CA_CERT` | No | – | Path to a PEM CA to trust for Redis's TLS certificate, for a self-signed one such as the local docker Redis. Only with `rediss://`; leave unset when a public CA signed it. The certificate is always verified |
 | `EMAIL_HOST` | **Yes**, except `NODE_ENV=test` | – | SMTP server for verification, password reset and password changed emails, e.g. `localhost` (Mailpit) |
 | `EMAIL_PORT` | **Yes**, except `NODE_ENV=test` | – | SMTP port. `465` uses TLS from the start, other ports upgrade with STARTTLS. Production requires TLS |
 | `EMAIL_USER`, `EMAIL_PASS` | No | – | SMTP login, both or neither (Mailpit takes none). `EMAIL_PASS` is **secret** |
@@ -465,10 +466,14 @@ Routes for the signed-in user's dashboard. They need the session cookie.
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/api/v1/dashboard/profile` | The user's `id`, `name`, `email`, `emailVerified` and `createdAt`, served from the session without a database query. |
+| `GET` | `/api/v1/dashboard/profile` | The user's `id`, `name`, `email`, `emailVerified` and `createdAt` from the session, plus `accountType` and `companyName`. |
 | `PATCH` | `/api/v1/dashboard/profile` | Changes the `name` (1–100 characters). It goes through Better Auth, so the user cached with the session in Redis is refreshed too. Other fields return `400`. |
 | `GET` | `/api/v1/dashboard/settings` | The user's settings. A user who has never saved settings gets the defaults: `{"timezone":"UTC","locale":"en","securityAlerts":true}`. |
 | `PATCH` | `/api/v1/dashboard/settings` | Updates only the fields sent: `timezone` (IANA, e.g. `Asia/Kolkata`), `locale` (BCP 47, e.g. `en-IN`) and `securityAlerts` (in-app alerts for security events). Invalid values or unknown fields return `400`. |
+| `GET` | `/api/v1/dashboard/account-type` | `{ accountType, companyName, chosenAt }`: `INDIVIDUAL` or `COMPANY`, used later to choose a subscription tier. All `null` until chosen. |
+| `PUT` | `/api/v1/dashboard/account-type` | Chooses the type once: `{"accountType":"INDIVIDUAL"}` or `{"accountType":"COMPANY","companyName":"Acme Labs"}` (1–200 characters, refused for an individual). The same type again answers `200` and renames a company; a different type answers `409`, and support changes it by hand. |
+
+Profile and settings responses also carry `accountType` and `companyName` (both `null` until chosen), and `/workspace` has them once as `account`. Settings can't change them: `PATCH /dashboard/settings` with `accountType` answers `400`.
 
 The password is changed through Better Auth's `/api/v1/auth/change-password` (see [Auth endpoints](#auth-endpoints)). Changing the email address isn't available yet.
 
@@ -482,6 +487,7 @@ Cipherion has no profile images. Better Auth's user table requires an `image` co
 {
   "profile": { "id": "...", "name": "Ada Lovelace", "email": "ada@cipherion.com", "emailVerified": true, "createdAt": "..." },
   "settings": { "timezone": "UTC", "locale": "en", "securityAlerts": true },
+  "account": { "accountType": "COMPANY", "companyName": "Acme Labs" },
   "projects": [
     {
       "id": "...", "name": "Payments", "description": "...", "role": "ADMIN", "keyVersion": 2,

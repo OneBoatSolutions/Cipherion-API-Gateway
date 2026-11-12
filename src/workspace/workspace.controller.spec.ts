@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   device: { findMany: vi.fn() },
   deviceCertificateNotice: { findMany: vi.fn() },
   userSettings: { findUnique: vi.fn() },
+  accountProfile: { findUnique: vi.fn() },
   user: { findMany: vi.fn() },
 }));
 
@@ -26,7 +27,11 @@ vi.mock('../lib/cipseq-prisma.js', () => ({
   },
 }));
 vi.mock('../lib/prisma.js', () => ({
-  prisma: { userSettings: mocks.userSettings, user: mocks.user },
+  prisma: {
+    userSettings: mocks.userSettings,
+    accountProfile: mocks.accountProfile,
+    user: mocks.user,
+  },
 }));
 
 const date = new Date('2026-11-05T06:36:46.000Z');
@@ -71,6 +76,7 @@ describe('WorkspaceController', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.userSettings.findUnique.mockResolvedValue(null);
+    mocks.accountProfile.findUnique.mockResolvedValue(null);
     mocks.project.findMany.mockResolvedValue([]);
     mocks.group.findMany.mockResolvedValue([]);
     mocks.groupInvitation.findMany.mockResolvedValue([]);
@@ -557,11 +563,32 @@ describe('WorkspaceController', () => {
         createdAt: date,
       },
       settings: { timezone: 'UTC', locale: 'en', securityAlerts: true },
+      account: { accountType: null, companyName: null },
       projects: [],
       devices: [],
       notifications: [],
     });
     expect(mocks.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns the account type once, at the top level', async () => {
+    mocks.accountProfile.findUnique.mockResolvedValue({
+      accountType: 'COMPANY',
+      companyName: 'Acme Labs',
+      createdAt: date,
+    });
+
+    const workspace = await controller.get(user);
+
+    expect(workspace.account).toEqual({
+      accountType: 'COMPANY',
+      companyName: 'Acme Labs',
+    });
+    expect(workspace.profile).not.toHaveProperty('accountType');
+    expect(workspace.settings).not.toHaveProperty('accountType');
+    expect(mocks.accountProfile.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: user.id } }),
+    );
   });
 
   it('only asks for projects the user belongs to, and for their groups or all if admin', async () => {
@@ -667,13 +694,14 @@ describe('WorkspaceController', () => {
     expect(selects).not.toMatch(/wrapped|salt|envelopeJson|publicKey/i);
   });
 
-  it.each(['project', 'userSettings'] as const)(
+  it.each(['project', 'userSettings', 'accountProfile'] as const)(
     'answers 503 when the %s query fails',
     async (model) => {
-      const query =
-        model === 'project'
-          ? mocks.project.findMany
-          : mocks.userSettings.findUnique;
+      const query = {
+        project: mocks.project.findMany,
+        userSettings: mocks.userSettings.findUnique,
+        accountProfile: mocks.accountProfile.findUnique,
+      }[model];
       query.mockRejectedValue(new Error('connection refused'));
 
       await expect(controller.get(user)).rejects.toBeInstanceOf(

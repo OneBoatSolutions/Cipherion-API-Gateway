@@ -399,6 +399,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   User: 'User',
   UserSettings: 'UserSettings',
+  AccountProfile: 'AccountProfile',
   Session: 'Session',
   Account: 'Account',
   Verification: 'Verification',
@@ -418,7 +419,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "userSettings" | "session" | "account" | "verification" | "rateLimit"
+    modelProps: "user" | "userSettings" | "accountProfile" | "session" | "account" | "verification" | "rateLimit"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -567,6 +568,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.UserSettingsCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.UserSettingsCountAggregateOutputType> | number
+        }
+      }
+    }
+    AccountProfile: {
+      payload: Prisma.$AccountProfilePayload<ExtArgs>
+      fields: Prisma.AccountProfileFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AccountProfileFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountProfilePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AccountProfileFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountProfilePayload>
+        }
+        findFirst: {
+          args: Prisma.AccountProfileFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountProfilePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AccountProfileFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountProfilePayload>
+        }
+        findMany: {
+          args: Prisma.AccountProfileFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountProfilePayload>[]
+        }
+        create: {
+          args: Prisma.AccountProfileCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountProfilePayload>
+        }
+        createMany: {
+          args: Prisma.AccountProfileCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AccountProfileCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountProfilePayload>[]
+        }
+        delete: {
+          args: Prisma.AccountProfileDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountProfilePayload>
+        }
+        update: {
+          args: Prisma.AccountProfileUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountProfilePayload>
+        }
+        deleteMany: {
+          args: Prisma.AccountProfileDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AccountProfileUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AccountProfileUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountProfilePayload>[]
+        }
+        upsert: {
+          args: Prisma.AccountProfileUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountProfilePayload>
+        }
+        aggregate: {
+          args: Prisma.AccountProfileAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAccountProfile>
+        }
+        groupBy: {
+          args: Prisma.AccountProfileGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AccountProfileGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AccountProfileCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AccountProfileCountAggregateOutputType> | number
         }
       }
     }
@@ -930,6 +1005,17 @@ export const UserSettingsScalarFieldEnum = {
 export type UserSettingsScalarFieldEnum = (typeof UserSettingsScalarFieldEnum)[keyof typeof UserSettingsScalarFieldEnum]
 
 
+export const AccountProfileScalarFieldEnum = {
+  userId: 'userId',
+  accountType: 'accountType',
+  companyName: 'companyName',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AccountProfileScalarFieldEnum = (typeof AccountProfileScalarFieldEnum)[keyof typeof AccountProfileScalarFieldEnum]
+
+
 export const SessionScalarFieldEnum = {
   id: 'id',
   expiresAt: 'expiresAt',
@@ -1047,6 +1133,20 @@ export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel
  * Reference to a field of type 'DateTime[]'
  */
 export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
+    
+
+
+/**
+ * Reference to a field of type 'AccountType'
+ */
+export type EnumAccountTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AccountType'>
+    
+
+
+/**
+ * Reference to a field of type 'AccountType[]'
+ */
+export type ListEnumAccountTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AccountType[]'>
     
 
 
@@ -1244,6 +1344,7 @@ export type PrismaClientOptions = PrismaClientOptionsWithAccelerateUrl | PrismaC
 export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
   userSettings?: Prisma.UserSettingsOmit
+  accountProfile?: Prisma.AccountProfileOmit
   session?: Prisma.SessionOmit
   account?: Prisma.AccountOmit
   verification?: Prisma.VerificationOmit

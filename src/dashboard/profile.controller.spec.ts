@@ -4,14 +4,20 @@ import type { FastifyRequest } from 'fastify';
 import type { AuthUser } from '../auth/auth.types.js';
 import { ProfileController } from './profile.controller.js';
 
-const { updateUser, findUniqueOrThrow } = vi.hoisted(() => ({
-  updateUser: vi.fn(),
-  findUniqueOrThrow: vi.fn(),
-}));
+const { updateUser, findUniqueOrThrow, accountFindUnique } = vi.hoisted(
+  () => ({
+    updateUser: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
+    accountFindUnique: vi.fn(),
+  }),
+);
 
 vi.mock('../auth.js', () => ({ auth: { api: { updateUser } } }));
 vi.mock('../lib/prisma.js', () => ({
-  prisma: { user: { findUniqueOrThrow } },
+  prisma: {
+    user: { findUniqueOrThrow },
+    accountProfile: { findUnique: accountFindUnique },
+  },
 }));
 
 describe('ProfileController', () => {
@@ -26,25 +32,40 @@ describe('ProfileController', () => {
     createdAt,
     updatedAt: createdAt,
   } as AuthUser;
-  const profile = {
+  const saved = {
     id: 'user-1',
     name: 'Ada',
     email: 'ada@cipherion.com',
     emailVerified: true,
     createdAt,
   };
+  const profile = { ...saved, accountType: null, companyName: null };
 
   beforeEach(() => {
     updateUser.mockReset().mockResolvedValue({ status: true });
     findUniqueOrThrow.mockReset();
+    accountFindUnique.mockReset().mockResolvedValue(null);
   });
 
-  it('returns the profile from the session', () => {
-    expect(controller.get(user)).toEqual(profile);
+  it('returns the profile from the session', async () => {
+    await expect(controller.get(user)).resolves.toEqual(profile);
+  });
+
+  it('includes the chosen account type', async () => {
+    accountFindUnique.mockResolvedValue({
+      accountType: 'INDIVIDUAL',
+      companyName: null,
+      createdAt,
+    });
+
+    await expect(controller.get(user)).resolves.toEqual({
+      ...profile,
+      accountType: 'INDIVIDUAL',
+    });
   });
 
   it('updates the name through Better Auth and returns the saved profile', async () => {
-    findUniqueOrThrow.mockResolvedValue({ ...profile, name: 'Ada L.' });
+    findUniqueOrThrow.mockResolvedValue({ ...saved, name: 'Ada L.' });
 
     await expect(
       controller.update(request, user, { name: 'Ada L.' }),

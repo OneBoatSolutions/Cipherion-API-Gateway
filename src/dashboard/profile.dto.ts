@@ -1,5 +1,10 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  IntersectionType,
+} from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { AccountTypeSummary } from './account-type.dto.js';
 
 export const NAME_MAX_LENGTH = 100;
 
@@ -19,6 +24,13 @@ export class ProfileResponse {
   @ApiProperty({ example: '2026-11-03T06:36:46.000Z' })
   createdAt!: Date;
 }
+
+// The profile from GET and PATCH /dashboard/profile. /workspace returns the
+// account type once at its top level instead, so it keeps ProfileResponse.
+export class ProfileWithAccountResponse extends IntersectionType(
+  ProfileResponse,
+  AccountTypeSummary,
+) {}
 
 export function toProfileResponse({
   id,

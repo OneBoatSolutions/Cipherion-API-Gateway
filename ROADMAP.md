@@ -50,7 +50,9 @@
 - [x] Settings: timezone, locale, in-app security alerts (`GET`/`PATCH /api/v1/dashboard/settings`)
 - [ ] Reject `null` on `PATCH` routes (`@IsOptional()` lets it through; projects use `@ValidateIf`)
 - [ ] Account activity: last login, last CipSeq operation and its time
-- [ ] Billing/subscription (provider not chosen; tables live in the CipSeq database)
+- [x] Account type, individual or company with a company name, set once (`PUT /dashboard/account-type`), shown in profile, settings and `/workspace`
+- [ ] Billing/subscription (provider not chosen; tables live in the CipSeq database). Refuse to start a subscription until the account type is set, and collect the tax id and country with the provider
+- [ ] A support or admin tool to change an account type (today it's changed by hand in the database)
 
 ## CipSeq
 
