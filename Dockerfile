@@ -27,9 +27,13 @@ COPY --from=build --chown=node:node /app/prisma ./prisma
 COPY --from=build --chown=node:node /app/prisma7.config.ts /app/prisma7.cipseq.config.ts /app/package.json ./
 # The generated Prisma and gRPC clients (imported at run time).
 COPY --from=build --chown=node:node /app/src/generated ./src/generated
+# Applies both databases' migrations on every start, then execs the CMD.
+COPY --from=build --chown=node:node --chmod=755 /app/scripts/entrypoint.sh ./scripts/entrypoint.sh
 USER node
 # 3000 = console (behind Traefik).  3443 = engine listener (publish directly, never through a proxy).
 EXPOSE 3000 3443
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+# Every route is under /api/v1. The start period covers migrations and the dependency checks.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/v1/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+ENTRYPOINT ["./scripts/entrypoint.sh"]
 CMD ["node", "dist/main"]

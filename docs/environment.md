@@ -128,5 +128,12 @@ On the server, put the files from `D:\OneBoatSolutions\servers\Cipherion-KMS\cer
 `DEVICE_TLS_PIN_FILE=/certs/engine-server.spki.sha256` and `DEVICE_CA_BUNDLE=/certs/device-ca-trust.pem`. After a rotation, replace the
 files and **restart**; the full routine is `docs/coolify-certificate-routine.md` in the KMS repository.
 
+### Migrations on Coolify
+
+The image's entrypoint (`scripts/entrypoint.sh`) applies both databases' migrations on every start, then starts the gateway, so a deploy needs
+no terminal step. Optional settings: `SKIP_MIGRATIONS=true` skips them, and `MIGRATE_ATTEMPTS` (default 5) and `MIGRATE_RETRY_SECONDS`
+(default 5) set how long it waits for a database that's still starting. It exits `20` (auth database) or `21` (CipSeq) if migrations keep
+failing, and Coolify restarts it.
+
 Secret files: `KMS_CLIENT_KEY` and `DEVICE_TLS_KEY`. Never put a CA private key, `device-ca.key`, the KMS's `server.key` or a spare server key on the
 gateway.
