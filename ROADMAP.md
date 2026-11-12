@@ -37,7 +37,7 @@
 - [x] Google and GitHub sign-in (optional; only joins verified accounts)
 - [x] Branded verification, reset and password changed emails
 - [ ] Change email address, verifying the new one first (Better Auth's `/change-email` is off; the README no longer claims it works)
-- [ ] Delete account: password and an email link, end every session; in CipSeq remove group memberships, revoke devices and certificates, cancel invitations and approvals, stop jobs; keep audit events under the old id; decide what happens to projects the user is admin of (refuse until handed over, or delete them), which probably needs project admin handover first
+- [ ] Delete account: password and an email link, end every session; in CipSeq remove group memberships, revoke devices and certificates, cancel invitations and approvals, stop jobs; keep audit events under the old id; decide what happens to projects the user is admin of (refuse until handed over, or delete them), which probably needs project admin handover first. Write an `account.deleted` audit row, which the master metrics count
 - [ ] Add the hosted frontend's origin to `AUTH_TRUSTED_ORIGINS` once it's deployed
 - [ ] Rate limiting against floods from many IPs needs a proxy or WAF in front of the gateway (Better Auth's limits are per IP)
 - [ ] Forward the client IP to Better Auth so rate limits are per client, not one shared bucket (decide which proxy headers to trust)
@@ -51,7 +51,11 @@
 - [ ] Reject `null` on `PATCH` routes (`@IsOptional()` lets it through; projects use `@ValidateIf`)
 - [ ] Account activity: last login, last CipSeq operation and its time
 - [x] Account type, individual or company with a company name, set once (`PUT /dashboard/account-type`), shown in profile, settings and `/workspace`
-- [ ] Billing/subscription (provider not chosen; tables live in the CipSeq database). Refuse to start a subscription until the account type is set, and collect the tax id and country with the provider
+- [x] Free-plan limits until there's billing (1 project, 2 groups per project, 3 people per group, 1 device, 500 encryptions and 500 decryptions a month), each set in the environment, with usage in `/workspace`
+- [x] Master accounts (`MASTER_EMAILS`) without limits, and platform metrics for them (`GET /api/v1/master/metrics`) in 6-hour, daily, weekly and monthly buckets
+- [ ] Billing/subscription (provider not chosen; tables live in the CipSeq database). Refuse to start a subscription until the account type is set, and collect the tax id and country with the provider. Replace the free-plan environment variables with per-tier limits
+- [ ] An "all time" period for the master metrics, and daily totals once the raw counts get slow
+- [ ] A way to change the master list without a restart, if it changes often
 - [ ] A support or admin tool to change an account type (today it's changed by hand in the database)
 
 ## CipSeq
@@ -91,7 +95,7 @@
 - [ ] Remaining `pending.md` items: more audit fields and audit refusals (A1, A2), last delivery per device (A3), an audit read API (A4), and the engine-side items (A5–A7)
 - [ ] Load test envelope delivery (a device lock and an audit row per request), and decide whether to keep the lock and how long to keep `device.envelope_delivered` rows
 - [ ] Test certificates from the old and new device CAs, a real expired `KMS_CLIENT_CERT`, and a KMS outage on the certificate routes
-- [ ] Agree with the team: the updated KMS proto with `IssueDeviceCertificate` (applied here; compare with the KMS's file), `/api/v1/cipseq` paths, the 1-day session, `503` with `Retry-After` while a device's new envelope isn't ready (a 10,000-device job takes about 5 minutes), and who generates and protects pins B and C
+- [ ] Agree with the team: the updated KMS proto with `IssueDeviceCertificate` (applied here; compare with the KMS's file), `/api/v1/cipseq` paths, the 1-day session, `503` with `Retry-After` while a device's new envelope isn't ready (a 10,000-device job takes about 5 minutes), the `403` `PLAN_LIMIT_REACHED` refusal with `resetsAt` on encrypt and decrypt, and who generates and protects pins B and C
 - [ ] Ask the KMS team why `CreateDeviceEnvelope` slows from about 90 ms to 120–146 ms after a few minutes of sustained load, and how many calls at once it can take (a 10,000-device job took 314 s at 5 at a time; the KMS alone stayed at about 50% CPU)
 - [ ] Decide whether to allow one early rotation after a revocation (a modified engine can keep a revoked envelope until the next rotation, and the 48-hour limit can extend that)
 - [ ] Limit repeat `request-approval` calls after a refusal

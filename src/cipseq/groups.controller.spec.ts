@@ -45,6 +45,15 @@ vi.mock('./passphrase-attempts.js', () => ({
   releasePassphraseAttempt: mocks.releasePassphraseAttempt,
   clearPassphraseAttempts: mocks.clearPassphraseAttempts,
 }));
+const plan = vi.hoisted(() => ({ assertGroupAllowed: vi.fn() }));
+vi.mock('./plan-limits.js', () => plan);
+
+// Array transactions run their operations; interactive ones get the mocked
+// models as their client.
+const runTransaction = (operations: unknown) =>
+  typeof operations === 'function'
+    ? (operations as (tx: unknown) => Promise<unknown>)(mocks)
+    : Promise.all(operations as unknown[]);
 vi.mock('../lib/cipseq-prisma.js', () => ({
   cipseqPrisma: {
     $transaction: mocks.$transaction,
@@ -184,9 +193,7 @@ describe('GroupsController', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.$transaction.mockImplementation((operations: unknown[]) =>
-      Promise.all(operations),
-    );
+    mocks.$transaction.mockImplementation(runTransaction);
     mocks.project.findFirst.mockResolvedValue(projectRow());
     mocks.group.findFirst.mockResolvedValue(groupRow());
     mocks.projectKeys.findUniqueOrThrow.mockResolvedValue(projectKeys);
@@ -233,6 +240,28 @@ describe('GroupsController', () => {
       description: 'Invoices and payroll',
       passphrase: PASSPHRASE,
     };
+
+    it('refuses past the free-plan limit before trying the passphrase', async () => {
+      plan.assertGroupAllowed.mockRejectedValue(new ForbiddenException());
+
+      await expect(
+        controller.create(admin, projectId, dto),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(plan.assertGroupAllowed).toHaveBeenCalledWith(projectRow());
+      expect(mocks.reservePassphraseAttempt).not.toHaveBeenCalled();
+      expect(mocks.kmsCall).not.toHaveBeenCalled();
+    });
+
+    it('checks the limit again inside the transaction', async () => {
+      mocks.group.create.mockResolvedValue(groupRow());
+
+      await controller.create(admin, projectId, dto);
+
+      expect(plan.assertGroupAllowed).toHaveBeenLastCalledWith(
+        projectRow(),
+        mocks,
+      );
+    });
 
     it('stores the wrapped pair as version 1 with the admin as a group admin', async () => {
       mocks.group.create.mockResolvedValue(groupRow());

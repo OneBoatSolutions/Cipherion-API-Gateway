@@ -26,6 +26,19 @@ vi.mock('../lib/cipseq-prisma.js', () => ({
     device: mocks.device,
   },
 }));
+const plan = vi.hoisted(() => ({ planLimitsFor: vi.fn() }));
+vi.mock('../cipseq/plan-limits.js', () => plan);
+
+const LIMITS = {
+  master: false,
+  projects: { max: 1, used: 0 },
+  groupsPerProject: 2,
+  peoplePerGroup: 3,
+  devices: { max: 1, used: 0 },
+  encryptions: { max: 500, used: 0, resetsAt: new Date('2026-12-01') },
+  decryptions: { max: 500, used: 0, resetsAt: new Date('2026-12-01') },
+};
+
 vi.mock('../lib/prisma.js', () => ({
   prisma: {
     userSettings: mocks.userSettings,
@@ -75,6 +88,7 @@ describe('WorkspaceController', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    plan.planLimitsFor.mockResolvedValue(LIMITS);
     mocks.userSettings.findUnique.mockResolvedValue(null);
     mocks.accountProfile.findUnique.mockResolvedValue(null);
     mocks.project.findMany.mockResolvedValue([]);
@@ -563,7 +577,7 @@ describe('WorkspaceController', () => {
         createdAt: date,
       },
       settings: { timezone: 'UTC', locale: 'en', securityAlerts: true },
-      account: { accountType: null, companyName: null },
+      account: { accountType: null, companyName: null, limits: LIMITS },
       projects: [],
       devices: [],
       notifications: [],
@@ -583,7 +597,9 @@ describe('WorkspaceController', () => {
     expect(workspace.account).toEqual({
       accountType: 'COMPANY',
       companyName: 'Acme Labs',
+      limits: LIMITS,
     });
+    expect(plan.planLimitsFor).toHaveBeenCalledWith(user);
     expect(workspace.profile).not.toHaveProperty('accountType');
     expect(workspace.settings).not.toHaveProperty('accountType');
     expect(mocks.accountProfile.findUnique).toHaveBeenCalledWith(

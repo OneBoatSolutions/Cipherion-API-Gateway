@@ -27,6 +27,7 @@ import {
   OPEN_INVITATION_STATUSES,
   toInvitationResponse,
 } from '../cipseq/invitations.controller.js';
+import { planLimitsFor } from '../cipseq/plan-limits.js';
 import {
   PROJECT_FIELDS,
   projectsOf,
@@ -487,18 +488,19 @@ export class WorkspaceController {
   @Get()
   async get(@CurrentUser() user: AuthUser): Promise<WorkspaceResponse> {
     try {
-      const [settings, account, cipseq] = await Promise.all([
+      const [settings, account, limits, cipseq] = await Promise.all([
         prisma.userSettings.findUnique({
           where: { userId: user.id },
           select: SETTINGS_FIELDS,
         }),
         loadAccountType(user.id),
+        planLimitsFor(user),
         loadCipSeq(user),
       ]);
       return {
         profile: toProfileResponse(user),
         settings: settings ?? DEFAULT_SETTINGS,
-        account: toAccountTypeSummary(account),
+        account: { ...toAccountTypeSummary(account), limits },
         ...cipseq,
       };
     } catch (error) {

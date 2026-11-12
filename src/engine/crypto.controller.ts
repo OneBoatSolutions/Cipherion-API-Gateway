@@ -15,6 +15,7 @@ import {
   deliverEnvelope,
   type EnvelopeDelivery,
 } from '../cipseq/envelope-delivery.js';
+import { isMaster } from '../cipseq/plan-limits.js';
 import { SessionAndCertificate } from './device-certificate.guard.js';
 
 export class EncryptEnvelopeDto {
@@ -53,6 +54,7 @@ export class CryptoController {
       userId: user.id,
       operation: 'ENCRYPT',
       groupId,
+      master: isMaster(user),
     });
   }
 
@@ -70,6 +72,7 @@ export class CryptoController {
       operation: 'DECRYPT',
       groupId,
       gdekVersion,
+      master: isMaster(user),
     });
   }
 }

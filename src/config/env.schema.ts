@@ -1,4 +1,5 @@
 import Joi from 'joi';
+import { FREE_PLAN_DEFAULTS } from './free-plan.js';
 
 // CipSeq holds key material, so in production it must not live in the auth
 // database.
@@ -20,6 +21,17 @@ const separateFromAuthDatabase: Joi.CustomValidator<string> = (
     return helpers.error('cipseq.sharedDatabase');
   }
   return value;
+};
+
+// A comma-separated list in which every entry is an email.
+const everyEmail: Joi.CustomValidator<string> = (value, helpers) => {
+  const invalid = value
+    .split(',')
+    .map((email) => email.trim())
+    .filter((email) => Joi.string().email().validate(email).error);
+  return invalid.length
+    ? helpers.error('emails.invalid', { invalid: invalid.join(', ') || '""' })
+    : value;
 };
 
 // A path to a PEM file the engine listener can't start without.
@@ -140,6 +152,27 @@ export const envSchema = Joi.object({
   GOOGLE_CLIENT_SECRET: Joi.string().optional(),
   GITHUB_CLIENT_ID: Joi.string().optional(),
   GITHUB_CLIENT_SECRET: Joi.string().optional(),
+
+  // Comma-separated emails of the master accounts: no free-plan limits, and
+  // the only ones that can read the platform metrics. Unset means no master.
+  // Each counts only once its address is verified.
+  MASTER_EMAILS: Joi.string()
+    .custom(everyEmail)
+    .messages({
+      'emails.invalid':
+        '"MASTER_EMAILS" must be a comma-separated list of emails ({{#invalid}})',
+    })
+    .optional(),
+  MASTER_EMAIL: Joi.forbidden().messages({
+    'any.unknown':
+      '"MASTER_EMAIL" was renamed to "MASTER_EMAILS" (a comma-separated list)',
+  }),
+  ...Object.fromEntries(
+    Object.entries(FREE_PLAN_DEFAULTS).map(([name, value]) => [
+      name,
+      Joi.number().integer().min(0).default(value),
+    ]),
+  ),
 
   OBSERVE_APP_KEY: Joi.string().optional(),
   OBSERVE_APP_SECRET: Joi.string().optional(),

@@ -13,6 +13,11 @@ export const INVITATION_STATUSES = [
 ] as const;
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
 
+export const OPEN_INVITATION_STATUSES = [
+  'PENDING_APPROVAL',
+  'PENDING_ACCEPTANCE',
+] as const;
+
 export class InvitationResponse {
   @ApiProperty({ format: 'uuid' })
   id!: string;

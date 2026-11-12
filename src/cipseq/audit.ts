@@ -35,7 +35,10 @@ export type AuditAction =
   // The account type lives in the auth database; its audit rows live here,
   // written after the change commits (src/dashboard/account-type.ts).
   | 'account.type_set'
-  | 'account.company_renamed';
+  | 'account.company_renamed'
+  // Not written yet: deleting an account isn't possible. Named now because the
+  // master metrics count it; the delete-account work must write it.
+  | 'account.deleted';
 
 type AuditMetadata =
   | { groupId: string; invitationId: string }

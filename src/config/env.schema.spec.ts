@@ -282,3 +282,41 @@ describe('envSchema KMS', () => {
     }
   });
 });
+
+describe('envSchema master accounts and free plan', () => {
+  const redis = { REDIS_URL: 'redis://localhost:6379' };
+
+  it('accepts a comma-separated list of master emails', () => {
+    const { error } = validate({
+      ...redis,
+      MASTER_EMAILS: 'you@cipherion.com, ops@cipherion.com',
+    });
+    expect(error).toBeUndefined();
+  });
+
+  it('names the entries that are not emails', () => {
+    const { error } = validate({
+      ...redis,
+      MASTER_EMAILS: 'you@cipherion.com,nope,',
+    });
+    expect(error?.message).toBe(
+      '"MASTER_EMAILS" must be a comma-separated list of emails (nope, )',
+    );
+  });
+
+  it('refuses the old MASTER_EMAIL with the new name', () => {
+    const { error } = validate({ ...redis, MASTER_EMAIL: 'you@cipherion.com' });
+    expect(error?.message).toBe(
+      '"MASTER_EMAIL" was renamed to "MASTER_EMAILS" (a comma-separated list)',
+    );
+  });
+
+  it('defaults the free-plan limits and refuses negative ones', () => {
+    const { value } = validate(redis);
+    expect(value.FREE_PLAN_MAX_PROJECTS).toBe(1);
+    expect(value.FREE_PLAN_MAX_ENCRYPTIONS_PER_MONTH).toBe(500);
+    expect(
+      validate({ ...redis, FREE_PLAN_MAX_DEVICES: '-1' }).error?.message,
+    ).toContain('FREE_PLAN_MAX_DEVICES');
+  });
+});

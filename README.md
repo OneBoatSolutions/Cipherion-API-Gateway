@@ -83,6 +83,7 @@ The console app sits behind Traefik on `PORT`. The [engine listener](#engine-lis
 │   ├── cipseq/              # CipSeq routes (projects, groups, invitations, devices), envelope jobs, access checks, audit events, device certificates, envelope delivery and metrics
 │   ├── engine/              # Engine listener on :3443: TLS setup, device identity, guards, enrol/renew and encrypt/decrypt controllers
 │   ├── workspace/           # GET /api/v1/workspace: everything the signed-in user is a part of
+│   ├── master/              # GET /api/v1/master/metrics: platform totals, for master accounts only
 │   ├── health/              # Liveness (/api/v1/health) and readiness (/api/v1/ready) endpoints
 │   ├── lib/prisma.ts        # Shared pg pool and PrismaClient for the auth database
 │   ├── lib/cipseq-prisma.ts # Shared pg pool and PrismaClient for the CipSeq database
@@ -186,6 +187,13 @@ See [docs/environment.md](docs/environment.md) for when each one is required, lo
 | `DEVICE_TLS_CERT` | When enabled | – | Path to its certificate |
 | `DEVICE_TLS_PIN_FILE` | When enabled | – | Path to the active pin. Start-up refuses a key that doesn't match it |
 | `DEVICE_CA_BUNDLE` | When enabled | – | Path to the device CAs (`device-ca-trust.pem`), holding every CA currently in a slot. Not the same file as `KMS_CA_CERT` |
+| `MASTER_EMAILS` | No | – | Comma-separated emails of the master accounts: no free-plan limits, and the only ones that can read `GET /api/v1/master/metrics`, e.g. `you@cipherion.com,ops@cipherion.com`. Each counts only once its address is verified. Unset means no master. The old `MASTER_EMAIL` is refused at startup |
+| `FREE_PLAN_MAX_PROJECTS` | No | `1` | Projects a non-master user can be admin of (deleted ones don't count) |
+| `FREE_PLAN_MAX_GROUPS_PER_PROJECT` | No | `2` | Live groups per project of a non-master admin |
+| `FREE_PLAN_MAX_PEOPLE_PER_GROUP` | No | `3` | Members besides the project admin plus open invitations, per group of a non-master admin |
+| `FREE_PLAN_MAX_DEVICES` | No | `1` | Active devices per non-master user (revoked ones don't count) |
+| `FREE_PLAN_MAX_ENCRYPTIONS_PER_MONTH` | No | `500` | Encryptions per non-master user per calendar month (UTC) |
+| `FREE_PLAN_MAX_DECRYPTIONS_PER_MONTH` | No | `500` | Decryptions per non-master user per calendar month (UTC), counted apart from encryptions |
 | `OBSERVE_APP_KEY` | No | – | NestJS Observe app key |
 | `OBSERVE_APP_SECRET` | No | – | NestJS Observe app secret |
 
@@ -517,7 +525,18 @@ Cipherion has no profile images. Better Auth's user table requires an `image` co
 {
   "profile": { "id": "...", "name": "Ada Lovelace", "email": "ada@cipherion.com", "emailVerified": true, "createdAt": "..." },
   "settings": { "timezone": "UTC", "locale": "en", "securityAlerts": true },
-  "account": { "accountType": "COMPANY", "companyName": "Acme Labs" },
+  "account": {
+    "accountType": "COMPANY", "companyName": "Acme Labs",
+    "limits": {
+      "master": false,
+      "projects": { "max": 1, "used": 1 },
+      "groupsPerProject": 2,
+      "peoplePerGroup": 3,
+      "devices": { "max": 1, "used": 1 },
+      "encryptions": { "max": 500, "used": 12, "resetsAt": "2026-12-01T00:00:00.000Z" },
+      "decryptions": { "max": 500, "used": 30, "resetsAt": "2026-12-01T00:00:00.000Z" }
+    }
+  },
   "projects": [
     {
       "id": "...", "name": "Payments", "description": "...", "role": "ADMIN", "keyVersion": 2,
@@ -572,6 +591,7 @@ Cipherion has no profile images. Better Auth's user table requires an `image` co
   | `ENVELOPES_COMPLETED` | Project admin | `jobKind`, `envelopeCount` | The admin dismisses it |
 
 - **Pending lists:** `pendingInvitations` and a group's `devices` are filled for the project admin and acting admins, and empty for everyone else.
+- **Limits:** `account.limits` gives the [free-plan](#free-plan-and-master-accounts) maximums and what the user has used, so the client can disable an action before it's refused. People per group aren't repeated: count a group's `members` (besides the admin) and `pendingInvitations`. For a master, `master` is `true` and every `max` is `null`.
 - **Errors:** `401` without a session, and `503` if any query fails, so a client never shows a partial workspace as complete. The cause goes to the `[Workspace]` log.
 - **Cost:** each call runs several database queries (about 20 SQL statements when measured), so call it on sign-in and page load, and only poll it while a job is in progress. There's no pagination yet.
 
@@ -722,6 +742,8 @@ Under `/api/v1/cipseq`:
 | `POST` | `/crypto/encrypt` | Yes | Yes | Takes `groupId` and returns the current envelope. `503` with `Retry-After` while a new one is being created, and never an older one |
 | `POST` | `/crypto/decrypt` | Yes | Yes | Takes `groupId` and `gdekVersion`, and returns that version |
 
+Both crypto routes answer `403` with `code: PLAN_LIMIT_REACHED` and `resetsAt` once a free account has used its month's [encryptions or decryptions](#free-plan-and-master-accounts). The refusal comes after the certificate and group checks, and isn't counted.
+
 - **Connection:** TLS 1.3 with `SecP256r1MLKEM768` only, so ordinary `curl` and most monitoring probes fail the handshake. Check the console port's `/ready` instead, and the pin as in [docs/tls-pins.md](docs/tls-pins.md).
 - **Session:** `Authorization: Bearer <token>`, using the signed token from the `set-auth-token` header at sign-in. Sessions last a fixed 1 day and aren't extended, on the dashboard too.
 - **Certificate answers:** enrol and renew return exactly `certificate`, `serialNumber`, `notBefore` and `notAfter`. `495` means the certificate is missing, invalid, expired or retired, so enrol again. `403` means enrolling won't help. `409` means the CSR belongs to a retired certificate, so make a new key. `429` and `503` carry `Retry-After`.
@@ -749,6 +771,80 @@ Under `/api/v1/cipseq/metrics`, on the console port:
 - **Timing:** over 100,000 deliveries in one project, the slowest call (leaderboard `all`) took about 100 ms locally.
 
 Swagger at `/api/v1/docs` (tag `cipseq`) has the full response shapes and an example for each period, for the frontend.
+
+## Free plan and master accounts
+
+There's no billing yet, so every account except the master accounts is on a free plan. Each limit is an environment variable (see [Configure the environment](#2-configure-the-environment)); these are the defaults:
+
+| Limit | Default | Whose plan | Checked on |
+| --- | --- | --- | --- |
+| Projects you're admin of | 1 | The caller's | `POST /cipseq/projects` |
+| Groups per project | 2 | The project admin's | `POST /cipseq/projects/:id/groups` |
+| People per group besides the admin (members, acting admin included, plus open invitations) | 3 | The project admin's | Inviting, and accepting an invitation |
+| Active devices | 1 | The caller's | `POST /cipseq/devices`, on both ports |
+| Encryptions a month (UTC) | 500 | The caller's | `/crypto/encrypt` on the engine listener |
+| Decryptions a month (UTC) | 500 | The caller's | `/crypto/decrypt` on the engine listener |
+
+A refusal answers `403` before anything is written (and, for groups, before the passphrase is tried):
+
+```json
+{ "statusCode": 403, "error": "Forbidden", "code": "PLAN_LIMIT_REACHED", "limit": "projects", "max": 1, "message": "The free plan allows 1 project" }
+```
+
+The monthly limits add `resetsAt`, the 1st of next month in UTC. `limit` is one of `projects`, `groupsPerProject`, `peoplePerGroup`, `devices`, `encryptionsPerMonth` and `decryptionsPerMonth`.
+
+- **Freeing a slot:** deleting a project or group, revoking a device everywhere, revoking a member, or cancelling, rejecting or declining an invitation.
+- **Whose plan:** group and people limits follow the project admin, so a master's projects have no limits for anyone. The monthly limits follow the user doing the operation, even in a master's projects.
+- **Existing data:** nothing is removed. An account already over a limit keeps everything, but can't add more until it's under. An invitation sent before the limit is refused on accept if the group is full.
+- **Races:** each check counts and writes in one transaction, under a Postgres advisory lock per user, project or group, so two requests can't both take the last slot.
+- **Changing a limit:** edit the variable and restart.
+
+**Master accounts** are whoever signs in with an address in `MASTER_EMAILS`, once that address is verified. Nothing in the API can grant it, and changing the list takes a restart. They have no limits, and they alone can read:
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/master/metrics` | Platform-wide counts for `today`, `week`, `month` and `year`, each with totals and a time series. Anyone else gets `404` |
+
+```json
+{
+  "generatedAt": "2026-11-12T10:15:00.000Z",
+  "periods": {
+    "today": {
+      "start": "2026-11-12T00:00:00.000Z",
+      "end": "2026-11-13T00:00:00.000Z",
+      "totals": {
+        "encryptions": 120, "decryptions": 340,
+        "accountsCreated": 4, "accountsDeleted": 0,
+        "projectsCreated": 2, "projectsDeleted": 0,
+        "groupsCreated": 3, "groupsDeleted": 1,
+        "devicesRegistered": 5, "membersRevoked": 1, "devicesRevoked": 2
+      },
+      "series": [
+        { "start": "2026-11-12T00:00:00.000Z", "end": "2026-11-12T06:00:00.000Z", "encryptions": 40, "...": "the same 11 counts" },
+        { "start": "2026-11-12T06:00:00.000Z", "end": "2026-11-12T12:00:00.000Z", "encryptions": 80, "...": "the same 11 counts" },
+        { "start": "2026-11-12T12:00:00.000Z", "end": "2026-11-12T18:00:00.000Z", "encryptions": 0, "...": "the same 11 counts" },
+        { "start": "2026-11-12T18:00:00.000Z", "end": "2026-11-13T00:00:00.000Z", "encryptions": 0, "...": "the same 11 counts" }
+      ]
+    },
+    "week": { "start": "2026-11-06T00:00:00.000Z", "end": "...", "totals": {}, "series": ["7 days"] },
+    "month": { "start": "2026-10-16T00:00:00.000Z", "end": "...", "totals": {}, "series": ["4 weeks"] },
+    "year": { "start": "2025-12-01T00:00:00.000Z", "end": "...", "totals": {}, "series": ["12 months"] }
+  }
+}
+```
+
+- **Periods and buckets,** all in UTC:
+
+  | Period | Window | Buckets |
+  | --- | --- | --- |
+  | `today` | Since midnight | 4 of 6 hours |
+  | `week` | The last 7 days, including today | 7 of 1 day |
+  | `month` | The last 4 weeks (28 days), including today | 4 of 7 days, the last ending at tomorrow's midnight |
+  | `year` | The last 12 calendar months, including this one | 12 of 1 month |
+
+  Every bucket is present, empty ones as `0`, oldest first. The current bucket is partial (today's later buckets are `0`). `end` is exclusive, and `totals` is the sum of `series`. `month` is 28 days here, not the 30 of the [usage charts](#cipseq-metrics), so its weeks are equal.
+- **Sources:** encryptions and decryptions from `envelopeDelivery`; accounts from the auth database's `user` table; projects, groups and devices from their `createdAt` and soft-delete `deletedAt` (so created counts include ones deleted since); revocations from audit rows (`group.member_revoked` and `project.member_revoked`; `device.revoked` from a group, a project or everywhere), one per revocation.
+- **Accounts deleted:** always `0` for now. Deleting an account isn't possible yet, and that work must write an `account.deleted` audit row.
 
 ## Protecting routes
 
