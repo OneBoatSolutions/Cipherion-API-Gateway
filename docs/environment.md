@@ -44,6 +44,7 @@ locally.
 | `EMAIL_USER`, `EMAIL_PASS` | – | SMTP login, both or neither. Leave out for Mailpit. `EMAIL_PASS` is **secret** |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | – | Google sign-in, on when both are set. Redirect URI: `<BETTER_AUTH_URL>/api/v1/auth/callback/google` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | – | GitHub sign-in, on when both are set. Redirect URI: `<BETTER_AUTH_URL>/api/v1/auth/callback/github` |
+| `SOCIAL_REDIRECT_BASE_URL` | – | The dashboard's origin, when it proxies `/api/v1/auth/*` to the gateway. Google and GitHub then return the user there, and the redirect URIs to register become `<SOCIAL_REDIRECT_BASE_URL>/api/v1/auth/callback/google` and `/github`. Unset means `BETTER_AUTH_URL` |
 | `OBSERVE_APP_KEY`, `OBSERVE_APP_SECRET` | – | NestJS Observe telemetry. Without them, nothing is sent |
 
 ## Private CAs for the databases and Redis

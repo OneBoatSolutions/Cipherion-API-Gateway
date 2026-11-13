@@ -156,6 +156,11 @@ export const envSchema = Joi.object({
   GOOGLE_CLIENT_SECRET: Joi.string().optional(),
   GITHUB_CLIENT_ID: Joi.string().optional(),
   GITHUB_CLIENT_SECRET: Joi.string().optional(),
+  // Origin the providers send the user back to, when the dashboard proxies
+  // /api/v1/auth/* to this gateway. Unset means BETTER_AUTH_URL.
+  SOCIAL_REDIRECT_BASE_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .optional(),
 
   // Comma-separated emails of the master accounts: no free-plan limits, and
   // the only ones that can read the platform metrics. Unset means no master.
