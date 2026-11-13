@@ -15,7 +15,7 @@ import { deleteTestUser } from './helpers/delete-test-user.js';
 import { cookieOf, signUpVerified } from './helpers/users.js';
 
 // Runs against the .env.dev database; the test users are removed afterwards.
-// test/setup-e2e.ts replaces the mailer, so the links are read from its calls.
+// test/setup-e2e.ts replaces the mailer, so the codes are read from its calls.
 describe('Auth (e2e)', () => {
   let app: NestFastifyApplication;
   const stamp = Date.now();
@@ -45,13 +45,16 @@ describe('Auth (e2e)', () => {
       headers: { cookie },
     });
 
-  // The link points at BETTER_AUTH_URL; inject needs only its path and query.
-  const linkIn = (call = send.mock.calls.length - 1): string => {
-    const [email_] = send.mock.calls[call];
-    const link = /(https?:\/\/\S+)/.exec(email_.text)![1];
-    const { pathname, search } = new URL(link);
-    return pathname + search;
-  };
+  // The 6-digit code from the plain-text part of a sent email.
+  const codeIn = (call = send.mock.calls.length - 1): string =>
+    /Your code: (\d{6})/.exec(send.mock.calls[call][0].text)![1];
+
+  // A code that's surely wrong: the right one with its first digit changed.
+  const wrong = (code: string): string =>
+    `${(Number(code[0]) + 1) % 10}${code.slice(1)}`;
+
+  const verifyEmail = (address: string, otp: string) =>
+    post('/email-otp/verify-email', { email: address, otp });
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -77,12 +80,11 @@ describe('Auth (e2e)', () => {
     await app.close();
   });
 
-  it('verifies the email before the first sign-in', async () => {
+  it('verifies the email with a code before the first sign-in', async () => {
     const signUp = await post('/sign-up/email', {
       name: 'E2E User',
       email,
       password,
-      callbackURL,
     });
     expect(signUp.statusCode).toBe(200);
     expect(signUp.json().token).toBeNull();
@@ -92,19 +94,32 @@ describe('Auth (e2e)', () => {
       to: email,
       subject: 'Verify your Cipherion email address',
     });
+    const first = codeIn(0);
 
-    // Unverified: refused, and a fresh link is sent.
+    // Unverified: refused, and a fresh code replaces the first.
     const early = await signIn(email);
     expect(early.statusCode).toBe(403);
     expect(early.json().code).toBe('EMAIL_NOT_VERIFIED');
     expect(send).toHaveBeenCalledTimes(2);
+    const code = codeIn(1);
 
-    // The sign-up email carries the callbackURL; the one from sign-in doesn't.
-    const verify = await app.inject({ method: 'GET', url: linkIn(0) });
-    expect(verify.statusCode).toBe(302);
-    expect(verify.headers.location).toBe(callbackURL);
-    // A link in an email never creates a session.
+    if (first !== code) {
+      expect((await verifyEmail(email, first)).statusCode).toBe(400);
+    }
+    expect((await verifyEmail(email, wrong(code))).statusCode).toBe(400);
+
+    const verify = await verifyEmail(email, code);
+    expect(verify.statusCode).toBe(200);
+    expect(verify.json()).toMatchObject({
+      status: true,
+      token: null,
+      user: { email, emailVerified: true },
+    });
+    // A code never creates a session.
     expect(verify.cookies).toHaveLength(0);
+
+    // Used once.
+    expect((await verifyEmail(email, code)).statusCode).toBe(400);
 
     const signedIn = await signIn(email);
     expect(signedIn.statusCode).toBe(200);
@@ -113,6 +128,109 @@ describe('Auth (e2e)', () => {
 
     const session = await getSession(cookie);
     expect(session.json().user).toMatchObject({ email, emailVerified: true });
+  });
+
+  describe('verification codes', () => {
+    const codeEmail = `e2e-code-${stamp}@cipherion.test`;
+    const redisKey = `verification:email-verification-otp-${codeEmail}`;
+
+    const newCode = async (): Promise<string> => {
+      send.mockClear();
+      const response = await post('/email-otp/send-verification-otp', {
+        email: codeEmail,
+        type: 'email-verification',
+      });
+      expect(response.statusCode).toBe(200);
+      expect(send).toHaveBeenCalledTimes(1);
+      return codeIn();
+    };
+
+    beforeAll(async () => {
+      await post('/sign-up/email', {
+        name: 'E2E Code',
+        email: codeEmail,
+        password,
+      });
+    });
+
+    afterAll(async () => {
+      await deleteTestUser(codeEmail);
+    });
+
+    it('stores only a keyed hash of the code', async () => {
+      const code = await newCode();
+      const stored = await redis.get(redisKey);
+      expect(stored).not.toBeNull();
+      expect(stored).not.toContain(`"${code}:`);
+    });
+
+    it('refuses even the right code after 3 wrong tries', async () => {
+      const code = await newCode();
+      for (let i = 0; i < 3; i++) {
+        expect((await verifyEmail(codeEmail, wrong(code))).statusCode).toBe(
+          400,
+        );
+      }
+      const locked = await verifyEmail(codeEmail, code);
+      expect(locked.statusCode).toBe(403);
+      expect(locked.json().code).toBe('TOO_MANY_ATTEMPTS');
+    });
+
+    it('refuses an expired code', async () => {
+      const code = await newCode();
+      const stored = JSON.parse((await redis.get(redisKey))!);
+      stored.expiresAt = new Date(Date.now() - 1000).toISOString();
+      await redis.set(redisKey, JSON.stringify(stored), 'EX', 60);
+
+      const expired = await verifyEmail(codeEmail, code);
+      expect(expired.statusCode).toBe(400);
+      expect(expired.json().code).toBe('OTP_EXPIRED');
+    });
+
+    it('sends nothing for an unknown email, and answers the same', async () => {
+      send.mockClear();
+      const response = await post('/email-otp/send-verification-otp', {
+        email: `nobody-${stamp}@cipherion.test`,
+        type: 'email-verification',
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ success: true });
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it.each(['sign-in', 'forget-password', 'change-email'])(
+      'refuses to send a %s code from this route',
+      async (type) => {
+        const response = await post('/email-otp/send-verification-otp', {
+          email: codeEmail,
+          type,
+        });
+        expect(response.statusCode).toBe(400);
+        expect(send).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  it.each([
+    ['POST', '/send-verification-email'],
+    ['GET', '/verify-email?token=x'],
+    ['POST', '/request-password-reset'],
+    ['POST', '/reset-password'],
+    ['GET', '/reset-password/some-token?callbackURL=%2F'],
+    ['POST', '/sign-in/email-otp'],
+    ['POST', '/forget-password/email-otp'],
+    ['POST', '/email-otp/check-verification-otp'],
+    ['POST', '/email-otp/request-email-change'],
+    ['POST', '/email-otp/change-email'],
+  ] as const)('turns off %s %s', async (method, path) => {
+    const response = await app.inject({
+      method,
+      url: `/api/v1/auth${path}`,
+      headers: { origin, 'x-forwarded-for': uniqueClientIp() },
+      ...(method === 'POST' ? { payload: { email } } : {}),
+    });
+    expect(response.statusCode).toBe(404);
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('refuses a callbackURL outside the trusted origins', async () => {
@@ -164,20 +282,24 @@ describe('Auth (e2e)', () => {
   });
 
   describe('password reset', () => {
-    const redirectTo = `${origin}/reset-password`;
+    const requestReset = (address: string, extra: object = {}) =>
+      post('/email-otp/request-password-reset', { email: address }, extra);
+    const reset = (address: string, otp: string, newPassword: string) =>
+      post('/email-otp/reset-password', {
+        email: address,
+        otp,
+        password: newPassword,
+      });
 
     it('answers the same for an unknown email, and sends nothing', async () => {
-      const response = await post('/request-password-reset', {
-        email: `nobody-${stamp}@cipherion.test`,
-        redirectTo,
-      });
+      const response = await requestReset(`nobody-${stamp}@cipherion.test`);
       expect(response.statusCode).toBe(200);
-      expect(response.json().status).toBe(true);
+      expect(response.json()).toEqual({ success: true });
       expect(send).not.toHaveBeenCalled();
     });
 
     it('resets once, ends every session and verifies the email', async () => {
-      // Registered but never verified: the reset link proves the inbox.
+      // Registered but never verified: the reset code proves the inbox.
       await post('/sign-up/email', {
         name: 'E2E Reset',
         email: resetEmail,
@@ -196,27 +318,26 @@ describe('Auth (e2e)', () => {
       expect((await getSession(before)).json()).not.toBeNull();
 
       send.mockClear();
-      const request = await post('/request-password-reset', {
-        email: resetEmail,
-        redirectTo,
-      });
+      const request = await requestReset(resetEmail);
       expect(request.statusCode).toBe(200);
       expect(send).toHaveBeenCalledTimes(1);
-      expect(send.mock.lastCall![0].subject).toBe(
-        'Reset your Cipherion password',
-      );
-
-      const link = await app.inject({ method: 'GET', url: linkIn() });
-      expect(link.statusCode).toBe(302);
-      const location = new URL(link.headers.location as string);
-      expect(location.origin + location.pathname).toBe(redirectTo);
-      const token = location.searchParams.get('token')!;
+      expect(send.mock.lastCall![0]).toMatchObject({
+        to: resetEmail,
+        subject: 'Reset your Cipherion password',
+      });
+      const code = codeIn();
 
       const newPassword = 'e2e-new-password-456';
-      const reset = await post('/reset-password', { newPassword, token });
-      expect(reset.statusCode).toBe(200);
+      expect((await reset(resetEmail, wrong(code), newPassword)).statusCode).toBe(
+        400,
+      );
+      // Still unchanged after a wrong code.
+      expect((await getSession(before)).json()).not.toBeNull();
 
-      const again = await post('/reset-password', { newPassword, token });
+      const done = await reset(resetEmail, code, newPassword);
+      expect(done.statusCode).toBe(200);
+
+      const again = await reset(resetEmail, code, 'e2e-other-password-789');
       expect(again.statusCode).toBe(400);
 
       expect((await getSession(before)).json()).toBeNull();
@@ -228,11 +349,12 @@ describe('Auth (e2e)', () => {
       ).toBe(true);
     });
 
-    it('refuses an unknown token', async () => {
-      const response = await post('/reset-password', {
-        newPassword: 'e2e-new-password-456',
-        token: 'not-a-real-token',
-      });
+    it('refuses a code nobody requested', async () => {
+      const response = await reset(
+        `nobody-${stamp}@cipherion.test`,
+        '123456',
+        'e2e-new-password-456',
+      );
       expect(response.statusCode).toBe(400);
     });
 
@@ -240,9 +362,8 @@ describe('Auth (e2e)', () => {
       const headers = { 'x-forwarded-for': uniqueClientIp() };
       const statuses: number[] = [];
       for (let i = 0; i < 4; i++) {
-        const response = await post(
-          '/request-password-reset',
-          { email: `nobody-${stamp}@cipherion.test`, redirectTo },
+        const response = await requestReset(
+          `nobody-${stamp}@cipherion.test`,
           headers,
         );
         statuses.push(response.statusCode);
