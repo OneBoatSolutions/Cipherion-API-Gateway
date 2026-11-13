@@ -1,13 +1,12 @@
 import {
   escapeHtml,
   passwordChangedEmail,
-  passwordResetEmail,
-  verificationEmail,
+  passwordResetCodeEmail,
+  verificationCodeEmail,
 } from './emails.js';
 
 describe('auth emails', () => {
-  const url =
-    'http://localhost:3000/api/v1/auth/verify-email?token=abc&callbackURL=x';
+  const code = '048213';
   const user = {
     name: '<script>alert(1)</script>',
     email: 'ada@cipherion.test',
@@ -20,33 +19,32 @@ describe('auth emails', () => {
   });
 
   it.each([
-    ['verification', verificationEmail, 'Verify email address'],
-    ['password reset', passwordResetEmail, 'Reset password'],
-  ])(
-    'builds the %s email with a button and a plain link',
-    (_, build, label) => {
-      const email = build(user, url);
-      const href = `href="${url.replaceAll('&', '&amp;')}"`;
+    ['verification', verificationCodeEmail, 'Verify your Cipherion email address'],
+    ['password reset', passwordResetCodeEmail, 'Reset your Cipherion password'],
+  ])('builds the %s email with the code and no link', (_, build, subject) => {
+    const email = build(user, code);
 
-      expect(email.to).toBe(user.email);
-      expect(email.html).not.toContain('<script>');
-      expect(email.html).toContain('Hi &lt;script&gt;alert(1)&lt;/script&gt;,');
-      // The button and the fallback link underneath it.
-      expect(email.html.split(href)).toHaveLength(3);
-      expect(email.html).toContain(`>${label}</a>`);
-      expect(email.html).not.toMatch(/<img|src=/);
-      expect(email.text).toContain(`${label}: ${url}`);
-      expect(email.text).toContain('expires in 1 hour');
-    },
-  );
+    expect(email.to).toBe(user.email);
+    expect(email.subject).toBe(subject);
+    // Never on a lock screen.
+    expect(email.subject).not.toContain(code);
+    expect(email.html).not.toContain('<script>');
+    expect(email.html).toContain('Hi &lt;script&gt;alert(1)&lt;/script&gt;,');
+    expect(email.html).toContain(`>${code}</td>`);
+    expect(email.html).not.toMatch(/<a |href=|<img|src=/);
+    expect(email.text).toContain(`Your code: ${code}`);
+    expect(email.text).toContain('expires in 10 minutes');
+    expect(email.text).toContain('Never share it');
+  });
 
-  it('builds the password changed email without a link', () => {
+  it('builds the password changed email without a link or code', () => {
     const when = new Date('2026-11-11T08:30:00Z');
     const email = passwordChangedEmail(user, when);
 
     expect(email.subject).toBe('Your Cipherion password was changed');
     expect(email.html).not.toContain('<script>');
     expect(email.html).not.toContain('<a ');
+    expect(email.text).not.toContain('Your code');
     expect(email.text).toContain(when.toUTCString());
     expect(email.text).toContain('Forgot password');
   });

@@ -431,24 +431,26 @@ Better Auth is mounted at `/api/v1/auth/*`. Sessions are returned as cookies, an
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `POST` | `/api/v1/auth/sign-up/email` | Create an account (`name`, `email`, `password`, optional `callbackURL`). Returns no session; emails a verification link |
-| `GET` | `/api/v1/auth/verify-email?token=…&callbackURL=…` | The link in that email. Verifies the address and redirects to `callbackURL` (with `?error=…` if the link is invalid or expired). Creates no session |
-| `POST` | `/api/v1/auth/send-verification-email` | Send a new link (`email`, optional `callbackURL`). 3 per minute per IP |
-| `POST` | `/api/v1/auth/sign-in/email` | Sign in (`email`, `password`) and receive the session cookie. `403` `EMAIL_NOT_VERIFIED` until verified, which also sends a new link |
-| `POST` | `/api/v1/auth/request-password-reset` | Email a reset link (`email`, `redirectTo`). Answers the same whether or not the account exists. 3 per minute per IP |
-| `GET` | `/api/v1/auth/reset-password/:token?callbackURL=…` | The link in that email. Redirects to `redirectTo?token=…`, or `?error=INVALID_TOKEN` |
-| `POST` | `/api/v1/auth/reset-password` | Set the new password (`newPassword`, `token`). Works once; ends every session and marks the email verified |
+| `POST` | `/api/v1/auth/sign-up/email` | Create an account (`name`, `email`, `password`). Returns no session; emails a 6-digit verification code |
+| `POST` | `/api/v1/auth/email-otp/verify-email` | Verify the address (`email`, `otp`). Returns `{ status: true, token: null, user }` and creates no session. 5 per minute per IP |
+| `POST` | `/api/v1/auth/email-otp/send-verification-otp` | Send a new code (`email`, `type: "email-verification"`; any other `type` answers `400`). Answers the same whether or not the account exists. 3 per minute per IP |
+| `POST` | `/api/v1/auth/sign-in/email` | Sign in (`email`, `password`) and receive the session cookie. `403` `EMAIL_NOT_VERIFIED` until verified, which also sends a new code |
+| `POST` | `/api/v1/auth/email-otp/request-password-reset` | Email a reset code (`email`). Answers the same whether or not the account exists. 3 per minute per IP |
+| `POST` | `/api/v1/auth/email-otp/reset-password` | Set the new password (`email`, `otp`, `password`). Works once; ends every session and marks the email verified. 5 per minute per IP |
 | `POST` | `/api/v1/auth/change-password` | Signed in: `currentPassword`, `newPassword`. Always signs out every other session, keeps this one with a fresh cookie, and emails the owner |
 | `POST` | `/api/v1/auth/sign-in/social` | `provider` (`google` or `github`), `callbackURL`, optional `errorCallbackURL`. Returns `{ url }` for the browser; `404` if that provider isn't configured |
 | `GET` | `/api/v1/auth/callback/:provider` | Where Google or GitHub send the user back. Sets the session cookie and redirects to `callbackURL`. `504` after 10 seconds |
 | `GET` | `/api/v1/auth/get-session` | Current user and session, or `null` |
 | `POST` | `/api/v1/auth/sign-out` | End the current session |
 
-`callbackURL`, `redirectTo` and `errorCallbackURL` are the frontend's own pages. Their origin must be in `AUTH_TRUSTED_ORIGINS`, or the request answers `403`.
+`callbackURL` and `errorCallbackURL` are the frontend's own pages. Their origin must be in `AUTH_TRUSTED_ORIGINS`, or the request answers `403`.
 
 **Rules worth knowing**
 
-- Links in emails last 1 hour, and never create a session: after verifying, the user signs in with their password.
+- Emails carry a 6-digit code, never a link. A code lasts 10 minutes, works once, and only the latest one sent works. After 3 wrong tries it's deleted (`403` `TOO_MANY_ATTEMPTS`) and a new one must be requested. Other refusals are `400` with `INVALID_OTP` or `OTP_EXPIRED`.
+- A code never creates a session: after verifying, the user signs in with their password.
+- Only a keyed hash (HMAC with `BETTER_AUTH_SECRET`) of each code is stored, in Redis.
+- The link routes (`/verify-email`, `/send-verification-email`, `/request-password-reset`, `/reset-password`) and the email OTP routes Cipherion doesn't use (`/sign-in/email-otp`, `/forget-password/email-otp`, `/email-otp/check-verification-otp`, email change) answer `404`.
 - Google or GitHub sign-in joins an existing account only if its email is verified. Otherwise it fails with `account_not_linked`, and the user verifies first (by signing in with the password, or with a reset).
 - Someone who registered with Google or GitHub has no password, so change password answers `400` `CREDENTIAL_ACCOUNT_NOT_FOUND`. A password reset sets one.
 - Signing up with an email that already has an account answers like a new sign-up, creates nothing and changes nothing.
@@ -465,12 +467,17 @@ with `EMAIL_HOST=localhost` and `EMAIL_PORT=1025`.
 **Google and GitHub:** create an OAuth app with each, with the redirect URI `<BETTER_AUTH_URL>/api/v1/auth/callback/google` (or `/github`), and set both of its variables.
 
 ```bash
-# sign up; the verification link arrives by email (Mailpit locally)
+# sign up; the verification code arrives by email (Mailpit locally)
 curl -X POST http://localhost:3000/api/v1/auth/sign-up/email \
   -H 'Content-Type: application/json' -H 'Origin: http://localhost:3000' \
-  -d '{"name":"Jane","email":"jane@example.com","password":"a-strong-password","callbackURL":"http://localhost:3000/"}'
+  -d '{"name":"Jane","email":"jane@example.com","password":"a-strong-password"}'
 
-# open the link from the email, then sign in and store the session cookie
+# verify with the code from the email
+curl -X POST http://localhost:3000/api/v1/auth/email-otp/verify-email \
+  -H 'Content-Type: application/json' -H 'Origin: http://localhost:3000' \
+  -d '{"email":"jane@example.com","otp":"123456"}'
+
+# then sign in and store the session cookie
 curl -X POST http://localhost:3000/api/v1/auth/sign-in/email -c cookies.txt \
   -H 'Content-Type: application/json' -H 'Origin: http://localhost:3000' \
   -d '{"email":"jane@example.com","password":"a-strong-password"}'
@@ -479,7 +486,7 @@ curl -X POST http://localhost:3000/api/v1/auth/sign-in/email -c cookies.txt \
 curl http://localhost:3000/api/v1/auth/get-session -b cookies.txt
 ```
 
-The e2e tests (`npm run test:e2e`) exercise these endpoints against the `.env.dev` database and Redis, and delete the test user and its cached sessions afterwards. They never send email: `test/setup-e2e.ts` replaces the mailer, and tests read the links from its calls. Tests that only need a signed-in user use `signUpVerified()` from `test/helpers/users.ts`.
+The e2e tests (`npm run test:e2e`) exercise these endpoints against the `.env.dev` database and Redis, and delete the test user and its cached sessions afterwards. They never send email: `test/setup-e2e.ts` replaces the mailer, and tests read the codes from its calls. Tests that only need a signed-in user use `signUpVerified()` from `test/helpers/users.ts`.
 
 > **Always delete users and revoke sessions through Better Auth** (`auth.api.*`), never with raw Prisma. Better Auth also removes the cached copy from Redis. A session deleted only from PostgreSQL stays valid in Redis until its TTL (up to 1 day) runs out.
 
