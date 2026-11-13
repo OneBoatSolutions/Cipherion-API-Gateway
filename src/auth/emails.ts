@@ -22,8 +22,10 @@ interface Content {
   heading: string;
   // Plain sentences; escaped before going into HTML.
   paragraphs: string[];
-  action?: { label: string; url: string };
-  // Under the button: how long the link lasts, and what to do if it wasn't you.
+  // A one-time code, shown large under the paragraphs. Never in the subject,
+  // so it doesn't show on a lock screen.
+  code?: string;
+  // Under the code: how long it lasts, and what to do if it wasn't you.
   notes: string[];
 }
 
@@ -39,17 +41,15 @@ function layout(content: Content, greetingName: string): string {
   const note = (text: string) =>
     `<p style="margin:0 0 8px;font-size:13px;line-height:20px;color:#667085;">${escapeHtml(text)}</p>`;
 
-  const action = content.action
+  // No link anywhere: the code is typed into the Cipherion app, so there's
+  // nothing in the email to phish with.
+  const code = content.code
     ? `
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;">
             <tr>
-              <td bgcolor="${BRAND}" style="border-radius:8px;">
-                <a href="${escapeHtml(content.action.url)}" target="_blank" style="display:inline-block;padding:12px 24px;font-family:${FONT};font-size:15px;font-weight:600;line-height:20px;color:#ffffff;text-decoration:none;border-radius:8px;">${escapeHtml(content.action.label)}</a>
-              </td>
+              <td class="code" style="background:#f2f4f7;border:1px solid #eaecf0;border-radius:8px;padding:14px 24px;font-family:'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;font-size:30px;font-weight:700;line-height:36px;letter-spacing:8px;color:${BRAND};">${escapeHtml(content.code)}</td>
             </tr>
-          </table>
-          ${note("If the button doesn't work, copy this link into your browser:")}
-          <p style="margin:0 0 24px;font-size:13px;line-height:20px;word-break:break-all;"><a href="${escapeHtml(content.action.url)}" target="_blank" style="color:${BRAND};">${escapeHtml(content.action.url)}</a></p>`
+          </table>`
     : '';
 
   return `<!doctype html>
@@ -65,6 +65,7 @@ function layout(content: Content, greetingName: string): string {
       .page { background:#0c111d !important; }
       .card { background:#161b26 !important; border-color:#2a3140 !important; }
       .card p, .card h1 { color:#e4e7ec !important; }
+      .card .code { background:#0c111d !important; border-color:#2a3140 !important; color:#a5b4fc !important; }
       .muted { color:#98a2b3 !important; }
     }
   </style>
@@ -85,7 +86,7 @@ function layout(content: Content, greetingName: string): string {
               <h1 style="margin:0 0 20px;font-size:22px;line-height:30px;font-weight:700;color:#101828;">${escapeHtml(content.heading)}</h1>
               ${paragraph(`Hi ${greetingName},`)}
               ${content.paragraphs.map(paragraph).join('\n              ')}
-              ${action}
+              ${code}
               ${content.notes.map(note).join('\n              ')}
             </td>
           </tr>
@@ -107,9 +108,7 @@ function text(content: Content, name: string): string {
     `Hi ${name},`,
     '',
     ...content.paragraphs.flatMap((line) => [line, '']),
-    ...(content.action
-      ? [`${content.action.label}: ${content.action.url}`, '']
-      : []),
+    ...(content.code ? [`Your code: ${content.code}`, ''] : []),
     ...content.notes,
     '',
     '-- ',
@@ -127,35 +126,40 @@ function build(user: Recipient, content: Content): Email {
   };
 }
 
-const LINK_LIFETIME = 'This link works once and expires in 1 hour.';
+// Matches emailOTP's expiresIn in src/auth.ts.
+export const CODE_LIFETIME_MINUTES = 10;
+const CODE_NOTES = [
+  `This code works once and expires in ${CODE_LIFETIME_MINUTES} minutes.`,
+  'Never share it. Cipherion will never ask you for it by phone, chat or email.',
+];
 
-export const verificationEmail = (user: Recipient, url: string): Email =>
+export const verificationCodeEmail = (user: Recipient, code: string): Email =>
   build(user, {
     subject: 'Verify your Cipherion email address',
-    preview: 'Confirm your email address to finish setting up your account.',
+    preview: 'Enter this code to finish setting up your account.',
     heading: 'Verify your email address',
     paragraphs: [
-      'Thanks for creating a Cipherion account. Confirm that this is your email address to finish setting it up.',
+      'Thanks for creating a Cipherion account. Enter this code in Cipherion to confirm that this is your email address.',
     ],
-    action: { label: 'Verify email address', url },
+    code,
     notes: [
-      LINK_LIFETIME,
-      "If you didn't create a Cipherion account, ignore this email and don't click the link.",
+      ...CODE_NOTES,
+      "If you didn't create a Cipherion account, ignore this email.",
     ],
   });
 
-export const passwordResetEmail = (user: Recipient, url: string): Email =>
+export const passwordResetCodeEmail = (user: Recipient, code: string): Email =>
   build(user, {
     subject: 'Reset your Cipherion password',
-    preview: 'Use this link to choose a new password.',
+    preview: 'Enter this code to choose a new password.',
     heading: 'Reset your password',
     paragraphs: [
-      'We received a request to reset the password of your Cipherion account. Choose a new one with the button below.',
+      'We received a request to reset the password of your Cipherion account. Enter this code in Cipherion with your new password.',
       'Resetting your password signs you out on every device.',
     ],
-    action: { label: 'Reset password', url },
+    code,
     notes: [
-      LINK_LIFETIME,
+      ...CODE_NOTES,
       "If you didn't ask for this, ignore this email. Your password stays the same.",
     ],
   });

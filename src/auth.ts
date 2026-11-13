@@ -1,12 +1,14 @@
+import { createHmac } from 'node:crypto';
 import { apiDocsEnabled, trustedOrigins } from './config/env.js';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
-import { bearer, openAPI } from 'better-auth/plugins';
+import { bearer, emailOTP, openAPI } from 'better-auth/plugins';
 import {
+  CODE_LIFETIME_MINUTES,
   passwordChangedEmail,
-  passwordResetEmail,
-  verificationEmail,
+  passwordResetCodeEmail,
+  verificationCodeEmail,
 } from './auth/emails.js';
 import { socialProviders } from './auth/social-providers.js';
 import { mailer } from './lib/mailer.js';
@@ -53,11 +55,77 @@ const sessionStoreUnavailable = (cause: unknown): never => {
 // image column, so clients are stopped from setting it instead.
 const USER_WRITE_PATHS = new Set(['/sign-up/email', '/update-user']);
 
+// Email codes replace links. These routes are turned off: the link flows
+// (nothing sends links any more), and the email OTP plugin's routes Cipherion
+// doesn't use: passwordless sign-in, the deprecated reset alias, a bare code
+// check, and email change. They answer 404 and are left out of the API docs.
+export const DISABLED_AUTH_PATHS = [
+  '/send-verification-email',
+  '/verify-email',
+  '/request-password-reset',
+  '/reset-password',
+  '/sign-in/email-otp',
+  '/forget-password/email-otp',
+  '/email-otp/check-verification-otp',
+  '/email-otp/request-email-change',
+  '/email-otp/change-email',
+];
+
+const hashCode = (otp: string): string =>
+  createHmac('sha256', authSecret).update(`email-otp:${otp}`).digest('base64url');
+
+// Sends the code, never awaited by the request. The plugin calls this only for
+// a registered address; the lookup gets the name and the id for the log.
+const sendCodeEmail = async ({
+  email,
+  otp,
+  type,
+}: {
+  email: string;
+  otp: string;
+  type: string;
+}): Promise<void> => {
+  const build =
+    type === 'email-verification'
+      ? verificationCodeEmail
+      : type === 'forget-password'
+        ? passwordResetCodeEmail
+        : undefined;
+  if (!build) {
+    return;
+  }
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, name: true, email: true },
+  });
+  if (user) {
+    mailer.send(build(user, otp), user.id);
+  }
+};
+
 const beforeAuth = createAuthMiddleware(async (ctx) => {
   const body = ctx.body as Record<string, unknown> | undefined;
   if (USER_WRITE_PATHS.has(ctx.path) && body?.image !== undefined) {
     throw new APIError('BAD_REQUEST', {
       message: 'Profile images are not supported',
+    });
+  }
+
+  // The reset link's landing route has a token in its path, which
+  // disabledPaths (exact paths only) can't match.
+  if (ctx.path === '/reset-password/:token') {
+    throw new APIError('NOT_FOUND');
+  }
+
+  // Only verification codes go out here. Reset codes come from
+  // /email-otp/request-password-reset, and sign-in and email-change codes
+  // aren't used.
+  if (
+    ctx.path === '/email-otp/send-verification-otp' &&
+    body?.type !== 'email-verification'
+  ) {
+    throw new APIError('BAD_REQUEST', {
+      message: 'type must be "email-verification"',
     });
   }
 
@@ -118,13 +186,10 @@ export const auth = betterAuth({
     // Sign-up returns no session, and email sign-in answers 403 until the
     // address is verified, so nobody can use someone else's email.
     requireEmailVerification: true,
-    sendResetPassword: async ({ user, url }) => {
-      mailer.send(passwordResetEmail(user, url), user.id);
-    },
-    resetPasswordTokenExpiresIn: 60 * 60,
+    // Resets use an emailed code (emailOTP below), never a link.
     // A stolen session ends when the owner resets their password.
     revokeSessionsOnPasswordReset: true,
-    // The reset link proves the inbox. This is how someone recovers an address
+    // The reset code proves the inbox. This is how someone recovers an address
     // another person registered: the reset replaces that person's password.
     onPasswordReset: async ({ user }) => {
       await prisma.user.updateMany({
@@ -134,17 +199,18 @@ export const auth = betterAuth({
     },
   },
 
+  // No sendVerificationEmail here: emailOTP supplies it and sends a code, and
+  // one set here would silently win over the plugin's and send links again.
   emailVerification: {
-    sendVerificationEmail: async ({ user, url }) => {
-      mailer.send(verificationEmail(user, url), user.id);
-    },
     sendOnSignUp: true,
-    // An unverified sign-in with the right password sends a new link.
+    // An unverified sign-in with the right password sends a new code.
     sendOnSignIn: true,
-    // A link in an email never creates a session: the user signs in afterwards.
+    // A code never creates a session: the user signs in with their password
+    // afterwards.
     autoSignInAfterVerification: false,
-    expiresIn: 60 * 60,
   },
+
+  disabledPaths: DISABLED_AUTH_PATHS,
 
   // Each provider is on only when both its id and secret are set.
   socialProviders: socialProviders(),
@@ -174,8 +240,11 @@ export const auth = betterAuth({
     // Each of these sends an email, so they're limited harder against flooding
     // an inbox. Per IP, like the rest.
     customRules: {
-      '/request-password-reset': { window: 60, max: 3 },
-      '/send-verification-email': { window: 60, max: 3 },
+      '/email-otp/send-verification-otp': { window: 60, max: 3 },
+      '/email-otp/request-password-reset': { window: 60, max: 3 },
+      // Guessing: each code also allows only 3 wrong tries, then it's deleted.
+      '/email-otp/verify-email': { window: 60, max: 5 },
+      '/email-otp/reset-password': { window: 60, max: 5 },
     },
   },
 
@@ -198,6 +267,20 @@ export const auth = betterAuth({
     // How the engine sends the owner's session. It takes the signed token from the
     // set-auth-token header at sign-in, and an unsigned token is refused.
     bearer({ requireSignature: true }),
+    // Email verification and password reset by a 6-digit code instead of a link.
+    emailOTP({
+      overrideDefaultEmailVerification: true,
+      otpLength: 6,
+      expiresIn: CODE_LIFETIME_MINUTES * 60,
+      // After 3 wrong tries the code is deleted, and a new one must be requested.
+      allowedAttempts: 3,
+      // Keyed, so whoever reads the stored value (Redis) can't recover the
+      // code by hashing all million of them, as with a plain SHA-256.
+      storeOTP: { hash: async (otp) => hashCode(otp) },
+      // A code never creates an account.
+      disableSignUp: true,
+      sendVerificationOTP: sendCodeEmail,
+    }),
     // Feeds the auth endpoints into the gateway's Swagger document. Its schema
     // endpoint is public, so the plugin is left out entirely in production; its
     // own Scalar page is disabled in favour of Swagger UI.
