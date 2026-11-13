@@ -168,6 +168,7 @@ See [docs/environment.md](docs/environment.md) for when each one is required, lo
 | `BETTER_AUTH_SECRET` | **Yes** | – | Secret used to sign sessions. Must be **at least 32 characters** |
 | `BETTER_AUTH_URL` | **Yes** | – | Public base URL of the gateway, e.g. `http://localhost:3000` |
 | `AUTH_TRUSTED_ORIGINS` | **Yes** | – | Comma-separated list of origins allowed to call auth endpoints (for example, the dashboard URL) |
+| `DATABASE_CA_CERT` | No | – | Path to a PEM file of CAs to trust for **both** databases' TLS certificates, for a Postgres signed by a private CA (self-hosted, or a platform's own CA). It may hold several CAs, so a CA can be rotated by listing the old and new one together. Leave unset when a public CA signed it. The certificate and host name are always verified, and the `sslmode` in the URL is ignored while this is set (`sslmode=disable` still disables TLS) |
 | `REDIS_URL` | **Yes** | – | Redis connection string (`redis://` or `rediss://` for TLS; `rediss://` is required when `NODE_ENV=production`), e.g. `redis://localhost:6379` |
 | `REDIS_CA_CERT` | No | – | Path to a PEM CA to trust for Redis's TLS certificate, for a self-signed one such as the local docker Redis. Only with `rediss://`; leave unset when a public CA signed it. The certificate is always verified |
 | `EMAIL_HOST` | **Yes**, except `NODE_ENV=test` | – | SMTP server for verification, password reset and password changed emails, e.g. `localhost` (Mailpit) |

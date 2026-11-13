@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `DATABASE_CA_CERT`: an optional PEM file of CAs to trust for both databases' TLS certificates, for a Postgres signed by a private CA such as Coolify's. It may hold several CAs for rotation, the certificate and host name are still always verified, and it ignores the URL's `sslmode` (except `disable`). Without it, behaviour is unchanged. `docs/environment.md` explains private CAs and rotation, and now lists `REDIS_CA_CERT`.
 - `Dockerfile` and `.dockerignore` for Coolify: a two-stage Node 24 build (OpenSSL 3.5, needed by the engine listener) that runs as the `node` user, exposes 3000 and 3443, and has a `/health` check. Certificates are never copied into the image.
 - `scripts/entrypoint.sh`, the image's `ENTRYPOINT`: applies both databases' migrations with `prisma migrate deploy` on every container start, then `exec`s the gateway so it stays PID 1 and gets `SIGTERM`. Each database is retried `MIGRATE_ATTEMPTS` times (default 5) `MIGRATE_RETRY_SECONDS` apart (default 5); it exits `1` without a database URL, `20` if the auth migrations fail and `21` if the CipSeq ones do, so the gateway never starts on an old schema. `SKIP_MIGRATIONS=true` skips both steps. Replaces the manual `npm run db:deploy` per release.
 - Project setup: NestJS 12 on Fastify, Joi environment validation, global validation pipe and NestJS Observe instrumentation.
@@ -187,6 +188,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The image failed to build on Coolify with `nest: not found`: Coolify passes every environment variable as a build argument, including `NODE_ENV=production`, so `npm ci` skipped the devDependencies the build needs. The build stage now runs `npm ci --include=dev` (they're still pruned from the runtime image) and installs `openssl`, which silences Prisma's "failed to detect libssl" warnings.
 - The image's health check requested `/health`, which answers `404` because every route is under `/api/v1`, so every container was marked unhealthy. It now checks `/api/v1/health`, with a 90-second start period instead of 30 to cover migrations and the dependency checks.
 - A `PERMISSION_DENIED` from the KMS only counts as a wrong passphrase when its text is exactly `incorrect passphrase`. A refused gateway certificate now answers `502` instead of "Incorrect passphrase", no longer uses up the project's passphrase attempts, and no longer stops envelope jobs with `WRONG_PASSPHRASE`.
 - A Postgres restart or a dropped idle connection can no longer crash the gateway: both databases now use a `pg` pool owned by the gateway (`connectionTimeoutMillis: 2000`) with an `error` listener, passed to Prisma with `disposeExternalPool`.
