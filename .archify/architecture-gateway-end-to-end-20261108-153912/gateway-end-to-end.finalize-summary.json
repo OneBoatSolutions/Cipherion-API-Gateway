@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "D:\\OneBoatSolutions\\servers\\Cipherion-API_Gateway\\.archify\\architecture-gateway-end-to-end-20261108-153912\\candidate.json",
+    "sha256": "2ceb3e33a10c39077c9d5ace6e7f5ecb20d2f5067bbedbd12b43bc577f86c5e2",
+    "bytes": 9663
+  },
+  "artifact": {
+    "path": "D:\\OneBoatSolutions\\servers\\Cipherion-API_Gateway\\.archify\\architecture-gateway-end-to-end-20261108-153912\\gateway-end-to-end.html",
+    "sha256": "bc842178c4d5a94eb02f0bc9b1a03f1e68d8bd400b58abeaaabdc5f92b124525",
+    "bytes": 877618
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "D:\\OneBoatSolutions\\servers\\Cipherion-API_Gateway\\.archify\\architecture-gateway-end-to-end-20261108-153912\\gateway-end-to-end.finalize.json",
+    "summaryReceipt": "D:\\OneBoatSolutions\\servers\\Cipherion-API_Gateway\\.archify\\architecture-gateway-end-to-end-20261108-153912\\gateway-end-to-end.finalize-summary.json",
+    "browserCheckReceipt": "D:\\OneBoatSolutions\\servers\\Cipherion-API_Gateway\\.archify\\architecture-gateway-end-to-end-20261108-153912\\gateway-end-to-end.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-08T10:09:53.243Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 7633,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

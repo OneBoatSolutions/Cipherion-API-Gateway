@@ -262,6 +262,19 @@ describe('envSchema email and social sign-in', () => {
       validate({ ...redis, GITHUB_CLIENT_SECRET: 'secret' }).error?.message,
     ).toContain('GITHUB_CLIENT_ID');
   });
+
+  it('takes an http(s) origin for SOCIAL_REDIRECT_BASE_URL', () => {
+    expect(
+      validate({
+        ...redis,
+        SOCIAL_REDIRECT_BASE_URL: 'https://cipseq.cipherion.in',
+      }).error,
+    ).toBeUndefined();
+    expect(
+      validate({ ...redis, SOCIAL_REDIRECT_BASE_URL: 'cipseq.cipherion.in' })
+        .error,
+    ).toBeDefined();
+  });
 });
 
 describe('envSchema KMS', () => {

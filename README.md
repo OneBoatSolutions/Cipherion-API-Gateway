@@ -177,6 +177,7 @@ See [docs/environment.md](docs/environment.md) for when each one is required, lo
 | `EMAIL_FROM` | **Yes**, except `NODE_ENV=test` | – | Sender of those emails, e.g. `Cipherion <no-reply@cipherion.com>`. Most providers only send as the login's own address |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | No | – | Google sign-in, on when both are set. Redirect URI: `<BETTER_AUTH_URL>/api/v1/auth/callback/google` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | No | – | GitHub sign-in, on when both are set. Redirect URI: `<BETTER_AUTH_URL>/api/v1/auth/callback/github` |
+| `SOCIAL_REDIRECT_BASE_URL` | No | `BETTER_AUTH_URL` | Origin Google and GitHub send the user back to. Set it to the dashboard's origin when the dashboard proxies `/api/v1/auth/*` to the gateway (otherwise sign-in fails with `state_mismatch`). The redirect URIs then become `<SOCIAL_REDIRECT_BASE_URL>/api/v1/auth/callback/google` and `/github`. No trailing slash |
 | `KMS_ADDRESS` | **Yes** | – | Cipherion KMS gRPC address as `host:port`, e.g. `localhost:50051` |
 | `KMS_CA_CERT` | **Yes** | – | Path to the PEM CA certificate that signed the KMS server certificate |
 | `KMS_CLIENT_CERT` | **Yes** | – | Path to the gateway's PEM client certificate (mutual TLS), signed by a CA the KMS trusts |

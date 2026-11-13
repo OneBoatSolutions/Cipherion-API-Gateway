@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "b8a02309-f436-434c-a310-eccf18c2d0bc",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\OneBoatSolutions\\servers\\Cipherion-API_Gateway\\.archify\\architecture-gateway-end-to-end-20261108-153912\\candidate.json",
+  "output": "D:\\OneBoatSolutions\\servers\\Cipherion-API_Gateway\\.archify\\architecture-gateway-end-to-end-20261108-153912\\gateway-end-to-end.html",
+  "specification": {
+    "sha256": "2ceb3e33a10c39077c9d5ace6e7f5ecb20d2f5067bbedbd12b43bc577f86c5e2",
+    "bytes": 9663
+  },
+  "artifact": {
+    "sha256": "bc842178c4d5a94eb02f0bc9b1a03f1e68d8bd400b58abeaaabdc5f92b124525",
+    "bytes": 877618
+  }
+}

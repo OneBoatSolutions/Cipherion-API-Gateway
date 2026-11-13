@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Cipherion API Gateway end to end",
+    "locale": "en",
+    "output": ".archify/architecture-gateway-end-to-end-20261108-153912/gateway-end-to-end.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/OneBoatSolutions/Cipherion-API-Gateway.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "df4acbb9ac932af1cafece6574f58553c4558a4b"
+    }
+  },
+  "components": [
+    {
+      "id": "browser", "type": "frontend", "label": "Dashboard", "sublabel": "browser, trusted origins",
+      "pos": [40, 40], "size": [160, 64],
+      "sources": [{ "path": "src/app.setup.ts", "line": 12, "end_line": 24, "label": "CORS for trusted origins" }]
+    },
+    {
+      "id": "traefik", "type": "cloud", "label": "Traefik", "sublabel": "reverse proxy",
+      "pos": [290, 40], "size": [150, 64],
+      "sources": [{ "path": "README.md", "line": 34, "label": "console app sits behind Traefik" }]
+    },
+    {
+      "id": "console", "type": "backend", "label": "Console app", "sublabel": "AppModule on PORT, /api/v1", "tag": "global AuthGuard",
+      "pos": [600, 40], "size": [200, 64],
+      "sources": [
+        { "path": "src/main.ts", "line": 14, "end_line": 43, "label": "bootstrap both apps" },
+        { "path": "src/app.module.ts", "line": 26, "end_line": 53, "label": "AppModule imports" },
+        { "path": "src/auth/auth.module.ts", "line": 6, "end_line": 10, "label": "AuthGuard as APP_GUARD" }
+      ]
+    },
+    {
+      "id": "auth", "type": "security", "label": "Better Auth", "sublabel": "/auth/*, bearer, 1-day sessions",
+      "pos": [290, 190], "size": [180, 64],
+      "sources": [
+        { "path": "src/auth.ts", "line": 58, "end_line": 122, "label": "betterAuth config" },
+        { "path": "src/auth/auth.guard.ts", "line": 20, "end_line": 49, "label": "session check per request" }
+      ]
+    },
+    {
+      "id": "dashboard", "type": "backend", "label": "DashboardModule", "sublabel": "profile, settings",
+      "pos": [510, 190], "size": [170, 64],
+      "sources": [{ "path": "src/dashboard/dashboard.module.ts", "line": 5, "end_line": 8 }]
+    },
+    {
+      "id": "workspace", "type": "backend", "label": "WorkspaceModule", "sublabel": "GET /workspace",
+      "pos": [720, 190], "size": [170, 64],
+      "sources": [{ "path": "src/workspace/workspace.controller.ts", "line": 473, "end_line": 483 }]
+    },
+    {
+      "id": "cipseq", "type": "backend", "label": "CipSeqModule", "sublabel": "projects, groups, invites, devices", "tag": "envelope job",
+      "pos": [930, 190], "size": [200, 64],
+      "sources": [
+        { "path": "src/cipseq/cipseq.module.ts", "line": 9, "end_line": 19, "label": "controllers" },
+        { "path": "src/cipseq/projects.controller.ts", "line": 73, "end_line": 84, "label": "KMS call before commit" },
+        { "path": "src/cipseq/device-envelopes.ts", "line": 68, "end_line": 72, "label": "CreateDeviceEnvelope" }
+      ]
+    },
+    {
+      "id": "redis", "type": "database", "label": "Redis", "sublabel": "sessions, rate limits",
+      "pos": [90, 350], "size": [160, 64],
+      "sources": [
+        { "path": "src/lib/redis.ts", "line": 5, "end_line": 12 },
+        { "path": "src/auth.ts", "line": 70, "end_line": 82, "label": "Better Auth secondary storage" }
+      ]
+    },
+    {
+      "id": "authdb", "type": "database", "label": "Auth PostgreSQL", "sublabel": "users, sessions, settings",
+      "pos": [400, 350], "size": [180, 64],
+      "sources": [
+        { "path": "src/lib/prisma.ts", "line": 8, "end_line": 26 },
+        { "path": "src/auth.ts", "line": 65, "end_line": 69, "label": "prismaAdapter" }
+      ]
+    },
+    {
+      "id": "cipseqdb", "type": "database", "label": "CipSeq PostgreSQL", "sublabel": "wrapped keys, devices, certs",
+      "pos": [810, 350], "size": [190, 64],
+      "sources": [{ "path": "src/lib/cipseq-prisma.ts", "line": 10, "end_line": 26 }]
+    },
+    {
+      "id": "kms", "type": "external", "label": "Cipherion KMS", "sublabel": "gRPC, mutual TLS", "tag": "stateless",
+      "pos": [1030, 350], "size": [170, 64],
+      "sources": [
+        { "path": "src/lib/kms.ts", "line": 33, "end_line": 47, "label": "client cert + CA" },
+        { "path": "src/kms/kms-call.ts", "line": 56, "end_line": 74, "label": "deadline, no retries" }
+      ]
+    },
+    {
+      "id": "register", "type": "backend", "label": "Device registration", "sublabel": "POST /cipseq/devices",
+      "pos": [590, 520], "size": [180, 64],
+      "sources": [{ "path": "src/engine/engine-devices.controller.ts", "line": 10, "end_line": 19 }]
+    },
+    {
+      "id": "crypto", "type": "backend", "label": "Envelope delivery", "sublabel": "encrypt, decrypt", "tag": "session + cert",
+      "pos": [820, 520], "size": [170, 64],
+      "sources": [
+        { "path": "src/engine/crypto.controller.ts", "line": 41, "end_line": 73 },
+        { "path": "src/cipseq/envelope-delivery.ts", "line": 119, "end_line": 129, "label": "deliverEnvelope" }
+      ]
+    },
+    {
+      "id": "certs", "type": "backend", "label": "Device certificates", "sublabel": "enrol, renew", "tag": "cert only on renew",
+      "pos": [1020, 520], "size": [180, 64],
+      "sources": [
+        { "path": "src/engine/device-certificates.controller.ts", "line": 25, "end_line": 71 },
+        { "path": "src/cipseq/device-certificate-issuance.ts", "line": 493, "end_line": 520, "label": "IssueDeviceCertificate" }
+      ]
+    },
+    {
+      "id": "device", "type": "external", "label": "Device engine", "sublabel": "pins server key, client cert",
+      "pos": [40, 690], "size": [180, 64],
+      "sources": [{ "path": "README.md", "line": 634, "label": "published directly, never via Traefik" }]
+    },
+    {
+      "id": "listener", "type": "security", "label": "Engine listener :3443", "sublabel": "TLS 1.3, SecP256r1MLKEM768", "tag": "EngineModule only",
+      "pos": [300, 690], "size": [210, 64],
+      "sources": [
+        { "path": "src/engine/engine-tls.ts", "line": 31, "end_line": 86, "label": "TLS options and pin check" },
+        { "path": "src/engine/engine-app.ts", "line": 27, "end_line": 60, "label": "second Nest app" },
+        { "path": "src/engine/engine.module.ts", "line": 14, "end_line": 22 }
+      ]
+    },
+    {
+      "id": "guard", "type": "security", "label": "DeviceCertificateGuard", "sublabel": "socket cert + DB check every request",
+      "pos": [790, 690], "size": [230, 64],
+      "sources": [
+        { "path": "src/engine/device-certificate.guard.ts", "line": 27, "end_line": 66 },
+        { "path": "src/cipseq/device-certificates.ts", "line": 66, "end_line": 128, "label": "checkCertificate, authorizeRequest" }
+      ]
+    }
+  ],
+  "connections": [
+    { "id": "browser-traefik", "from": "browser", "to": "traefik", "label": "HTTPS", "variant": "emphasis" },
+    { "id": "traefik-console", "from": "traefik", "to": "console", "label": "HTTP :PORT", "variant": "emphasis" },
+    { "id": "console-auth", "from": "console", "to": "auth", "label": "/auth/*" },
+    { "id": "console-dashboard", "from": "console", "to": "dashboard", "label": "/dashboard" },
+    { "id": "console-workspace", "from": "console", "to": "workspace", "label": "/workspace" },
+    { "id": "console-cipseq", "from": "console", "to": "cipseq", "label": "/cipseq/*" },
+    { "id": "auth-redis", "from": "auth", "to": "redis", "label": "sessions" },
+    { "id": "auth-authdb", "from": "auth", "to": "authdb", "label": "users" },
+    { "id": "dashboard-authdb", "from": "dashboard", "to": "authdb", "label": "Prisma" },
+    { "id": "workspace-cipseqdb", "from": "workspace", "to": "cipseqdb", "label": "read" },
+    { "id": "cipseq-cipseqdb", "from": "cipseq", "to": "cipseqdb", "label": "commit + audit" },
+    { "id": "cipseq-kms", "from": "cipseq", "to": "kms", "label": "wrap keys", "variant": "security" },
+    { "id": "device-listener", "from": "device", "to": "listener", "label": "mTLS, pinned", "variant": "emphasis" },
+    { "id": "listener-redis", "from": "listener", "to": "redis", "label": "IP limit", "variant": "dashed" },
+    { "id": "listener-guard", "from": "listener", "to": "guard", "label": "client cert", "variant": "security" },
+    { "id": "guard-register", "from": "guard", "to": "register", "label": "session" },
+    { "id": "guard-crypto", "from": "guard", "to": "crypto" },
+    { "id": "guard-certs", "from": "guard", "to": "certs" },
+    { "id": "register-cipseqdb", "from": "register", "to": "cipseqdb", "label": "pending device" },
+    { "id": "crypto-cipseqdb", "from": "crypto", "to": "cipseqdb", "label": "envelope" },
+    { "id": "certs-cipseqdb", "from": "certs", "to": "cipseqdb", "label": "2 tx + lock" },
+    { "id": "certs-kms", "from": "certs", "to": "kms", "label": "sign CSR", "variant": "security" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Two apps, one process", "items": ["Console app on PORT behind Traefik", "Engine app on :3443, published directly", "Engine TLS is checked before either port opens"] },
+    { "dot": "rose", "title": "Device identity", "items": ["Only from the TLS socket, never headers", "socket.authorized + database check every request", "495 = re-enrol, 403 = policy"] },
+    { "dot": "emerald", "title": "Writes", "items": ["KMS call first, outside any transaction", "Then change + audit in one CipSeq transaction", "Per-device advisory lock on status and certificates"] },
+    { "dot": "amber", "title": "Not drawn", "items": ["HealthModule: /health, /ready checks both DBs, Redis, KMS", "Per-device limit (Redis) in DeviceCertificateGuard", "Session check on engine routes uses Better Auth"] }
+  ]
+}
