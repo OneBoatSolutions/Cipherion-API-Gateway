@@ -108,6 +108,25 @@ describe('envSchema REDIS_URL', () => {
   });
 });
 
+describe('envSchema DATABASE_CA_CERT', () => {
+  const redis = { REDIS_URL: 'redis://localhost:6379' };
+
+  it('is optional', () => {
+    const { error, value } = validate(redis);
+    expect(error).toBeUndefined();
+    expect(value.DATABASE_CA_CERT).toBeUndefined();
+  });
+
+  it('accepts a path', () => {
+    const { error, value } = validate({
+      ...redis,
+      DATABASE_CA_CERT: '/certs/database-ca.pem',
+    });
+    expect(error).toBeUndefined();
+    expect(value.DATABASE_CA_CERT).toBe('/certs/database-ca.pem');
+  });
+});
+
 describe('envSchema REDIS_CA_CERT', () => {
   const REDIS_CA_CERT = '/home/you/.cipherion/redis-tls/ca.crt';
 

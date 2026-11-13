@@ -2,6 +2,7 @@ import '../config/env.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { PrismaClient } from '../generated/prisma/client.js';
+import { databasePoolConfig } from './database-tls.js';
 import { watchDatabase } from './database-watch.js';
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -13,7 +14,7 @@ if (!databaseUrl) {
 // The gateway owns the pool so it can watch its connection. A dead database
 // fails a new connection within 2 s instead of hanging the request.
 export const pool = new Pool({
-  connectionString: databaseUrl,
+  ...databasePoolConfig(databaseUrl),
   connectionTimeoutMillis: 2000,
 });
 

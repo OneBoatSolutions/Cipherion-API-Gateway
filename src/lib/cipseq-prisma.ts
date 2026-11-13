@@ -2,6 +2,7 @@ import '../config/env.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { PrismaClient } from '../generated/cipseq/client.js';
+import { databasePoolConfig } from './database-tls.js';
 import { watchDatabase } from './database-watch.js';
 
 // Client for the CipSeq database (prisma/cipseq/schema.prisma). It is separate
@@ -14,7 +15,7 @@ if (!databaseUrl) {
 
 // Owned and watched like the auth database's pool in lib/prisma.ts.
 export const cipseqPool = new Pool({
-  connectionString: databaseUrl,
+  ...databasePoolConfig(databaseUrl),
   connectionTimeoutMillis: 2000,
 });
 
