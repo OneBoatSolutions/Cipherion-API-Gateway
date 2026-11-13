@@ -39,10 +39,31 @@ locally.
 | --- | --- | --- |
 | `NODE_ENV` | `development` | `development`, `test` or `production`. Production also hides the API docs and turns on secure cookies |
 | `PORT` | `3000` | Console port: dashboard, auth and CipSeq routes. Behind Traefik in production |
+| `DATABASE_CA_CERT` | – | PEM file of CAs to trust for both databases' TLS certificates, when a private CA signed them. See [Private CAs](#private-cas-for-the-databases-and-redis) |
+| `REDIS_CA_CERT` | – | The same for Redis, `rediss://` only. Can point at the same file |
 | `EMAIL_USER`, `EMAIL_PASS` | – | SMTP login, both or neither. Leave out for Mailpit. `EMAIL_PASS` is **secret** |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | – | Google sign-in, on when both are set. Redirect URI: `<BETTER_AUTH_URL>/api/v1/auth/callback/google` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | – | GitHub sign-in, on when both are set. Redirect URI: `<BETTER_AUTH_URL>/api/v1/auth/callback/github` |
 | `OBSERVE_APP_KEY`, `OBSERVE_APP_SECRET` | – | NestJS Observe telemetry. Without them, nothing is sent |
+
+## Private CAs for the databases and Redis
+
+A database or Redis whose certificate a **private** CA signed (self-hosted, or a platform such as Coolify, which has its own CA) isn't trusted by default, and
+the gateway fails at start-up with `unable to verify the first certificate` or `SELF_SIGNED_CERT_IN_CHAIN`. Give it the CA, as a file:
+
+```
+DATABASE_CA_CERT=/certs/database-ca.pem
+REDIS_CA_CERT=/certs/database-ca.pem
+```
+
+- The files are not tied to a host. Moving to another host or provider changes the **file**, never the code: put that provider's CA in the file, or unset
+  the setting when a public CA signs the certificate (most managed databases, which also publish a CA bundle if they don't).
+- The file may hold **several** CAs. Before a CA expires, add the new one **next to** the old one, restart, and remove the old one later. Check when one ends with
+  `openssl x509 -enddate -noout -in <file>` (for a bundle, run it on each certificate).
+- The certificate and its host name are always verified. The URL's host must be a name in the database's certificate.
+- While `DATABASE_CA_CERT` is set, the `sslmode` in the URL is ignored. Leave it out, or use `sslmode=disable` to turn TLS off for a database on a trusted private network.
+- `NODE_EXTRA_CA_CERTS` also works for the databases, but it trusts the CA for every connection the process makes. Prefer these settings.
+- Migrations (`npm run db:deploy`) are run by Prisma's own tool, which reads the URL's `sslmode` and not these settings.
 
 ## Engine listener (port 3443)
 

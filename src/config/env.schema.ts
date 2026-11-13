@@ -96,6 +96,10 @@ export const envSchema = Joi.object({
       .uri({ scheme: ['redis', 'rediss'] })
       .required(),
   }),
+  // A PEM file of CAs to trust for both databases' TLS certificates, for a
+  // Postgres signed by a private CA (self-hosted, or a platform's own CA). May
+  // hold several CAs, for rotation. Not needed when a public CA signed it.
+  DATABASE_CA_CERT: Joi.string().optional(),
   // A PEM CA to trust for Redis's TLS certificate, for a self-signed one such
   // as the local docker Redis. Not needed when a public CA signed it. Only
   // meaningful with rediss://.
