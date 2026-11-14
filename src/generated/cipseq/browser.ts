@@ -102,3 +102,8 @@ export type AuditEvent = Prisma.AuditEventModel
  * 
  */
 export type EnvelopeDelivery = Prisma.EnvelopeDeliveryModel
+/**
+ * Model MasterMetricsSnapshot
+ * 
+ */
+export type MasterMetricsSnapshot = Prisma.MasterMetricsSnapshotModel
