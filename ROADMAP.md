@@ -36,6 +36,7 @@
 - [x] Change password signs out every other session and emails the owner
 - [x] Google and GitHub sign-in (optional; only joins verified accounts)
 - [x] Branded verification, reset and password changed emails
+- [x] Google and GitHub sign-in for the CipSeQ desktop agent (loopback redirect, PKCE-bound one-time code)
 - [ ] Change email address, verifying the new one first (Better Auth's `/change-email` is off; the README no longer claims it works)
 - [ ] Delete account: password and an email link, end every session; in CipSeq remove group memberships, revoke devices and certificates, cancel invitations and approvals, stop jobs; keep audit events under the old id; decide what happens to projects the user is admin of (refuse until handed over, or delete them), which probably needs project admin handover first. Write an `account.deleted` audit row, which the master metrics count
 - [ ] Add the hosted frontend's origin to `AUTH_TRUSTED_ORIGINS` once it's deployed
