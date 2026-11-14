@@ -108,7 +108,11 @@ export class MasterMetricsPeriods {
 }
 
 export class MasterMetricsResponse {
-  @ApiProperty({ example: '2026-11-12T10:15:00.000Z' })
+  @ApiProperty({
+    description:
+      'When the snapshot was taken: just after 00:00, 06:00, 12:00 or 18:00 UTC, or at the last restart',
+    example: '2026-11-12T06:00:05.000Z',
+  })
   generatedAt!: Date;
 
   @ApiProperty({ type: MasterMetricsPeriods })

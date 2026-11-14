@@ -9,6 +9,7 @@ import { configureApp } from './../src/app.setup.js';
 import { FREE_PLAN_DEFAULTS } from './../src/config/free-plan.js';
 import { resetMasterCache } from './../src/cipseq/plan-limits.js';
 import { cipseqPrisma } from './../src/lib/cipseq-prisma.js';
+import { refreshMasterMetrics } from './../src/master/master-metrics-snapshot.js';
 import { deleteTestUser } from './helpers/delete-test-user.js';
 import { type SignedInUser, signUpVerified } from './helpers/users.js';
 
@@ -327,6 +328,9 @@ describe('Free-plan limits and the master account (e2e)', () => {
     });
 
     it('reads the platform metrics, which count what was just created', async () => {
+      // The endpoint serves the snapshot, so take one now instead of waiting
+      // for the next 6-hour boundary.
+      const snapshot = await refreshMasterMetrics();
       const response = await call(master, 'GET', '/master/metrics');
       expect(response.statusCode, response.body).toBe(200);
       type Counts = Record<string, number>;
@@ -340,7 +344,7 @@ describe('Free-plan limits and the master account (e2e)', () => {
         generatedAt: string;
         periods: Record<string, Period>;
       }>();
-      expect(new Date(generatedAt).getTime()).not.toBeNaN();
+      expect(generatedAt).toBe(snapshot.generatedAt.toISOString());
       expect(Object.keys(periods)).toEqual(['today', 'week', 'month', 'year']);
 
       const metrics = [

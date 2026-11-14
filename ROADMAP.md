@@ -55,7 +55,8 @@
 - [x] Free-plan limits until there's billing (1 project, 2 groups per project, 3 people per group, 1 device, 500 encryptions and 500 decryptions a month), each set in the environment, with usage in `/workspace`
 - [x] Master accounts (`MASTER_EMAILS`) without limits, and platform metrics for them (`GET /api/v1/master/metrics`) in 6-hour, daily, weekly and monthly buckets
 - [ ] Billing/subscription (provider not chosen; tables live in the CipSeq database). Refuse to start a subscription until the account type is set, and collect the tax id and country with the provider. Replace the free-plan environment variables with per-tier limits
-- [ ] An "all time" period for the master metrics, and daily totals once the raw counts get slow
+- [x] Master metrics served from a snapshot refreshed every 6 hours (00:00, 06:00, 12:00, 18:00 UTC), so the endpoint answers at once
+- [ ] An "all time" period for the master metrics, and daily totals so each 6-hour refresh stays fast as the data grows
 - [ ] A way to change the master list without a restart, if it changes often
 - [ ] A support or admin tool to change an account type (today it's changed by hand in the database)
 

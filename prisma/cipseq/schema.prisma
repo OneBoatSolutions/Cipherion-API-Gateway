@@ -467,3 +467,16 @@ model EnvelopeDelivery {
   @@index([createdAt])
   @@map("envelopeDelivery")
 }
+
+// The latest GET /master/metrics response, computed in the background at
+// 00:00, 06:00, 12:00 and 18:00 UTC (src/master/master-metrics-snapshot.ts).
+// One row, id "master", overwritten each time. Counts only, no user data.
+model MasterMetricsSnapshot {
+  id          String   @id
+  generatedAt DateTime
+  // MasterMetricsResponse.periods, with dates as ISO strings.
+  periods     Json
+  updatedAt   DateTime @updatedAt
+
+  @@map("masterMetricsSnapshot")
+}
