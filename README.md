@@ -441,6 +441,10 @@ Better Auth is mounted at `/api/v1/auth/*`. Sessions are returned as cookies, an
 | `POST` | `/api/v1/auth/change-password` | Signed in: `currentPassword`, `newPassword`. Always signs out every other session, keeps this one with a fresh cookie, and emails the owner |
 | `POST` | `/api/v1/auth/sign-in/social` | `provider` (`google` or `github`), `callbackURL`, optional `errorCallbackURL`. Returns `{ url }` for the browser; `404` if that provider isn't configured |
 | `GET` | `/api/v1/auth/callback/:provider` | Where Google or GitHub send the user back. Sets the session cookie and redirects to `callbackURL`. `504` after 10 seconds |
+| `GET` | `/api/v1/auth/desktop/start` | Opened by the CipSeQ desktop agent in the browser: `provider`, `port` (1024–65535), `state`, `challenge` (S256), `challenge_method=S256`. Keeps the flow in Redis for 10 minutes and redirects to `/desktop/begin`. A malformed link or an unconfigured provider answers a `400` page; 20 starts per minute per IP |
+| `GET` | `/api/v1/auth/desktop/begin` | `flow`. On `SOCIAL_REDIRECT_BASE_URL` (else `BETTER_AUTH_URL`): sets the OAuth state cookie and redirects to Google or GitHub. Once per flow |
+| `GET` | `/api/v1/auth/desktop/finish` | Where the provider sign-in ends. Takes the flow once, makes a one-time code for a session newer than the flow, clears the browser's session cookie, and redirects to `http://127.0.0.1:<port>/callback?code=…&state=…` (or `error=…`) |
+| `POST` | `/api/v1/auth/one-time-token/verify` | The agent redeems the code: `token`, `verifier` (PKCE). Returns `{ session, user }` and the signed token in `set-auth-token`. Each code works once, for 3 minutes, only with its verifier; 10 per minute per IP. Codes can't be made over HTTP (`/one-time-token/generate` answers `400`) |
 | `GET` | `/api/v1/auth/get-session` | Current user and session, or `null` |
 | `POST` | `/api/v1/auth/sign-out` | End the current session |
 
@@ -455,6 +459,7 @@ Better Auth is mounted at `/api/v1/auth/*`. Sessions are returned as cookies, an
 - Google or GitHub sign-in joins an existing account only if its email is verified. Otherwise it fails with `account_not_linked`, and the user verifies first (by signing in with the password, or with a reset).
 - Someone who registered with Google or GitHub has no password, so change password answers `400` `CREDENTIAL_ACCOUNT_NOT_FOUND`. A password reset sets one.
 - Signing up with an email that already has an account answers like a new sign-up, creates nothing and changes nothing.
+- Desktop agent sign-in (OAuth for native apps, RFC 8252, with PKCE): the code reaches the agent through the browser, so it's bound to the agent's PKCE challenge and stored only as a keyed hash; a code read from the browser history can't be redeemed. Google and GitHub need no extra redirect URI for it: the provider still returns to `/api/v1/auth/callback/<provider>`. See `src/auth/desktop-sign-in.ts`.
 - Emails are queued and sent in the background, so no request waits on the mail server, and a failure is only logged.
 
 **Email locally:** [Mailpit](https://mailpit.axllent.org) catches every email, with an inbox at http://localhost:8025 and no login:

@@ -3,13 +3,17 @@ import { apiDocsEnabled, trustedOrigins } from './config/env.js';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
-import { bearer, emailOTP, openAPI } from 'better-auth/plugins';
+import { bearer, emailOTP, oneTimeToken, openAPI } from 'better-auth/plugins';
 import {
   CODE_LIFETIME_MINUTES,
   passwordChangedEmail,
   passwordResetCodeEmail,
   verificationCodeEmail,
 } from './auth/emails.js';
+import {
+  CODE_TTL_MINUTES,
+  codeMatchesVerifier,
+} from './auth/desktop-sign-in.js';
 import { socialProviders } from './auth/social-providers.js';
 import { mailer } from './lib/mailer.js';
 import { prisma } from './lib/prisma.js';
@@ -72,7 +76,9 @@ export const DISABLED_AUTH_PATHS = [
 ];
 
 const hashCode = (otp: string): string =>
-  createHmac('sha256', authSecret).update(`email-otp:${otp}`).digest('base64url');
+  createHmac('sha256', authSecret)
+    .update(`email-otp:${otp}`)
+    .digest('base64url');
 
 // Sends the code, never awaited by the request. The plugin calls this only for
 // a registered address; the lookup gets the name and the id for the log.
@@ -127,6 +133,18 @@ const beforeAuth = createAuthMiddleware(async (ctx) => {
     throw new APIError('BAD_REQUEST', {
       message: 'type must be "email-verification"',
     });
+  }
+
+  // The desktop agent's code is redeemed only with the verifier of the flow that
+  // made it (PKCE, see auth/desktop-sign-in.ts). The verifier is checked here and
+  // left out of the body the plugin sees.
+  if (ctx.path === '/one-time-token/verify') {
+    const token = typeof body?.token === 'string' ? body.token : '';
+    const verifier = typeof body?.verifier === 'string' ? body.verifier : '';
+    if (!(await codeMatchesVerifier(token, verifier))) {
+      throw new APIError('BAD_REQUEST', { message: 'Invalid token' });
+    }
+    return { context: { body: { token } } };
   }
 
   // A password change always signs out every other session, whatever the
@@ -245,6 +263,8 @@ export const auth = betterAuth({
       // Guessing: each code also allows only 3 wrong tries, then it's deleted.
       '/email-otp/verify-email': { window: 60, max: 5 },
       '/email-otp/reset-password': { window: 60, max: 5 },
+      // The desktop agent's sign-in code: one try each, and few per minute.
+      '/one-time-token/verify': { window: 60, max: 10 },
     },
   },
 
@@ -280,6 +300,14 @@ export const auth = betterAuth({
       // A code never creates an account.
       disableSignUp: true,
       sendVerificationOTP: sendCodeEmail,
+    }),
+    // Hands a Google or GitHub session to the desktop agent (auth/desktop-sign-in.ts).
+    // Codes are made only by the gateway (never over HTTP), stored hashed, and
+    // redeemed with the agent's PKCE verifier (beforeAuth above).
+    oneTimeToken({
+      expiresIn: CODE_TTL_MINUTES,
+      storeToken: 'hashed',
+      disableClientRequest: true,
     }),
     // Feeds the auth endpoints into the gateway's Swagger document. Its schema
     // endpoint is public, so the plugin is left out entirely in production; its
