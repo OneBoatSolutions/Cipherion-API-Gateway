@@ -4,11 +4,11 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { APIError } from 'better-auth/api';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../auth.js';
+import { clientIp } from '../lib/client-ip.js';
 import { Public } from './decorators/public.decorator.js';
 import {
   BEGIN_PATH,
   bindCode,
-  clientIp,
   errorCode,
   FINISH_PATH,
   firstBegin,

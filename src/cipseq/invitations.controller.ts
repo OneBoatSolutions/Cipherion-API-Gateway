@@ -39,6 +39,7 @@ import {
   OPEN_INVITATION_STATUSES,
 } from './invitations.dto.js';
 import { assertPersonAllowed } from './plan-limits.js';
+import { RateLimit } from '../lib/rate-limit.guard.js';
 
 export const INVITATION_FIELDS = {
   id: true,
@@ -91,6 +92,7 @@ export class InvitationsController {
   @ApiConflictResponse({
     description: 'Already a member, or an invitation is already open',
   })
+  @RateLimit()
   @Post()
   async create(
     @CurrentUser() user: AuthUser,
@@ -159,6 +161,7 @@ export class InvitationsController {
   @ApiForbiddenResponse({ description: 'Not the project admin' })
   @ApiConflictResponse({ description: 'Already handled' })
   @HttpCode(200)
+  @RateLimit()
   @Post(':id/approve')
   approve(
     @CurrentUser() user: AuthUser,
@@ -182,6 +185,7 @@ export class InvitationsController {
   @ApiForbiddenResponse({ description: 'Not the project admin' })
   @ApiConflictResponse({ description: 'Already handled' })
   @HttpCode(200)
+  @RateLimit()
   @Post(':id/reject')
   reject(
     @CurrentUser() user: AuthUser,
@@ -207,6 +211,7 @@ export class InvitationsController {
   })
   @ApiConflictResponse({ description: 'Already handled' })
   @HttpCode(200)
+  @RateLimit()
   @Post(':id/cancel')
   async cancel(
     @CurrentUser() user: AuthUser,

@@ -28,6 +28,7 @@ import {
   toProfileResponse,
   UpdateProfileDto,
 } from './profile.dto.js';
+import { RateLimit } from '../lib/rate-limit.guard.js';
 
 const PROFILE_FIELDS = {
   id: true,
@@ -58,6 +59,7 @@ export class ProfileController {
   @ApiOperation({ summary: "Update the signed-in user's name" })
   @ApiOkResponse({ type: ProfileWithAccountResponse })
   @ApiBadRequestResponse({ description: 'Validation failed' })
+  @RateLimit()
   @Patch()
   async update(
     @Req() request: FastifyRequest,

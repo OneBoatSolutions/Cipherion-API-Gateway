@@ -55,6 +55,7 @@ import {
 } from './revocations.js';
 import { assertProjectAllowed } from './plan-limits.js';
 import { withPassphraseAttempt } from './with-passphrase-attempt.js';
+import { RateLimit } from '../lib/rate-limit.guard.js';
 
 const FIRST_KEY_VERSION = 1;
 
@@ -74,6 +75,7 @@ export class ProjectsController {
   })
   @ApiServiceUnavailableResponse({ description: 'The KMS is unavailable' })
   @ApiBadGatewayResponse({ description: 'The KMS call failed' })
+  @RateLimit()
   @Post()
   async create(
     @CurrentUser() user: AuthUser,
@@ -121,6 +123,7 @@ export class ProjectsController {
   @ApiServiceUnavailableResponse({ description: 'The KMS is unavailable' })
   @ApiBadGatewayResponse({ description: 'The KMS call failed' })
   @HttpCode(200)
+  @RateLimit()
   @Post(':id/initialize')
   async initialize(
     @CurrentUser() user: AuthUser,
@@ -200,6 +203,7 @@ export class ProjectsController {
   @ApiServiceUnavailableResponse({ description: 'A dependency is unavailable' })
   @ApiBadGatewayResponse({ description: 'The KMS call failed' })
   @HttpCode(200)
+  @RateLimit()
   @Post(':id/rotate')
   async rotate(
     @CurrentUser() user: AuthUser,
@@ -322,6 +326,7 @@ export class ProjectsController {
   @ApiBadRequestResponse({ description: 'Validation failed' })
   @ApiForbiddenResponse({ description: 'Not the project admin' })
   @ApiNotFoundResponse({ description: 'No such project' })
+  @RateLimit()
   @Patch(':id')
   async update(
     @CurrentUser() user: AuthUser,
@@ -358,6 +363,7 @@ export class ProjectsController {
   @ApiForbiddenResponse({ description: 'Not the project admin' })
   @ApiNotFoundResponse({ description: 'No such project' })
   @HttpCode(204)
+  @RateLimit()
   @Delete(':id')
   async delete(
     @CurrentUser() user: AuthUser,
@@ -382,6 +388,7 @@ export class ProjectsController {
   @ApiForbiddenResponse({ description: 'Not the project admin' })
   @ApiNotFoundResponse({ description: 'No such project or member' })
   @HttpCode(204)
+  @RateLimit()
   @Post(':id/members/:userId/revoke')
   async revokeMember(
     @CurrentUser() user: AuthUser,

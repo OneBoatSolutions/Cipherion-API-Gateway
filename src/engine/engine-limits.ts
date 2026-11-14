@@ -1,6 +1,6 @@
 import { HttpException, ServiceUnavailableException } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { redis } from '../lib/redis.js';
+import { countInWindow } from '../lib/rate-limit.js';
 
 // One device can't queue up on its own lock and hold every pooled connection. This
 // is on top of the attempt limits in the database, which only count once a request
@@ -12,19 +12,7 @@ const DEVICE_REQUESTS_PER_MINUTE = 60;
 const IP_REQUESTS_PER_MINUTE = 600;
 const WINDOW_SECONDS = 60;
 
-// The first increment starts the window, atomically, so a crash can't leave a
-// counter that never expires.
-const COUNT_SCRIPT = `
-local count = redis.call('INCR', KEYS[1])
-if count == 1 then
-  redis.call('EXPIRE', KEYS[1], ARGV[1])
-end
-return count
-`;
-
-async function countRequest(key: string): Promise<number> {
-  return Number(await redis.eval(COUNT_SCRIPT, 1, key, WINDOW_SECONDS));
-}
+const countRequest = (key: string) => countInWindow(key, WINDOW_SECONDS);
 
 // Fails closed, like the session store: without Redis the limit can't be enforced.
 export async function assertDeviceRequestLimit(
