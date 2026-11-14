@@ -33,6 +33,7 @@ import {
   toInvitationResponse,
 } from './invitations.controller.js';
 import { assertPersonAllowed } from './plan-limits.js';
+import { RateLimit } from '../lib/rate-limit.guard.js';
 
 // Someone else's invitation answers 404, so its id reveals nothing. Emails aren't
 // verified yet: accepting gives no keys, because those need an approved device.
@@ -77,6 +78,7 @@ export class InvitationResponsesController {
     description: 'PLAN_LIMIT_REACHED: the group is full on the free plan',
   })
   @HttpCode(200)
+  @RateLimit()
   @Post(':id/accept')
   async accept(
     @CurrentUser() user: AuthUser,
@@ -137,6 +139,7 @@ export class InvitationResponsesController {
   @ApiOkResponse({ type: InvitationResponse })
   @ApiConflictResponse({ description: 'Already handled' })
   @HttpCode(200)
+  @RateLimit()
   @Post(':id/decline')
   async decline(
     @CurrentUser() user: AuthUser,

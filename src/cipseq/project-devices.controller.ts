@@ -48,6 +48,7 @@ import {
   deviceFromProjectWrites,
 } from './revocations.js';
 import { withPassphraseAttempt } from './with-passphrase-attempt.js';
+import { RateLimit } from '../lib/rate-limit.guard.js';
 
 function pendingInProject(projectId: string, deviceId: string) {
   return {
@@ -76,6 +77,7 @@ export class ProjectDevicesController {
   @ApiServiceUnavailableResponse({ description: 'A dependency is unavailable' })
   @ApiBadGatewayResponse({ description: 'The KMS call failed' })
   @HttpCode(200)
+  @RateLimit()
   @Post('devices/:deviceId/approve')
   async approve(
     @CurrentUser() user: AuthUser,
@@ -146,6 +148,7 @@ export class ProjectDevicesController {
   @ApiForbiddenResponse({ description: 'Not the project admin' })
   @ApiNotFoundResponse({ description: 'No such project or waiting device' })
   @HttpCode(204)
+  @RateLimit()
   @Post('devices/:deviceId/reject')
   async reject(
     @CurrentUser() user: AuthUser,
@@ -175,6 +178,7 @@ export class ProjectDevicesController {
   @ApiForbiddenResponse({ description: 'Not the project admin' })
   @ApiNotFoundResponse({ description: 'No such project or device' })
   @HttpCode(204)
+  @RateLimit()
   @Post('devices/:deviceId/revoke')
   async revokeFromProject(
     @CurrentUser() user: AuthUser,
@@ -209,6 +213,7 @@ export class ProjectDevicesController {
   @ApiForbiddenResponse({ description: 'Not a group admin' })
   @ApiNotFoundResponse({ description: 'No such project, group or device' })
   @HttpCode(204)
+  @RateLimit()
   @Post('groups/:groupId/devices/:deviceId/revoke')
   async revokeFromGroup(
     @CurrentUser() user: AuthUser,
@@ -259,6 +264,7 @@ export class ProjectDevicesController {
   @ApiServiceUnavailableResponse({ description: 'A dependency is unavailable' })
   @ApiBadGatewayResponse({ description: 'The KMS call failed' })
   @HttpCode(200)
+  @RateLimit()
   @Post('groups/:groupId/envelopes/renew')
   async renew(
     @CurrentUser() user: AuthUser,
@@ -304,6 +310,7 @@ export class ProjectDevicesController {
   @ApiForbiddenResponse({ description: 'Not the project admin' })
   @ApiNotFoundResponse({ description: 'No such project or group' })
   @HttpCode(204)
+  @RateLimit()
   @Post('groups/:groupId/envelopes/completed/dismiss')
   async dismissCompleted(
     @CurrentUser() user: AuthUser,

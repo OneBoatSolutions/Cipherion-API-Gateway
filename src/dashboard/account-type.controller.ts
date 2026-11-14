@@ -17,6 +17,7 @@ import {
   setAccountType,
 } from './account-type.js';
 import { AccountTypeResponse, SetAccountTypeDto } from './account-type.dto.js';
+import { RateLimit } from '../lib/rate-limit.guard.js';
 
 const SET_ONCE = [
   'The type is set once. Sending the same type again succeeds, and for a',
@@ -105,6 +106,7 @@ export class AccountTypeController {
     },
   })
   @HttpCode(200)
+  @RateLimit()
   @Put()
   set(
     @CurrentUser() user: AuthUser,
