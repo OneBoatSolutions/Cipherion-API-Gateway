@@ -10,6 +10,7 @@ import { engineEnabled, startEngineApp } from './engine/engine-app.js';
 import { engineTlsOptions } from './engine/engine-tls.js';
 import { startConnectionEvents } from './lib/connection-events.js';
 import { mailer } from './lib/mailer.js';
+import { scheduleMasterMetricsRefresh } from './master/master-metrics-snapshot.js';
 import { checkDependenciesOnStartup } from './lib/startup-checks.js';
 import { setupOpenApi } from './openapi.js';
 
@@ -45,6 +46,8 @@ async function bootstrap() {
     await startEngineApp(engineTls);
   }
   watchCertificateExpiry();
+  // Now if the stored snapshot is old, then at 00:00, 06:00, 12:00 and 18:00 UTC.
+  scheduleMasterMetricsRefresh();
 }
 
 await bootstrap();

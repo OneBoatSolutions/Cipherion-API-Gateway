@@ -819,7 +819,7 @@ The monthly limits add `resetsAt`, the 1st of next month in UTC. `limit` is one 
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/api/v1/master/metrics` | Platform-wide counts for `today`, `week`, `month` and `year`, each with totals and a time series. Anyone else gets `404` |
+| `GET` | `/api/v1/master/metrics` | Platform-wide counts for `today`, `week`, `month` and `year`, each with totals and a time series. Served from a snapshot taken at 00:00, 06:00, 12:00 and 18:00 UTC (and at startup if the stored one is older), so the counts are at most 6 hours old; `generatedAt` says when. Anyone else gets `404` |
 
 ```json
 {

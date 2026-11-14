@@ -413,7 +413,8 @@ export const ModelName = {
   DeviceEnvelope: 'DeviceEnvelope',
   EnvelopeJob: 'EnvelopeJob',
   AuditEvent: 'AuditEvent',
-  EnvelopeDelivery: 'EnvelopeDelivery'
+  EnvelopeDelivery: 'EnvelopeDelivery',
+  MasterMetricsSnapshot: 'MasterMetricsSnapshot'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -429,7 +430,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "project" | "projectKeys" | "projectKeyVersion" | "group" | "groupKeys" | "groupKeyVersion" | "groupMember" | "groupInvitation" | "device" | "deviceCertificate" | "deviceCertificateAttempt" | "deviceCertificateNotice" | "groupDevice" | "deviceEnvelope" | "envelopeJob" | "auditEvent" | "envelopeDelivery"
+    modelProps: "project" | "projectKeys" | "projectKeyVersion" | "group" | "groupKeys" | "groupKeyVersion" | "groupMember" | "groupInvitation" | "device" | "deviceCertificate" | "deviceCertificateAttempt" | "deviceCertificateNotice" | "groupDevice" | "deviceEnvelope" | "envelopeJob" | "auditEvent" | "envelopeDelivery" | "masterMetricsSnapshot"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1691,6 +1692,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    MasterMetricsSnapshot: {
+      payload: Prisma.$MasterMetricsSnapshotPayload<ExtArgs>
+      fields: Prisma.MasterMetricsSnapshotFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.MasterMetricsSnapshotFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MasterMetricsSnapshotPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.MasterMetricsSnapshotFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MasterMetricsSnapshotPayload>
+        }
+        findFirst: {
+          args: Prisma.MasterMetricsSnapshotFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MasterMetricsSnapshotPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.MasterMetricsSnapshotFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MasterMetricsSnapshotPayload>
+        }
+        findMany: {
+          args: Prisma.MasterMetricsSnapshotFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MasterMetricsSnapshotPayload>[]
+        }
+        create: {
+          args: Prisma.MasterMetricsSnapshotCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MasterMetricsSnapshotPayload>
+        }
+        createMany: {
+          args: Prisma.MasterMetricsSnapshotCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.MasterMetricsSnapshotCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MasterMetricsSnapshotPayload>[]
+        }
+        delete: {
+          args: Prisma.MasterMetricsSnapshotDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MasterMetricsSnapshotPayload>
+        }
+        update: {
+          args: Prisma.MasterMetricsSnapshotUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MasterMetricsSnapshotPayload>
+        }
+        deleteMany: {
+          args: Prisma.MasterMetricsSnapshotDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.MasterMetricsSnapshotUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.MasterMetricsSnapshotUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MasterMetricsSnapshotPayload>[]
+        }
+        upsert: {
+          args: Prisma.MasterMetricsSnapshotUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MasterMetricsSnapshotPayload>
+        }
+        aggregate: {
+          args: Prisma.MasterMetricsSnapshotAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateMasterMetricsSnapshot>
+        }
+        groupBy: {
+          args: Prisma.MasterMetricsSnapshotGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MasterMetricsSnapshotGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.MasterMetricsSnapshotCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MasterMetricsSnapshotCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1974,6 +2049,16 @@ export const EnvelopeDeliveryScalarFieldEnum = {
 export type EnvelopeDeliveryScalarFieldEnum = (typeof EnvelopeDeliveryScalarFieldEnum)[keyof typeof EnvelopeDeliveryScalarFieldEnum]
 
 
+export const MasterMetricsSnapshotScalarFieldEnum = {
+  id: 'id',
+  generatedAt: 'generatedAt',
+  periods: 'periods',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MasterMetricsSnapshotScalarFieldEnum = (typeof MasterMetricsSnapshotScalarFieldEnum)[keyof typeof MasterMetricsSnapshotScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -1988,6 +2073,13 @@ export const NullableJsonNullValueInput = {
 } as const
 
 export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
+
+
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
 export const QueryMode = {
@@ -2440,6 +2532,7 @@ export type GlobalOmitConfig = {
   envelopeJob?: Prisma.EnvelopeJobOmit
   auditEvent?: Prisma.AuditEventOmit
   envelopeDelivery?: Prisma.EnvelopeDeliveryOmit
+  masterMetricsSnapshot?: Prisma.MasterMetricsSnapshotOmit
 }
 
 /* Types for Logging */
