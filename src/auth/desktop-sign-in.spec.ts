@@ -97,6 +97,14 @@ describe('codeMatchesVerifier', () => {
     await expect(codeMatchesVerifier(CODE, VERIFIER)).resolves.toBe(false);
   });
 
+  // Better Auth's codes use a-z, A-Z, 0-9, "-" and "_", so about 2 in 3 of
+  // them contain "-" or "_".
+  it('accepts a code that contains "-" and "_"', async () => {
+    const code = 'abc-def_ghijklmnopqrstuvwxyz0123';
+    await bindCode(code, CHALLENGE);
+    await expect(codeMatchesVerifier(code, VERIFIER)).resolves.toBe(true);
+  });
+
   it('refuses another verifier, and burns the code', async () => {
     await bindCode(CODE, CHALLENGE);
     await expect(codeMatchesVerifier(CODE, 'w'.repeat(43))).resolves.toBe(
