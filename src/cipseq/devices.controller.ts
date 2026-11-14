@@ -33,6 +33,7 @@ import {
   RegisterDeviceDto,
 } from './devices.dto.js';
 import { deviceEverywhereWrites } from './revocations.js';
+import { RateLimit } from '../lib/rate-limit.guard.js';
 
 async function findOwnActiveDevice(deviceId: string, userId: string) {
   const device = await cipseqPrisma.device.findFirst({
@@ -68,6 +69,7 @@ export class DevicesController {
     description:
       'PLAN_LIMIT_REACHED: the free plan allows no more active devices',
   })
+  @RateLimit()
   @Post()
   async register(
     @CurrentUser() user: AuthUser,
@@ -89,6 +91,7 @@ export class DevicesController {
     description: 'The device was revoked everywhere, or a request is open',
   })
   @HttpCode(200)
+  @RateLimit()
   @Post(':deviceId/groups/:groupId/request-approval')
   async requestApproval(
     @CurrentUser() user: AuthUser,
@@ -149,6 +152,7 @@ export class DevicesController {
   @ApiNoContentResponse({ description: 'Dismissed' })
   @ApiBadRequestResponse({ description: 'Invalid id' })
   @HttpCode(204)
+  @RateLimit()
   @Post('certificate-notices/:noticeId/dismiss')
   async dismissCertificateNotice(
     @CurrentUser() user: AuthUser,
@@ -178,6 +182,7 @@ export class DevicesController {
   @ApiNotFoundResponse({ description: 'Not your device' })
   @ApiConflictResponse({ description: 'Already revoked' })
   @HttpCode(204)
+  @RateLimit()
   @Post(':deviceId/revoke')
   async revoke(
     @CurrentUser() user: AuthUser,

@@ -36,7 +36,7 @@ The console app sits behind Traefik on `PORT`. The [engine listener](#engine-lis
 **Responsibilities**
 
 - **Authentication**: email/password sign-in through [Better Auth](https://better-auth.com). Sessions last a fixed 1 day and are never extended, because a stolen session can enrol a device certificate for as long as it lasts. The engine sends the session as `Authorization: Bearer <token>`, using the signed token from the `set-auth-token` header at sign-in. User, session and account ids are UUID v4. They are cached in Redis and also stored in PostgreSQL, which stays the source of truth: if a Redis entry is missing, the session is read from the database. Signing out removes the Redis entry, so a revoked session stops working immediately. If Redis is unreachable, auth fails closed: auth and protected routes answer `503 Service Unavailable` within about 2 seconds, and work again as soon as Redis is back.
-- **Rate limiting**: 100 requests per 60-second window, counted atomically in Redis so the limit holds across instances.
+- **Rate limiting**: counted atomically in Redis so the limits hold across instances. See [Rate limits](#rate-limits).
 - **Request validation**: a global `ValidationPipe` that removes unknown fields, rejects requests containing them, and returns errors in one consistent format.
 - **Configuration safety**: environment variables are checked with Joi when the app starts, so a misconfigured deployment fails immediately.
 - **Observability**: tracing, metrics, logs and error tracking through [NestJS Observe](https://observe.nestjs.com).
@@ -889,6 +889,20 @@ export class ExampleController {
   }
 }
 ```
+
+## Rate limits
+
+Every limit is counted in Redis, per 60-second window. Over a limit, the answer is `429` with `Retry-After` (seconds) and `{ "statusCode": 429, "message": "Too many requests. Please wait a moment and try again." }`. Clients should wait that long and retry.
+
+| Limit | Applies to | Keyed by | While Redis is down |
+| --- | --- | --- | --- |
+| 600 requests a minute | every route except `/api/v1/auth/*`, `/health`, `/ready` and `OPTIONS` preflights, before the session lookup | client IP | not enforced (logged once) |
+| 60 writes a minute | every `POST`, `PATCH`, `PUT` and `DELETE` in CipSeq and the Dashboard (`@RateLimit()`) | signed-in user | `503` |
+| 100 requests a minute, tighter for email codes, the desktop code and desktop starts | `/api/v1/auth/*` (Better Auth's limiter, plus the desktop starts) | client IP | `503` |
+
+The client IP is a single-value `X-Forwarded-For` that is an IP address, otherwise the socket's address (`clientIp()`, `src/lib/client-ip.ts`). In production, Coolify's Traefik replaces any `X-Forwarded-For` a client sends with the client's real address. The engine listener (port 3443) has its own limits and uses the socket address.
+
+Master accounts aren't exempt: these limits protect the service, not the plan. Add `@RateLimit()` to every new write route.
 
 ## Validation error format
 

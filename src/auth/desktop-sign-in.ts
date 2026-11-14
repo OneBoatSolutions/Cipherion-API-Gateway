@@ -4,8 +4,8 @@ import {
   randomBytes,
   timingSafeEqual,
 } from 'node:crypto';
-import { isIP } from 'node:net';
 import { APIError } from 'better-auth/api';
+import { countInWindow } from '../lib/rate-limit.js';
 import { redis } from '../lib/redis.js';
 
 // Google and GitHub sign-in for the CipSeQ desktop agent (a native app, RFC 8252).
@@ -120,30 +120,11 @@ const storeUnavailable = (cause: unknown): never => {
 // Each start writes to Redis, so starts are limited per IP. Better Auth's own
 // limiter only covers its routes.
 export const STARTS_PER_MINUTE = 20;
-const COUNT_SCRIPT = `
-local count = redis.call('INCR', KEYS[1])
-if count == 1 then
-  redis.call('EXPIRE', KEYS[1], ARGV[1])
-end
-return count
-`;
 
-// The client's address, by Better Auth's rule for its own limiter: a single-value
-// X-Forwarded-For that is an IP address (what a proxy in front sets), otherwise
-// the socket's. Keyed by this, users behind one load balancer don't share a limit.
-export function clientIp(
-  forwardedFor: string | string[] | undefined,
-  socketIp: string,
-): string {
-  const value = typeof forwardedFor === 'string' ? forwardedFor.trim() : '';
-  return value && !value.includes(',') && isIP(value) ? value : socketIp;
-}
-
+// `ip` comes from clientIp() (src/lib/client-ip.ts).
 export async function tooManyStarts(ip: string): Promise<boolean> {
-  const count = Number(
-    await redis
-      .eval(COUNT_SCRIPT, 1, `desktop-signin:starts:${ip}`, 60)
-      .catch(storeUnavailable),
+  const count = await countInWindow(`desktop-signin:starts:${ip}`, 60).catch(
+    storeUnavailable,
   );
   return count > STARTS_PER_MINUTE;
 }

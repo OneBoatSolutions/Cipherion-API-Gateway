@@ -55,6 +55,7 @@ import { assertGroupAllowed } from './plan-limits.js';
 import { findProjectForAdmin } from './project-access.js';
 import { assertMayRevokeMember, memberFromGroupWrites } from './revocations.js';
 import { withPassphraseAttempt } from './with-passphrase-attempt.js';
+import { RateLimit } from '../lib/rate-limit.guard.js';
 
 const FIRST_GDEK_VERSION = 1;
 const ROTATION_INTERVAL_MS = 48 * 60 * 60 * 1000;
@@ -79,6 +80,7 @@ export class GroupsController {
   @ApiTooManyRequestsResponse({ description: 'Too many incorrect passphrases' })
   @ApiServiceUnavailableResponse({ description: 'A dependency is unavailable' })
   @ApiBadGatewayResponse({ description: 'The KMS call failed' })
+  @RateLimit()
   @Post()
   async create(
     @CurrentUser() user: AuthUser,
@@ -140,6 +142,7 @@ export class GroupsController {
   @ApiBadRequestResponse({ description: 'Validation failed' })
   @ApiForbiddenResponse({ description: 'Not the project admin' })
   @ApiNotFoundResponse({ description: 'No such project or group' })
+  @RateLimit()
   @Patch(':groupId')
   async update(
     @CurrentUser() user: AuthUser,
@@ -177,6 +180,7 @@ export class GroupsController {
   @ApiForbiddenResponse({ description: 'Not the project admin' })
   @ApiNotFoundResponse({ description: 'No such project or group' })
   @HttpCode(204)
+  @RateLimit()
   @Delete(':groupId')
   async delete(
     @CurrentUser() user: AuthUser,
@@ -212,6 +216,7 @@ export class GroupsController {
   @ApiServiceUnavailableResponse({ description: 'A dependency is unavailable' })
   @ApiBadGatewayResponse({ description: 'The KMS call failed' })
   @HttpCode(200)
+  @RateLimit()
   @Post(':groupId/rotate')
   async rotate(
     @CurrentUser() user: AuthUser,
@@ -295,6 +300,7 @@ export class GroupsController {
   @ApiForbiddenResponse({ description: 'Not the project admin' })
   @ApiNotFoundResponse({ description: 'No such project, group or member' })
   @ApiConflictResponse({ description: 'The group already has an acting admin' })
+  @RateLimit()
   @Patch(':groupId/members/:userId')
   async updateMember(
     @CurrentUser() user: AuthUser,
@@ -346,6 +352,7 @@ export class GroupsController {
   @ApiForbiddenResponse({ description: 'Not a group admin' })
   @ApiNotFoundResponse({ description: 'No such project, group or member' })
   @HttpCode(200)
+  @RateLimit()
   @Post(':groupId/members/:userId/revoke')
   async revoke(
     @CurrentUser() user: AuthUser,

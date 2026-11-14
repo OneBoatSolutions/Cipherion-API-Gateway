@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { trustedOrigins } from './config/env.js';
+import { ipRateLimitHook } from './lib/ip-rate-limit.js';
 
 export const API_PREFIX = 'api/v1';
 
@@ -22,6 +23,9 @@ export function configureApp(app: NestFastifyApplication): void {
   });
 
   app.useGlobalPipes(validationPipe());
+
+  // Per client IP, before any route or session lookup (src/lib/ip-rate-limit.ts).
+  app.getHttpAdapter().getInstance().addHook('onRequest', ipRateLimitHook);
 }
 
 // Shared with the engine listener, which doesn't use the rest of configureApp().

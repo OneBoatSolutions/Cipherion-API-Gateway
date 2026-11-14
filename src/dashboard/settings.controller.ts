@@ -17,6 +17,7 @@ import {
   SettingsWithAccountResponse,
   UpdateSettingsDto,
 } from './settings.dto.js';
+import { RateLimit } from '../lib/rate-limit.guard.js';
 
 @ApiTags('dashboard')
 @ApiCookieAuth()
@@ -48,6 +49,7 @@ export class SettingsController {
   @ApiOperation({ summary: "Update the signed-in user's settings" })
   @ApiOkResponse({ type: SettingsWithAccountResponse })
   @ApiBadRequestResponse({ description: 'Validation failed' })
+  @RateLimit()
   @Patch()
   async update(
     @CurrentUser() user: AuthUser,

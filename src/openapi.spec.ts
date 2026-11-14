@@ -11,6 +11,8 @@ vi.mock('./config/env.js', () => ({
   trustedOrigins: [],
 }));
 vi.mock('./auth.js', () => ({ auth: { api: { generateOpenAPISchema } } }));
+// app.setup.js (for API_PREFIX) loads the rate-limit hook, which needs Redis.
+vi.mock('./lib/redis.js', () => ({ redis: {} }));
 
 describe('setupOpenApi', () => {
   it('serves no docs when they are disabled (production)', async () => {

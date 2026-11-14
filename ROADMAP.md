@@ -40,8 +40,9 @@
 - [ ] Change email address, verifying the new one first (Better Auth's `/change-email` is off; the README no longer claims it works)
 - [ ] Delete account: password and an email link, end every session; in CipSeq remove group memberships, revoke devices and certificates, cancel invitations and approvals, stop jobs; keep audit events under the old id; decide what happens to projects the user is admin of (refuse until handed over, or delete them), which probably needs project admin handover first. Write an `account.deleted` audit row, which the master metrics count
 - [ ] Add the hosted frontend's origin to `AUTH_TRUSTED_ORIGINS` once it's deployed
-- [ ] Rate limiting against floods from many IPs needs a proxy or WAF in front of the gateway (Better Auth's limits are per IP)
-- [ ] Forward the client IP to Better Auth so rate limits are per client, not one shared bucket (decide which proxy headers to trust)
+- [x] Per-client rate limits behind the proxy: Traefik passes the real client IP and drops forged `X-Forwarded-For` (tested against production), and every limit reads it through `clientIp()`
+- [ ] Rate limiting against floods from many IPs needs a proxy or WAF in front of the gateway (every limit here is per IP or per user)
+- [ ] `TRUSTED_PROXIES` (trust `X-Forwarded-For` only from named proxies, such as `coolify-proxy`), if an untrusted app ever shares the proxy's Docker network: today any container on the `coolify` network could reach port 3000 and forge the header
 - [ ] API keys for service-to-service and programmatic clients
 - [ ] Separate `.env.test` database for e2e tests (they currently use the `.env.dev` database)
 
@@ -110,7 +111,8 @@
 - [ ] Test a KMS that stops during a job against the real KMS (only unit tested)
 - [x] Per-project limit on passphrase attempts in Redis (the KMS is stateless and can't count them)
 - [ ] Test rotation against a KMS that accepts the connection and never answers (a closed port is tested; the deadline and its `503` mapping are only unit tested)
-- [ ] Rate-limit project, group, invitation and device routes (group writes also call the KMS, and invitations and devices can be created without limit)
+- [x] Rate-limit project, group, invitation and device routes: 60 writes a minute per user on every CipSeq and Dashboard write, and 600 requests a minute per IP on all non-auth routes
+- [ ] Tighter per-route buckets if needed (for example invitations or device registrations per hour); `@RateLimit()` takes a bucket name for this
 - [ ] Paginate the project list
 - [ ] Revisit `/workspace` for very large accounts (return `memberCount` and load members per group; a 10,000-member group with one device each took 262–558 ms locally and returned 2.8 MB)
 - [ ] Audit reads and failed attempts

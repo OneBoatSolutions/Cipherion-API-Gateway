@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { APIError } from 'better-auth/api';
 import {
   bindCode,
-  clientIp,
   codeMatchesVerifier,
   errorCode,
   firstBegin,
@@ -171,16 +170,6 @@ describe('flows', () => {
     redisMock.eval.mockResolvedValueOnce(20).mockResolvedValueOnce(21);
     await expect(tooManyStarts('1.2.3.4')).resolves.toBe(false);
     await expect(tooManyStarts('1.2.3.4')).resolves.toBe(true);
-  });
-});
-
-describe('clientIp', () => {
-  it('takes a single forwarded address, like Better Auth', () => {
-    expect(clientIp('203.0.113.7', '10.0.0.1')).toBe('203.0.113.7');
-    expect(clientIp('203.0.113.7, 198.51.100.1', '10.0.0.1')).toBe('10.0.0.1');
-    expect(clientIp('not-an-ip', '10.0.0.1')).toBe('10.0.0.1');
-    expect(clientIp(undefined, '10.0.0.1')).toBe('10.0.0.1');
-    expect(clientIp(['a', 'b'], '10.0.0.1')).toBe('10.0.0.1');
   });
 });
 
