@@ -38,8 +38,9 @@ export const BEGIN_PATH = '/api/v1/auth/desktop/begin';
 const RANDOM_43 = /^[A-Za-z0-9_-]{43}$/;
 // RFC 7636: 43 to 128 unreserved characters.
 const VERIFIER = /^[A-Za-z0-9._~-]{43,128}$/;
-// Better Auth's one-time tokens are 32 letters and digits.
-const CODE = /^[A-Za-z0-9]{16,128}$/;
+// Better Auth's one-time tokens are 32 characters of a-z, A-Z, 0-9, "-" and "_"
+// (its generateRandomString). All are safe in the loopback URL's query.
+const CODE = /^[A-Za-z0-9_-]{16,128}$/;
 // Better Auth's error codes, passed on to the agent only when they look like one.
 const ERROR_CODE = /^[a-z0-9_]{1,64}$/;
 
